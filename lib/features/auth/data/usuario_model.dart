@@ -63,7 +63,6 @@ class UsuarioModel {
   final PerfilUsuario perfil;
   final StatusUsuario status;
   final String? ministerioId;
-  final String? celulaId;
   final QualificacaoUsuario? qualificacao;
   final String? aprovadoPor;
   final DateTime? aprovadoEm;
@@ -81,7 +80,6 @@ class UsuarioModel {
     required this.perfil,
     required this.status,
     this.ministerioId,
-    this.celulaId,
     this.qualificacao,
     this.aprovadoPor,
     this.aprovadoEm,
@@ -119,7 +117,6 @@ class UsuarioModel {
       perfil: PerfilUsuarioExt.fromString(map['perfil'] as String? ?? 'membro'),
       status: StatusUsuarioExt.fromString(map['status'] as String? ?? 'pendente'),
       ministerioId: map['ministerio_id'] as String?,
-      celulaId: map['celula_id'] as String?,
       qualificacao: map['qualificacao'] != null
           ? QualificacaoUsuario.fromMap(
               Map<String, dynamic>.from(map['qualificacao'] as Map))
@@ -145,7 +142,6 @@ class UsuarioModel {
         'perfil': perfil.valor,
         'status': status.valor,
         'ministerio_id': ministerioId,
-        'celula_id': celulaId,
         'qualificacao': qualificacao?.toMap(),
         'aprovado_por': aprovadoPor,
         'aprovado_em':
@@ -160,7 +156,6 @@ class UsuarioModel {
     PerfilUsuario? perfil,
     StatusUsuario? status,
     String? ministerioId,
-    String? celulaId,
   }) {
     return UsuarioModel(
       uid: uid,
@@ -175,7 +170,6 @@ class UsuarioModel {
       perfil: perfil ?? this.perfil,
       status: status ?? this.status,
       ministerioId: ministerioId ?? this.ministerioId,
-      celulaId: celulaId ?? this.celulaId,
       qualificacao: qualificacao,
       aprovadoPor: aprovadoPor,
       aprovadoEm: aprovadoEm,

@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/providers/auth_controller.dart';
 import '../mock_data.dart';
 import '../profile_photo_notifier.dart';
 import '../visual_router.dart';
@@ -451,25 +453,47 @@ class _ProfileOptionRow extends StatelessWidget {
   }
 }
 
-class _LogoutButton extends StatelessWidget {
+class _LogoutButton extends ConsumerWidget {
   const _LogoutButton({required this.scale});
 
   final double scale;
 
+  Future<void> _confirmarESair(BuildContext context, WidgetRef ref) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sair da conta'),
+        content: const Text('Deseja realmente encerrar sua sessão?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sair'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    await ref.read(authActionsProvider).sair();
+    // O RootGate reage ao logout e mostra a tela pública; voltamos à raiz.
+    if (context.mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Material(
       color: PerfilScreen._logoutBackground,
       borderRadius: BorderRadius.circular(12 * scale),
       child: InkWell(
         borderRadius: BorderRadius.circular(12 * scale),
-        onTap: () {
-          Navigator.pushNamedAndRemoveUntil(
-            context,
-            VisualRoutes.login,
-            (route) => false,
-          );
-        },
+        onTap: () => _confirmarESair(context, ref),
         child: Container(
           height: 52 * scale,
           alignment: Alignment.center,

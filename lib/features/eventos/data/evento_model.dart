@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum TipoEvento { culto, celula, eventoEspecial }
+enum TipoEvento { culto, ministerio, eventoEspecial }
 
 class EventoModel {
   final String id;

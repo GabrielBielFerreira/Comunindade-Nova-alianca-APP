@@ -1,20 +1,25 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/data/auth_error.dart';
+import '../../features/auth/providers/auth_controller.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 
-class CadastroScreen extends StatefulWidget {
+class CadastroScreen extends ConsumerStatefulWidget {
   const CadastroScreen({super.key});
 
   @override
-  State<CadastroScreen> createState() => _CadastroScreenState();
+  ConsumerState<CadastroScreen> createState() => _CadastroScreenState();
 }
 
-class _CadastroScreenState extends State<CadastroScreen> {
+class _CadastroScreenState extends ConsumerState<CadastroScreen> {
+  bool _loading = false;
+
   final _nomeController = TextEditingController();
   final _emailController = TextEditingController();
   final _telefoneController = TextEditingController();
@@ -44,8 +49,9 @@ class _CadastroScreenState extends State<CadastroScreen> {
       );
   }
 
-  void _submitCadastro() {
+  Future<void> _submitCadastro() async {
     FocusScope.of(context).unfocus();
+    if (_loading) return;
 
     if (_nomeController.text.trim().isEmpty) {
       _showMessage('Informe seu nome completo');
@@ -67,7 +73,24 @@ class _CadastroScreenState extends State<CadastroScreen> {
       return;
     }
 
-    _showMessage('Cadastro visual validado com sucesso');
+    setState(() => _loading = true);
+    try {
+      await ref.read(authActionsProvider).cadastrar(
+            nome: _nomeController.text.trim(),
+            email: _emailController.text.trim().toLowerCase(),
+            telefone: _telefoneController.text.trim(),
+            senha: _senhaController.text,
+          );
+      // Conta criada com status pendente. O RootGate mostrará a tela de
+      // "Aguardando aprovação"; voltamos à raiz para revelá-la.
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(mensagemErroAuth(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -258,7 +281,7 @@ class _CadastroCard extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.pushNamedAndRemoveUntil(
               context,
-              VisualRoutes.entraconta,
+              VisualRoutes.login,
               (route) => false,
             ),
             child: Text.rich(

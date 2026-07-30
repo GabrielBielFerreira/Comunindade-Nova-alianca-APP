@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum PrioridadeAviso { normal, urgente }
 
-enum SegmentoAviso { todos, jovens, lideres, ministerio, celula }
+// Segmentação por ministério/grupo — a Comunidade Nova Aliança não usa células.
+enum SegmentoAviso { todos, jovens, lideres, ministerio }
 
 class AvisoModel {
   final String id;

@@ -17,7 +17,7 @@ class IgrejaInfo {
   static const List<Map<String, String>> cultos = [
     {'dia': 'domingo', 'horario': '19h', 'nome': 'Culto Principal'},
     {'dia': 'terca', 'horario': '19h', 'nome': 'Cristo no Lar'},
-    {'dia': 'quinta', 'horario': '19h', 'nome': 'Células de Jovens'},
+    {'dia': 'quinta', 'horario': '19h', 'nome': 'Culto de Jovens'},
   ];
 
   static const List<String> ministerios = [

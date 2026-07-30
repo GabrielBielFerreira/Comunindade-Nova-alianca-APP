@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/data/auth_error.dart';
+import '../../features/auth/providers/auth_controller.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 
-class RecuperarSenhaScreen extends StatefulWidget {
+class RecuperarSenhaScreen extends ConsumerStatefulWidget {
   const RecuperarSenhaScreen({super.key});
 
   @override
-  State<RecuperarSenhaScreen> createState() => _RecuperarSenhaScreenState();
+  ConsumerState<RecuperarSenhaScreen> createState() =>
+      _RecuperarSenhaScreenState();
 }
 
-class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
+class _RecuperarSenhaScreenState extends ConsumerState<RecuperarSenhaScreen> {
   final _emailController = TextEditingController();
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -34,15 +39,28 @@ class _RecuperarSenhaScreenState extends State<RecuperarSenhaScreen> {
       );
   }
 
-  void _submitRecovery() {
+  Future<void> _submitRecovery() async {
     FocusScope.of(context).unfocus();
+    if (_loading) return;
 
     if (!_isValidEmail(_emailController.text)) {
       _showMessage('Informe um e-mail válido');
       return;
     }
 
-    Navigator.pushNamed(context, VisualRoutes.emailEnviado);
+    setState(() => _loading = true);
+    try {
+      await ref
+          .read(authActionsProvider)
+          .recuperarSenha(_emailController.text.trim().toLowerCase());
+      if (mounted) {
+        Navigator.pushNamed(context, VisualRoutes.emailEnviado);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(mensagemErroAuth(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -146,7 +164,7 @@ class _RecoveryCard extends StatelessWidget {
           GestureDetector(
             onTap: () => Navigator.pushNamedAndRemoveUntil(
               context,
-              VisualRoutes.entraconta,
+              VisualRoutes.login,
               (route) => false,
             ),
             child: Row(

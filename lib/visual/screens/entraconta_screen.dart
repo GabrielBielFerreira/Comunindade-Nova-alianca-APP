@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/data/auth_error.dart';
+import '../../features/auth/providers/auth_controller.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 
-class EntracontaScreen extends StatefulWidget {
+class EntracontaScreen extends ConsumerStatefulWidget {
   const EntracontaScreen({super.key});
 
   static const _primary = Color(0xFF7A0022);
@@ -18,25 +21,15 @@ class EntracontaScreen extends StatefulWidget {
   static const _headerSubtitle = Color(0xFFFFB2B7);
 
   @override
-  State<EntracontaScreen> createState() => _EntracontaScreenState();
+  ConsumerState<EntracontaScreen> createState() => _EntracontaScreenState();
 }
 
-class _EntracontaScreenState extends State<EntracontaScreen> {
-  static const _demoMemberEmail = 'membro@cna.app';
-  static const _demoLeaderEmail = 'lider@cna.app';
-  static const _demoPassword = '123456';
-
+class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  int _nextDemoAccountIndex = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _applyDemoAccount(isLeader: false);
-  }
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -53,8 +46,9 @@ class _EntracontaScreenState extends State<EntracontaScreen> {
       );
   }
 
-  void _submitLogin() {
+  Future<void> _submitLogin() async {
     FocusScope.of(context).unfocus();
+    if (_loading) return;
 
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
@@ -69,35 +63,20 @@ class _EntracontaScreenState extends State<EntracontaScreen> {
       return;
     }
 
-    if (email == _demoMemberEmail && password == _demoPassword) {
-      Navigator.pushNamed(context, VisualRoutes.homeMember);
-      return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(authActionsProvider).login(email: email, senha: password);
+      // Sucesso: o RootGate reage à mudança de sessão e mostra a Home correta.
+      // Como o login pode ter sido alcançado via push (Welcome → login),
+      // voltamos à raiz para revelar a tela decidida pelo gate.
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(mensagemErroAuth(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-
-    if (email == _demoLeaderEmail && password == _demoPassword) {
-      Navigator.pushNamed(context, VisualRoutes.homeLeader);
-      return;
-    }
-
-    _showMessage('Conta de teste não encontrada');
-  }
-
-  void _applyDemoAccount({required bool isLeader}) {
-    _emailController.text = isLeader ? _demoLeaderEmail : _demoMemberEmail;
-    _passwordController.text = _demoPassword;
-  }
-
-  void _fillNextDemoAccount() {
-    final isLeader = _nextDemoAccountIndex.isOdd;
-
-    setState(() {
-      _applyDemoAccount(isLeader: isLeader);
-      _nextDemoAccountIndex++;
-    });
-
-    _showMessage(
-      isLeader ? 'Conta de líder preenchida' : 'Conta de membro preenchida',
-    );
   }
 
   @override
@@ -131,7 +110,6 @@ class _EntracontaScreenState extends State<EntracontaScreen> {
                           _Header(
                             height: headerHeight,
                             scale: scale,
-                            onFillDemoAccount: _fillNextDemoAccount,
                           ),
                           _LoginCard(
                             scale: scale,
@@ -139,11 +117,11 @@ class _EntracontaScreenState extends State<EntracontaScreen> {
                             emailController: _emailController,
                             passwordController: _passwordController,
                             obscurePassword: _obscurePassword,
+                            loading: _loading,
                             onTogglePassword: () => setState(
                               () => _obscurePassword = !_obscurePassword,
                             ),
                             onSubmit: _submitLogin,
-                            onFillDemoAccount: _fillNextDemoAccount,
                           ),
                         ],
                       ),
@@ -163,12 +141,10 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.height,
     required this.scale,
-    required this.onFillDemoAccount,
   });
 
   final double height;
   final double scale;
-  final VoidCallback onFillDemoAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -184,33 +160,28 @@ class _Header extends StatelessWidget {
             child: Column(
               children: [
                 Center(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onFillDemoAccount,
-                    onLongPress: onFillDemoAccount,
-                    child: Container(
-                      width: 96 * scale,
-                      height: 96 * scale,
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.06),
-                            offset: Offset(0, 2 * scale),
-                            blurRadius: 2 * scale,
-                          ),
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.07),
-                            offset: Offset(0, 4 * scale),
-                            blurRadius: 3 * scale,
-                          ),
-                        ],
-                      ),
-                      child: Image.asset(
-                        EntracontaMockData.logoAsset,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, error, stackTrace) =>
-                            const SizedBox.shrink(),
-                      ),
+                  child: Container(
+                    width: 96 * scale,
+                    height: 96 * scale,
+                    decoration: BoxDecoration(
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.06),
+                          offset: Offset(0, 2 * scale),
+                          blurRadius: 2 * scale,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.07),
+                          offset: Offset(0, 4 * scale),
+                          blurRadius: 3 * scale,
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      EntracontaMockData.logoAsset,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, error, stackTrace) =>
+                          const SizedBox.shrink(),
                     ),
                   ),
                 ),
@@ -253,9 +224,9 @@ class _LoginCard extends StatelessWidget {
     required this.emailController,
     required this.passwordController,
     required this.obscurePassword,
+    required this.loading,
     required this.onTogglePassword,
     required this.onSubmit,
-    required this.onFillDemoAccount,
   });
 
   final double scale;
@@ -263,9 +234,9 @@ class _LoginCard extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final bool obscurePassword;
+  final bool loading;
   final VoidCallback onTogglePassword;
   final VoidCallback onSubmit;
-  final VoidCallback onFillDemoAccount;
 
   @override
   Widget build(BuildContext context) {
@@ -289,20 +260,15 @@ class _LoginCard extends StatelessWidget {
           SizedBox(
             height: 28 * scale,
             child: Center(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onFillDemoAccount,
-                onLongPress: onFillDemoAccount,
-                child: Text(
-                  EntracontaMockData.title,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.montserrat(
-                    fontSize: 24 * scale,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                    letterSpacing: -0.6 * scale,
-                    color: EntracontaScreen._text,
-                  ),
+              child: Text(
+                EntracontaMockData.title,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.montserrat(
+                  fontSize: 24 * scale,
+                  fontWeight: FontWeight.w700,
+                  height: 1.2,
+                  letterSpacing: -0.6 * scale,
+                  color: EntracontaScreen._text,
                 ),
               ),
             ),
@@ -329,7 +295,7 @@ class _LoginCard extends StatelessWidget {
             onFieldSubmitted: (_) => onSubmit(),
           ),
           SizedBox(height: 20 * scale),
-          _SubmitButton(scale: scale, onTap: onSubmit),
+          _SubmitButton(scale: scale, onTap: onSubmit, loading: loading),
           SizedBox(height: 16 * scale),
           GestureDetector(
             onTap: () =>
@@ -522,15 +488,20 @@ class _FormFieldBlock extends StatelessWidget {
 }
 
 class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.scale, required this.onTap});
+  const _SubmitButton({
+    required this.scale,
+    required this.onTap,
+    required this.loading,
+  });
 
   final double scale;
   final VoidCallback onTap;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: loading ? null : onTap,
       child: Container(
         height: 52 * scale,
         width: double.infinity,
@@ -546,16 +517,25 @@ class _SubmitButton extends StatelessWidget {
             ),
           ],
         ),
-        child: Text(
-          EntracontaMockData.submit,
-          style: GoogleFonts.inter(
-            fontSize: 14 * scale,
-            fontWeight: FontWeight.w700,
-            height: 20 / 14,
-            letterSpacing: 1.4 * scale,
-            color: Colors.white,
-          ),
-        ),
+        child: loading
+            ? SizedBox(
+                width: 22 * scale,
+                height: 22 * scale,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                EntracontaMockData.submit,
+                style: GoogleFonts.inter(
+                  fontSize: 14 * scale,
+                  fontWeight: FontWeight.w700,
+                  height: 20 / 14,
+                  letterSpacing: 1.4 * scale,
+                  color: Colors.white,
+                ),
+              ),
       ),
     );
   }

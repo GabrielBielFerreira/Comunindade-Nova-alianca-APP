@@ -26,7 +26,7 @@ class AppStrings {
 
   // Seções
   static const String eventos = 'Eventos';
-  static const String minhasCelula = 'Minha Célula';
+  static const String programacao = 'Programação';
   static const String contribuir = 'CONTRIBUIR';
   static const String campanhas = 'Campanhas';
   static const String sobre = 'Sobre a Igreja';

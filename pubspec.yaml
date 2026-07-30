@@ -1,5 +1,5 @@
 name: nova_alianca_app
-description: "Nova AlianÃ§a App â€” plataforma digital da Comunidade Nova AlianÃ§a (Olinda-PE)"
+description: "Nova Aliança App — plataforma digital da Comunidade Nova Aliança (Olinda-PE)"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -22,7 +22,7 @@ dependencies:
   # Estado
   flutter_riverpod: ^2.5.1
 
-  # NavegaÃ§Ã£o
+  # Navegação
   go_router: ^14.2.7
 
   # UI
@@ -32,7 +32,7 @@ dependencies:
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
 
-  # HTTP / API BÃ­blica
+  # HTTP / API Bíblica
   http: ^1.2.2
   dio: ^5.7.0
 
