@@ -13,10 +13,20 @@ final muralPedidosProvider =
   return ref.watch(oracaoRepositoryProvider).streamMural();
 });
 
-/// Pedidos do usuário logado (inclui privados).
+/// Pedidos do usuário logado (inclui privados e não aprovados).
 final meusPedidosProvider =
     StreamProvider.autoDispose<List<PedidoOracaoModel>>((ref) {
   final uid = ref.watch(authStateProvider).valueOrNull?.uid;
   if (uid == null) return Stream.value(const <PedidoOracaoModel>[]);
   return ref.watch(oracaoRepositoryProvider).streamMeusPedidos(uid);
+});
+
+/// Pedidos públicos aguardando moderação (liderança).
+final pedidosModeracaoProvider =
+    StreamProvider.autoDispose<List<PedidoOracaoModel>>((ref) {
+  return ref.watch(oracaoRepositoryProvider).streamPendentesModeracao();
+});
+
+final pedidosModeracaoCountProvider = Provider.autoDispose<int>((ref) {
+  return ref.watch(pedidosModeracaoProvider).valueOrNull?.length ?? 0;
 });

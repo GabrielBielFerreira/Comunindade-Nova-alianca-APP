@@ -83,7 +83,8 @@ service cloud.firestore {
     match /pedidos_oracao/{pedidoId} {
       allow read: if isLider()
                   || (isSignedIn() && resource.data.autor_id == request.auth.uid)
-                  || (isAprovado() && resource.data.privado == false);
+                  || (isAprovado() && resource.data.privado == false
+                      && resource.data.aprovado == true);
       allow create: if isAprovado()
                     && request.resource.data.autor_id == request.auth.uid;
       allow update: if isLider()

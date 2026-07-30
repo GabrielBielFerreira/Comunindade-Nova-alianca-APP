@@ -15,6 +15,9 @@ class PedidoOracaoModel {
   final bool privado;
   final bool anonimo;
   final bool urgente;
+
+  /// Moderação: pedidos públicos só aparecem na Comunidade após `aprovado`.
+  final bool aprovado;
   final StatusPedidoOracao status;
   final DateTime criadoEm;
   final String? testemunho;
@@ -29,6 +32,7 @@ class PedidoOracaoModel {
     required this.privado,
     this.anonimo = false,
     this.urgente = false,
+    this.aprovado = false,
     required this.status,
     required this.criadoEm,
     this.testemunho,
@@ -51,6 +55,7 @@ class PedidoOracaoModel {
       privado: data['privado'] as bool? ?? false,
       anonimo: data['anonimo'] as bool? ?? false,
       urgente: data['urgente'] as bool? ?? false,
+      aprovado: data['aprovado'] as bool? ?? false,
       status: StatusPedidoOracao.values.firstWhere(
         (e) => e.name == (data['status'] as String? ?? 'recebido'),
         orElse: () => StatusPedidoOracao.recebido,
@@ -71,6 +76,7 @@ class PedidoOracaoModel {
         'privado': privado,
         'anonimo': anonimo,
         'urgente': urgente,
+        'aprovado': aprovado,
         'status': status.name,
         'criado_em': Timestamp.fromDate(criadoEm),
         'testemunho': testemunho,

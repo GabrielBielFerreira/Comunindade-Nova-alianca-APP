@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../features/admin/providers/aprovacoes_providers.dart';
+import '../../features/oracao/providers/oracao_providers.dart';
 import '../visual_router.dart';
 import '../widgets/leader_bottom_navigation.dart';
 
@@ -161,6 +162,14 @@ class _GestaoContent extends StatelessWidget {
         _ManagementPanelCard(scale: scale),
         SizedBox(height: 22 * scale),
         _CadastrosPendentesCard(scale: scale),
+        SizedBox(height: 22 * scale),
+        _AcaoGestaoCard(
+          scale: scale,
+          icone: Icons.reviews_outlined,
+          titulo: 'Pedidos de oração a aprovar',
+          countProvider: pedidosModeracaoCountProvider,
+          rota: VisualRoutes.moderacaoOracao,
+        ),
         SizedBox(height: 22 * scale),
         _ExclusiveNotice(scale: scale),
         SizedBox(height: 24 * scale),
@@ -410,6 +419,78 @@ class _CadastrosPendentesCard extends ConsumerWidget {
                     color: GestaoEntryScreen._primary,
                     borderRadius: BorderRadius.circular(999),
                   ),
+                  child: Text('$count',
+                      style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13 * scale)),
+                ),
+              SizedBox(width: 8 * scale),
+              Icon(Icons.chevron_right,
+                  color: GestaoEntryScreen._muted, size: 22 * scale),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AcaoGestaoCard extends ConsumerWidget {
+  const _AcaoGestaoCard({
+    required this.scale,
+    required this.icone,
+    required this.titulo,
+    required this.countProvider,
+    required this.rota,
+  });
+
+  final double scale;
+  final IconData icone;
+  final String titulo;
+  final ProviderListenable<int> countProvider;
+  final String rota;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(countProvider);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18 * scale),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18 * scale),
+        onTap: () => Navigator.pushNamed(context, rota),
+        child: Container(
+          padding: EdgeInsets.all(18 * scale),
+          decoration: BoxDecoration(
+            border: Border.all(color: GestaoEntryScreen._line),
+            borderRadius: BorderRadius.circular(18 * scale),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48 * scale,
+                height: 48 * scale,
+                decoration: const BoxDecoration(
+                    color: GestaoEntryScreen._soft, shape: BoxShape.circle),
+                child: Icon(icone,
+                    color: GestaoEntryScreen._primary, size: 26 * scale),
+              ),
+              SizedBox(width: 14 * scale),
+              Expanded(
+                child: Text(titulo,
+                    style: GoogleFonts.montserrat(
+                        fontSize: 15 * scale,
+                        fontWeight: FontWeight.w700,
+                        color: GestaoEntryScreen._title)),
+              ),
+              if (count > 0)
+                Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 10 * scale, vertical: 4 * scale),
+                  decoration: BoxDecoration(
+                      color: GestaoEntryScreen._primary,
+                      borderRadius: BorderRadius.circular(999)),
                   child: Text('$count',
                       style: GoogleFonts.inter(
                           color: Colors.white,

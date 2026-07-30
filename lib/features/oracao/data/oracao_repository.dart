@@ -12,15 +12,38 @@ class OracaoRepository {
 
   final CollectionReference<Map<String, dynamic>> _col;
 
-  /// Mural da comunidade: pedidos públicos (não privados), mais recentes antes.
+  /// Mural da comunidade: pedidos públicos JÁ APROVADOS, mais recentes antes.
+  /// Os filtros de igualdade vão no servidor (exigência das regras: membro
+  /// comum só pode ler públicos aprovados).
   Stream<List<PedidoOracaoModel>> streamMural() {
-    return _col.where('privado', isEqualTo: false).snapshots().map((snap) {
-      final lista =
-          snap.docs.map(PedidoOracaoModel.fromFirestore).toList();
+    return _col
+        .where('privado', isEqualTo: false)
+        .where('aprovado', isEqualTo: true)
+        .snapshots()
+        .map((snap) {
+      final lista = snap.docs.map(PedidoOracaoModel.fromFirestore).toList();
       lista.sort((a, b) => b.criadoEm.compareTo(a.criadoEm));
       return lista;
     });
   }
+
+  /// Pedidos públicos aguardando moderação (para liderança).
+  Stream<List<PedidoOracaoModel>> streamPendentesModeracao() {
+    return _col
+        .where('privado', isEqualTo: false)
+        .where('aprovado', isEqualTo: false)
+        .snapshots()
+        .map((snap) {
+      final lista = snap.docs.map(PedidoOracaoModel.fromFirestore).toList();
+      lista.sort((a, b) => a.criadoEm.compareTo(b.criadoEm));
+      return lista;
+    });
+  }
+
+  Future<void> aprovarPedido(String id) =>
+      _col.doc(id).update({'aprovado': true});
+
+  Future<void> recusarPedido(String id) => _col.doc(id).delete();
 
   /// Pedidos do próprio usuário (inclui privados).
   Stream<List<PedidoOracaoModel>> streamMeusPedidos(String uid) {
