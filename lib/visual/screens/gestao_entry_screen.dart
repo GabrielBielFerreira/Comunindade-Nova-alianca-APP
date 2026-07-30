@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_config.dart';
 import '../widgets/leader_bottom_navigation.dart';
 
 class GestaoEntryScreen extends StatelessWidget {
@@ -213,6 +215,44 @@ class _ManagementPanelCard extends StatelessWidget {
 
   final double scale;
 
+  void _mostrarErro(BuildContext context, String mensagem) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(mensagem),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  Future<void> _abrirPainel(BuildContext context) async {
+    final url = AppConfig.gestaoPanelUrl.trim();
+    final uri = Uri.tryParse(url);
+
+    if (url.isEmpty ||
+        uri == null ||
+        !uri.hasScheme ||
+        !(uri.isScheme('http') || uri.isScheme('https'))) {
+      _mostrarErro(
+        context,
+        'Painel de gestão ainda não configurado. Fale com a administração.',
+      );
+      return;
+    }
+
+    try {
+      final abriu = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!abriu && context.mounted) {
+        _mostrarErro(context, 'Não foi possível abrir o painel de gestão.');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _mostrarErro(context, 'Painel indisponível no momento. Tente novamente.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -268,16 +308,7 @@ class _ManagementPanelCard extends StatelessWidget {
           ),
           SizedBox(height: 20 * scale),
           GestureDetector(
-            onTap: () {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text('Painel externo será conectado futuramente'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-            },
+            onTap: () => _abrirPainel(context),
             child: Container(
               height: 56 * scale,
               width: double.infinity,

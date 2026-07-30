@@ -1,0 +1,15 @@
+# Assinatura de RELEASE — copie para android/key.properties e preencha.
+# NUNCA versione o key.properties nem o arquivo .jks (já ignorados no .gitignore).
+#
+# Gerar o keystore (uma única vez):
+#   keytool -genkey -v -keystore nova-alianca-release.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias nova-alianca
+#
+# Guarde o .jks e as senhas em local seguro — sem eles não é possível publicar
+# atualizações do app na Play Store.
+
+storePassword=SUA_SENHA_DO_KEYSTORE
+keyPassword=SUA_SENHA_DA_CHAVE
+keyAlias=nova-alianca
+# Caminho absoluto ou relativo à pasta android/ para o arquivo .jks:
+storeFile=nova-alianca-release.jks

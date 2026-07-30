@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// Regras de segurança do Firestore — Comunidade Nova Aliança.
+// Princípios: negar por padrão; leitura apenas autenticada; escrita de conteúdo
+// (avisos/eventos/campanhas) restrita à liderança; dados pessoais e financeiros
+// acessíveis apenas ao próprio dono (ou liderança quando fizer sentido).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function meu() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function isAprovado() {
+      return isSignedIn() && meu().status == 'aprovado';
+    }
+
+    function isLider() {
+      return isAprovado() && meu().perfil in ['pastor', 'diacono', 'lider'];
+    }
+
+    function isDono(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── Usuários ───────────────────────────────────────────────────────
+    // Cada um lê/edita o próprio perfil. Liderança pode ler todos (aprovação).
+    // Campos sensíveis de controle (perfil, status, aprovado_por) NÃO podem ser
+    // alterados pelo próprio usuário — apenas pela liderança/painel.
+    match /usuarios/{uid} {
+      allow read: if isDono(uid) || isLider();
+      allow create: if isDono(uid)
+                    && request.resource.data.status == 'pendente'
+                    && request.resource.data.perfil == 'membro';
+      allow update: if isLider()
+                    || (isDono(uid)
+                        && request.resource.data.perfil == resource.data.perfil
+                        && request.resource.data.status == resource.data.status);
+      allow delete: if false; // exclusão de conta tratada via função/servidor
+    }
+
+    // ── Tokens de dispositivo (FCM) ────────────────────────────────────
+    match /tokens_dispositivo/{tokenId} {
+      allow read: if isSignedIn() && resource.data.perfil_id == request.auth.uid;
+      allow create: if isSignedIn()
+                    && request.resource.data.perfil_id == request.auth.uid;
+      allow update, delete: if isSignedIn()
+                    && resource.data.perfil_id == request.auth.uid;
+    }
+
+    // ── Avisos ─────────────────────────────────────────────────────────
+    match /avisos/{avisoId} {
+      allow read: if isAprovado();
+      allow write: if isLider();
+    }
+
+    // ── Eventos / Programação ──────────────────────────────────────────
+    match /eventos/{eventoId} {
+      allow read: if isAprovado();
+      allow write: if isLider();
+
+      // Confirmações de presença: o próprio usuário gerencia a sua.
+      match /participantes/{uid} {
+        allow read: if isAprovado();
+        allow write: if isDono(uid);
+      }
+    }
+
+    // ── Campanhas ──────────────────────────────────────────────────────
+    match /campanhas/{campanhaId} {
+      allow read: if isAprovado();
+      allow write: if isLider();
+    }
+
+    // ── Pedidos de oração ──────────────────────────────────────────────
+    // Pedidos privados só são visíveis ao dono e à liderança. Pedidos públicos
+    // (não privados e não anônimos-restritos) são visíveis a aprovados.
+    match /pedidos_oracao/{pedidoId} {
+      allow read: if isLider()
+                  || (isSignedIn() && resource.data.autor_id == request.auth.uid)
+                  || (isAprovado() && resource.data.privado == false);
+      allow create: if isAprovado()
+                    && request.resource.data.autor_id == request.auth.uid;
+      allow update: if isLider()
+                    || (isSignedIn() && resource.data.autor_id == request.auth.uid)
+                    // Reação "Estou orando": qualquer aprovado incrementa o contador,
+                    // sem alterar o conteúdo do pedido.
+                    || (isAprovado()
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['oram_count', 'oram_por']));
+      allow delete: if isLider()
+                    || (isSignedIn() && resource.data.autor_id == request.auth.uid);
+    }
+
+    // ── Transações / Contribuições ─────────────────────────────────────
+    // Escopo do usuário. A CONFIRMAÇÃO de pagamento é feita pelo servidor
+    // (Cloud Functions/webhook), nunca pelo cliente — por isso o cliente não
+    // pode definir/alterar o status para 'aprovado'.
+    match /transacoes/{txId} {
+      allow read: if isLider()
+                  || (isSignedIn() && resource.data.usuario_id == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.usuario_id == request.auth.uid
+                    && request.resource.data.status == 'pendente';
+      allow update, delete: if false; // somente servidor
+    }
+
+    // ── Igreja (dados institucionais) ──────────────────────────────────
+    match /igreja/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isLider();
+    }
+
+    // ── Ministérios ────────────────────────────────────────────────────
+    match /ministerios/{ministerioId} {
+      allow read: if isAprovado();
+      allow write: if isLider();
+    }
+
+    // ── Notificações pessoais ──────────────────────────────────────────
+    match /notificacoes/{notifId} {
+      allow read, update: if isSignedIn()
+                    && resource.data.destinatario_id == request.auth.uid;
+      allow create: if isLider();
+      allow delete: if isSignedIn()
+                    && resource.data.destinatario_id == request.auth.uid;
+    }
+  }
+}

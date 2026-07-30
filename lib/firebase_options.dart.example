@@ -1,0 +1,49 @@
+// EXEMPLO — NÃO É USADO EM BUILD.
+//
+// O arquivo real `lib/firebase_options.dart` é GERADO automaticamente por:
+//
+//     dart pub global activate flutterfire_cli
+//     flutterfire configure
+//
+// Ele contém as chaves públicas do projeto Firebase (apiKey, appId, etc.).
+// Essas chaves são identificadores públicos do app cliente — a segurança real
+// vem das Security Rules (firestore.rules / storage.rules) e do backend.
+//
+// Após gerar, em lib/main.dart:
+//   import 'firebase_options.dart';
+//   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+//
+// Estrutura gerada (ilustrativa):
+//
+// import 'package:firebase_core/firebase_core.dart';
+// import 'package:flutter/foundation.dart';
+//
+// class DefaultFirebaseOptions {
+//   static FirebaseOptions get currentPlatform {
+//     switch (defaultTargetPlatform) {
+//       case TargetPlatform.android:
+//         return android;
+//       case TargetPlatform.iOS:
+//         return ios;
+//       default:
+//         throw UnsupportedError('Plataforma não configurada.');
+//     }
+//   }
+//
+//   static const FirebaseOptions android = FirebaseOptions(
+//     apiKey: 'SUA_API_KEY',
+//     appId: 'SEU_APP_ID',
+//     messagingSenderId: 'SEU_SENDER_ID',
+//     projectId: 'SEU_PROJECT_ID',
+//     storageBucket: 'SEU_PROJECT_ID.appspot.com',
+//   );
+//
+//   static const FirebaseOptions ios = FirebaseOptions(
+//     apiKey: 'SUA_API_KEY',
+//     appId: 'SEU_APP_ID',
+//     messagingSenderId: 'SEU_SENDER_ID',
+//     projectId: 'SEU_PROJECT_ID',
+//     storageBucket: 'SEU_PROJECT_ID.appspot.com',
+//     iosBundleId: 'br.com.novaalianca.novaAliancaApp',
+//   );
+// }

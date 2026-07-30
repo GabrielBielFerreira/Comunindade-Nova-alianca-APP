@@ -1,0 +1,22 @@
+{
+  "_comentario": "EXEMPLO. Baixe o google-services.json REAL no Console do Firebase (Configurações do projeto > Seus apps > Android) e salve como android/app/google-services.json. Não versione o arquivo real.",
+  "project_info": {
+    "project_number": "SEU_PROJECT_NUMBER",
+    "project_id": "SEU_PROJECT_ID",
+    "storage_bucket": "SEU_PROJECT_ID.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "SEU_APP_ID",
+        "android_client_info": {
+          "package_name": "br.com.novaalianca.nova_alianca_app"
+        }
+      },
+      "api_key": [
+        { "current_key": "SUA_API_KEY" }
+      ]
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -43,3 +43,25 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ── Segredos e configuração privada (NUNCA versionar) ──────────────────
+# Firebase
+lib/firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+.firebase/
+
+# Assinatura Android
+android/key.properties
+**/*.jks
+**/*.keystore
+
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Mantém os arquivos de exemplo versionados
+!lib/firebase_options.dart.example
+!android/app/google-services.json.example
+!android/key.properties.example

@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Regras do Firebase Storage — Comunidade Nova Aliança.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImagem() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function tamanhoOk() {
+      return request.resource.size < 5 * 1024 * 1024; // 5 MB
+    }
+
+    // Foto de perfil: cada usuário gerencia a sua; leitura por autenticados.
+    match /perfil/{uid}/{arquivo} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
+                   && request.auth.uid == uid
+                   && isImagem()
+                   && tamanhoOk();
+    }
+
+    // Anexos de avisos/eventos: leitura por autenticados; escrita via painel/servidor.
+    match /avisos/{arquivo=**} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Bloqueia todo o resto por padrão.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

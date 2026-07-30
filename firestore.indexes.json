@@ -1,0 +1,53 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "avisos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "publicado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "eventos",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ativo", "order": "ASCENDING" },
+        { "fieldPath": "data_inicio", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pedidos_oracao",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "privado", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "transacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuario_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notificacoes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "destinatario_id", "order": "ASCENDING" },
+        { "fieldPath": "criado_em", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "tokens_dispositivo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "perfil_id", "order": "ASCENDING" },
+        { "fieldPath": "token", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
