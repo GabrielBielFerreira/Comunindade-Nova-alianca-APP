@@ -22,7 +22,6 @@ class PerfilScreen extends StatelessWidget {
   static const _primary = Color(0xFF7A0022);
   static const _topTitle = Color(0xFF510014);
   static const _title = Color(0xFF1C1B1B);
-  static const _body = Color(0xFF584142);
   static const _muted = Color(0xFF6B7280);
   static const _line = Color(0xFFE5E7EB);
   static const _soft = Color(0xFFF5E6EC);

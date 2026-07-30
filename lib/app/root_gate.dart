@@ -44,7 +44,7 @@ class RootGate extends ConsumerWidget {
 
     return authState.when(
       loading: () => const SplashScreen(),
-      error: (_, __) => const WelcomeAccessScreen(),
+      error: (_, _) => const WelcomeAccessScreen(),
       data: (firebaseUser) {
         if (firebaseUser == null) {
           return const WelcomeAccessScreen();
@@ -53,7 +53,7 @@ class RootGate extends ConsumerWidget {
         final usuarioAsync = ref.watch(usuarioAtualProvider);
         return usuarioAsync.when(
           loading: () => const SplashScreen(),
-          error: (_, __) =>
+          error: (_, _) =>
               const SplashScreen(mensagem: 'Não foi possível carregar seu perfil.'),
           data: (usuario) {
             if (usuario == null) {
