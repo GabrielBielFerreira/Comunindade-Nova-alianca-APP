@@ -115,6 +115,12 @@ Histórico em git (branch local, baseline preservado como primeiro commit).
   até o wiring.
 - Camada de repositórios não foi criada como abstração especulativa (evitar código
   morto); recomenda-se introduzi-la junto ao wiring de dados.
+- **Ações secundárias ainda com placeholder "será conectado futuramente"** (não são
+  do fluxo crítico, mas devem ser implementadas antes do lançamento público):
+  compartilhar/baixar anexo de aviso (`aviso_detalhes_screen`), abrir mapa e
+  compartilhar evento (`programacao_detalhes_screen`), calendário completo
+  (`programacao_screen`) e alguns itens de `configuracoes_screen`. As ações
+  **críticas** (login, "Abrir painel de gestão", logout) já são reais.
 
 ## 7. Próximos passos mínimos
 1. Instalar Flutter/Android SDK; `flutter pub get`; `flutter analyze` (corrigir avisos).
