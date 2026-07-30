@@ -1,0 +1,824 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../mock_data.dart';
+import '../visual_router.dart';
+import '../widgets/app_bottom_navigation.dart';
+import '../widgets/auth_widgets.dart';
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({
+    super.key,
+    this.greeting = HomeMockData.greeting,
+    this.greetingSubtitle = HomeMockData.greetingSubtitle,
+    this.secondaryCardLabel = HomeMockData.schedulesLabel,
+    this.showSecondaryCard = true,
+    this.showBottomNavigation = true,
+    this.muralRoute = VisualRoutes.muralOracao,
+    this.onMuralTap,
+    this.onContribuirCardTap,
+  });
+
+  final String greeting;
+  final String greetingSubtitle;
+  final String secondaryCardLabel;
+  final bool showSecondaryCard;
+  final bool showBottomNavigation;
+  final String muralRoute;
+  final void Function(BuildContext context)? onMuralTap;
+  final void Function(BuildContext context)? onContribuirCardTap;
+
+  static const _designWidth = 394.0;
+  static const _background = Color(0xFFFAFAFA);
+  static const _topTitle = Color(0xFF510014);
+  static const _primary = Color(0xFF7A0022);
+  static const _hero = Color(0xFF510014);
+  static const _title = Color(0xFF1A1A1A);
+  static const _body = Color(0xFF584142);
+  static const _muted = Color(0xFF6B7280);
+  static const _line = Color(0xFFE5E7EB);
+  static const _soft = Color(0xFFF5E6EC);
+  static const _iconBackground = Color(0xFFE8E8E8);
+  static const _success = Color(0xFF16A34A);
+  static const _danger = Color(0xFFB02D21);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: _background,
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = (constraints.maxWidth / _designWidth)
+                  .clamp(0.86, 1.0)
+                  .toDouble();
+              final topPadding = MediaQuery.paddingOf(context).top;
+              final bottomPadding = MediaQuery.paddingOf(context).bottom;
+              final navHeight = 72 * scale + bottomPadding;
+
+              return Stack(
+                children: [
+                  Column(
+                    children: [
+                      _TopBar(scale: scale, topPadding: topPadding),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          padding: EdgeInsets.fromLTRB(
+                            16 * scale,
+                            22 * scale,
+                            16 * scale,
+                            navHeight + 20 * scale,
+                          ),
+                          child: _HomeContent(
+                            greeting: greeting,
+                            greetingSubtitle: greetingSubtitle,
+                            secondaryCardLabel: secondaryCardLabel,
+                            showSecondaryCard: showSecondaryCard,
+                            muralRoute: muralRoute,
+                            onMuralTap: onMuralTap,
+                            onContribuirCardTap: onContribuirCardTap,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (showBottomNavigation)
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: AppBottomNavigation(
+                        items: _memberNavItems(),
+                        scale: scale,
+                        bottomPadding: bottomPadding,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<AppNavItem> _memberNavItems() {
+    return [
+      for (final item in HomeMockData.bottomNavigation)
+        AppNavItem(
+          label: item.label,
+          asset: item.asset,
+          iconWidth: item.iconWidth,
+          iconHeight: item.iconHeight,
+          selected: item.selected,
+          fontSize: item.fontSize,
+          onTap: _memberOnTapFor(item),
+        ),
+    ];
+  }
+
+  void Function(BuildContext context)? _memberOnTapFor(
+    HomeBottomNavigationData item,
+  ) {
+    if (item.label == 'Avisos') {
+      return (context) => Navigator.pushNamed(context, VisualRoutes.avisos);
+    }
+    if (item.asset == HomeAssets.schedule) {
+      return (context) =>
+          Navigator.pushNamed(context, VisualRoutes.programacao);
+    }
+    if (item.asset == HomeAssets.prayer) {
+      return (context) => Navigator.pushNamed(context, VisualRoutes.oracao);
+    }
+    if (item.asset == HomeAssets.contribute) {
+      return (context) => Navigator.pushNamed(context, VisualRoutes.contribuir);
+    }
+    if (item.asset == HomeAssets.profile) {
+      return (context) => Navigator.pushNamed(context, VisualRoutes.perfil);
+    }
+    return null;
+  }
+}
+
+class _TopBar extends StatelessWidget {
+  const _TopBar({required this.scale, required this.topPadding});
+
+  final double scale;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64 * scale + topPadding,
+      width: double.infinity,
+      padding: EdgeInsets.only(top: topPadding),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: HomeScreen._line)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(7 * scale, 0, 16 * scale, 1 * scale),
+        child: Row(
+          children: [
+            ClipOval(
+              child: Image.asset(
+                HomeAssets.logo,
+                width: 32 * scale,
+                height: 32 * scale,
+                fit: BoxFit.cover,
+                errorBuilder: (_, error, stackTrace) => const SizedBox.shrink(),
+              ),
+            ),
+            SizedBox(width: 11 * scale),
+            Expanded(
+              child: Text(
+                ' ${HomeMockData.communityName}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.montserrat(
+                  fontSize: 16.5 * scale,
+                  fontWeight: FontWeight.w700,
+                  height: 31.2 / 16.5,
+                  color: HomeScreen._topTitle,
+                ),
+              ),
+            ),
+            SizedBox(width: 5 * scale),
+            _TopIconButton(
+              scale: scale,
+              asset: HomeAssets.notification,
+              width: 16,
+              height: 20,
+              showDot: true,
+              onTap: () =>
+                  Navigator.pushNamed(context, VisualRoutes.notificacoes),
+            ),
+            SizedBox(width: 8 * scale),
+            _TopIconButton(
+              scale: scale,
+              asset: HomeAssets.menu,
+              width: 18,
+              height: 12,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopIconButton extends StatelessWidget {
+  const _TopIconButton({
+    required this.scale,
+    required this.asset,
+    required this.width,
+    required this.height,
+    this.showDot = false,
+    this.onTap,
+  });
+
+  final double scale;
+  final String asset;
+  final double width;
+  final double height;
+  final bool showDot;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = SizedBox(
+      width: 32 * scale,
+      height: 36 * scale,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          AuthAssetImage(asset, width: width * scale, height: height * scale),
+          if (showDot)
+            Positioned(
+              top: 7 * scale,
+              right: 6 * scale,
+              child: Container(
+                width: 8 * scale,
+                height: 8 * scale,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDC2626),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+
+    if (onTap == null) {
+      return button;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: button,
+    );
+  }
+}
+
+class _HomeContent extends StatelessWidget {
+  const _HomeContent({
+    required this.greeting,
+    required this.greetingSubtitle,
+    required this.secondaryCardLabel,
+    required this.showSecondaryCard,
+    required this.muralRoute,
+    required this.onMuralTap,
+    required this.onContribuirCardTap,
+  });
+
+  final String greeting;
+  final String greetingSubtitle;
+  final String secondaryCardLabel;
+  final bool showSecondaryCard;
+  final String muralRoute;
+  final void Function(BuildContext context)? onMuralTap;
+  final void Function(BuildContext context)? onContribuirCardTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = (MediaQuery.sizeOf(context).width / HomeScreen._designWidth)
+        .clamp(0.86, 1.0)
+        .toDouble();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Greeting(
+          scale: scale,
+          greeting: greeting,
+          subtitle: greetingSubtitle,
+        ),
+        SizedBox(height: 20 * scale),
+        _WordCard(scale: scale),
+        SizedBox(height: 20 * scale),
+        _InfoCard(
+          scale: scale,
+          iconAsset: HomeAssets.calendar,
+          iconWidth: 18,
+          iconHeight: 20,
+          label: HomeMockData.nextServiceLabel,
+          title: HomeMockData.nextServiceTitle,
+          status: HomeMockData.nextServiceStatus,
+          statusAsset: HomeAssets.check,
+          statusColor: HomeScreen._success,
+        ),
+        if (showSecondaryCard) ...[
+          SizedBox(height: 16 * scale),
+          _InfoCard(
+            scale: scale,
+            iconAsset: HomeAssets.scaleBell,
+            iconWidth: 16,
+            iconHeight: 20,
+            label: secondaryCardLabel,
+            title: HomeMockData.schedulesTitle,
+            status: HomeMockData.schedulesStatus,
+            statusAsset: HomeAssets.alert,
+            statusColor: HomeScreen._danger,
+          ),
+        ],
+        SizedBox(height: 20 * scale),
+        _QuickLinksSection(
+          scale: scale,
+          muralRoute: muralRoute,
+          onMuralTap: onMuralTap,
+          onContribuirCardTap: onContribuirCardTap,
+        ),
+      ],
+    );
+  }
+}
+
+class _Greeting extends StatelessWidget {
+  const _Greeting({
+    required this.scale,
+    required this.greeting,
+    required this.subtitle,
+  });
+
+  final double scale;
+  final String greeting;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          greeting,
+          style: GoogleFonts.montserrat(
+            fontSize: 28 * scale,
+            fontWeight: FontWeight.w700,
+            height: 35 / 28,
+            letterSpacing: -0.7 * scale,
+            color: HomeScreen._title,
+          ),
+        ),
+        SizedBox(height: 4 * scale),
+        Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 16 * scale,
+            fontWeight: FontWeight.w400,
+            height: 24 / 16,
+            color: HomeScreen._body,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WordCard extends StatelessWidget {
+  const _WordCard({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(24 * scale),
+      decoration: BoxDecoration(
+        color: HomeScreen._hero,
+        borderRadius: BorderRadius.circular(16 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: Offset(0, 1 * scale),
+            blurRadius: 2 * scale,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: 12 * scale,
+              vertical: 4 * scale,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.20),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AuthAssetImage(
+                  HomeAssets.word,
+                  width: 14.7 * scale,
+                  height: 10.7 * scale,
+                ),
+                SizedBox(width: 8 * scale),
+                Text(
+                  HomeMockData.wordLabel,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 12 * scale,
+                    fontWeight: FontWeight.w700,
+                    height: 16.8 / 12,
+                    letterSpacing: 0.6 * scale,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16 * scale),
+          Text(
+            HomeMockData.verse,
+            style: GoogleFonts.montserrat(
+              fontSize: 20 * scale,
+              fontWeight: FontWeight.w500,
+              height: 25 / 20,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 8 * scale),
+          Text(
+            HomeMockData.verseReference,
+            style: GoogleFonts.inter(
+              fontSize: 14 * scale,
+              fontWeight: FontWeight.w400,
+              height: 21 / 14,
+              color: Colors.white.withValues(alpha: 0.80),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.scale,
+    required this.iconAsset,
+    required this.iconWidth,
+    required this.iconHeight,
+    required this.label,
+    required this.title,
+    required this.status,
+    required this.statusAsset,
+    required this.statusColor,
+  });
+
+  final double scale;
+  final String iconAsset;
+  final double iconWidth;
+  final double iconHeight;
+  final String label;
+  final String title;
+  final String status;
+  final String statusAsset;
+  final Color statusColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 105.8 * scale,
+      width: double.infinity,
+      padding: EdgeInsets.all(17 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: HomeScreen._line.withValues(alpha: 0.50)),
+        borderRadius: BorderRadius.circular(16 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: Offset(0, 1 * scale),
+            blurRadius: 1 * scale,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48 * scale,
+            height: 48 * scale,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: HomeScreen._iconBackground,
+              borderRadius: BorderRadius.circular(12 * scale),
+            ),
+            child: AuthAssetImage(
+              iconAsset,
+              width: iconWidth * scale,
+              height: iconHeight * scale,
+            ),
+          ),
+          SizedBox(width: 12 * scale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12 * scale,
+                    fontWeight: FontWeight.w400,
+                    height: 16.8 / 12,
+                    letterSpacing: 0.6 * scale,
+                    color: HomeScreen._muted,
+                  ),
+                ),
+                SizedBox(height: 2 * scale),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20 * scale,
+                    fontWeight: FontWeight.w600,
+                    height: 28 / 20,
+                    color: HomeScreen._title,
+                  ),
+                ),
+                SizedBox(height: 1 * scale),
+                Row(
+                  children: [
+                    AuthAssetImage(
+                      statusAsset,
+                      width: 13 * scale,
+                      height: 12 * scale,
+                    ),
+                    SizedBox(width: 4 * scale),
+                    Flexible(
+                      child: Text(
+                        status,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14 * scale,
+                          fontWeight: FontWeight.w400,
+                          height: 21 / 14,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12 * scale),
+          AuthAssetImage(
+            HomeAssets.arrow,
+            width: 16 * scale,
+            height: 16 * scale,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickLinksSection extends StatelessWidget {
+  const _QuickLinksSection({
+    required this.scale,
+    required this.muralRoute,
+    required this.onMuralTap,
+    required this.onContribuirCardTap,
+  });
+
+  final double scale;
+  final String muralRoute;
+  final void Function(BuildContext context)? onMuralTap;
+  final void Function(BuildContext context)? onContribuirCardTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              HomeMockData.nextStepsTitle,
+              style: GoogleFonts.montserrat(
+                fontSize: 18 * scale,
+                fontWeight: FontWeight.w700,
+                height: 27 / 18,
+                letterSpacing: -0.45 * scale,
+                color: HomeScreen._title,
+              ),
+            ),
+            Text(
+              HomeMockData.seeAll,
+              style: GoogleFonts.inter(
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w500,
+                height: 18 / 12,
+                color: HomeScreen._primary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 16 * scale),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = (constraints.maxWidth - 12 * scale) / 2;
+
+            return Wrap(
+              spacing: 12 * scale,
+              runSpacing: 12 * scale,
+              children: [
+                for (final item in HomeMockData.quickLinks)
+                  SizedBox(
+                    width: itemWidth,
+                    height: 114 * scale,
+                    child: _QuickLinkCard(
+                      item: item,
+                      scale: scale,
+                      muralRoute: muralRoute,
+                      onMuralTap: onMuralTap,
+                      onContribuirCardTap: onContribuirCardTap,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickLinkCard extends StatelessWidget {
+  const _QuickLinkCard({
+    required this.item,
+    required this.scale,
+    required this.muralRoute,
+    required this.onMuralTap,
+    required this.onContribuirCardTap,
+  });
+
+  final HomeQuickLinkData item;
+  final double scale;
+  final String muralRoute;
+  final void Function(BuildContext context)? onMuralTap;
+  final void Function(BuildContext context)? onContribuirCardTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = item.asset;
+    final icon = item.icon;
+    final isMural = asset == HomeAssets.mural;
+    final iconFrameSize = 48.0;
+    final iconCircleSize = 48.0;
+    final iconWidth = isMural ? 24.0 : item.iconWidth;
+    final iconHeight = isMural ? 24.0 : item.iconHeight;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: HomeScreen._line),
+        borderRadius: BorderRadius.circular(16 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            offset: Offset(0, 1 * scale),
+            blurRadius: 1 * scale,
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            if (isMural) {
+              if (onMuralTap != null) {
+                onMuralTap!(context);
+              } else {
+                Navigator.pushNamed(context, muralRoute);
+              }
+              return;
+            }
+
+            if (asset == HomeAssets.instagram) {
+              _openInstagram(context);
+              return;
+            }
+
+            if (item.label == 'Contribuir') {
+              if (onContribuirCardTap != null) {
+                onContribuirCardTap!(context);
+                return;
+              }
+              final route =
+                  ModalRoute.of(context)?.settings.name ==
+                      VisualRoutes.homeLeader
+                  ? VisualRoutes.contribuirLeader
+                  : VisualRoutes.contribuir;
+              Navigator.pushNamed(context, route);
+            }
+          },
+          borderRadius: BorderRadius.circular(16 * scale),
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: 9 * scale,
+              vertical: 10 * scale,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: iconFrameSize * scale,
+                  height: 56 * scale,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: item.iconIncludesCircle && asset != null
+                        ? AuthAssetImage(
+                            asset,
+                            width: iconCircleSize * scale,
+                            height: iconCircleSize * scale,
+                          )
+                        : Container(
+                            width: iconCircleSize * scale,
+                            height: iconCircleSize * scale,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              color: HomeScreen._soft,
+                              shape: BoxShape.circle,
+                            ),
+                            child: asset != null
+                                ? AuthAssetImage(
+                                    asset,
+                                    width: iconWidth * scale,
+                                    height: iconHeight * scale,
+                                  )
+                                : Icon(
+                                    icon,
+                                    size: iconHeight * scale,
+                                    color: HomeScreen._primary,
+                                  ),
+                          ),
+                  ),
+                ),
+                SizedBox(height: 8 * scale),
+                SizedBox(
+                  width: double.infinity,
+                  height: 22 * scale,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 12 * scale,
+                        fontWeight: FontWeight.w500,
+                        height: 18 / 12,
+                        color: HomeScreen._title,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInstagram(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final uri = Uri.parse('https://www.instagram.com/novaaliancaolinda/');
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+    if (!opened) {
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível abrir o Instagram agora.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+  }
+}
+
