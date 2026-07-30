@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
+import '../../features/admin/providers/aprovacoes_providers.dart';
+import '../visual_router.dart';
 import '../widgets/leader_bottom_navigation.dart';
 
 class GestaoEntryScreen extends StatelessWidget {
@@ -156,6 +159,8 @@ class _GestaoContent extends StatelessWidget {
         ),
         SizedBox(height: 22 * scale),
         _ManagementPanelCard(scale: scale),
+        SizedBox(height: 22 * scale),
+        _CadastrosPendentesCard(scale: scale),
         SizedBox(height: 22 * scale),
         _ExclusiveNotice(scale: scale),
         SizedBox(height: 24 * scale),
@@ -337,6 +342,86 @@ class _ManagementPanelCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CadastrosPendentesCard extends ConsumerWidget {
+  const _CadastrosPendentesCard({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(cadastrosPendentesCountProvider);
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18 * scale),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18 * scale),
+        onTap: () =>
+            Navigator.pushNamed(context, VisualRoutes.cadastrosPendentes),
+        child: Container(
+          padding: EdgeInsets.all(18 * scale),
+          decoration: BoxDecoration(
+            border: Border.all(color: GestaoEntryScreen._line),
+            borderRadius: BorderRadius.circular(18 * scale),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48 * scale,
+                height: 48 * scale,
+                decoration: const BoxDecoration(
+                  color: GestaoEntryScreen._soft,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.how_to_reg_outlined,
+                    color: GestaoEntryScreen._primary, size: 26 * scale),
+              ),
+              SizedBox(width: 14 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Cadastros pendentes',
+                        style: GoogleFonts.montserrat(
+                            fontSize: 16 * scale,
+                            fontWeight: FontWeight.w700,
+                            color: GestaoEntryScreen._title)),
+                    SizedBox(height: 2 * scale),
+                    Text(
+                      count == 0
+                          ? 'Nenhum aguardando'
+                          : '$count aguardando aprovação',
+                      style: GoogleFonts.inter(
+                          fontSize: 13 * scale,
+                          color: GestaoEntryScreen._muted),
+                    ),
+                  ],
+                ),
+              ),
+              if (count > 0)
+                Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: 10 * scale, vertical: 4 * scale),
+                  decoration: BoxDecoration(
+                    color: GestaoEntryScreen._primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text('$count',
+                      style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13 * scale)),
+                ),
+              SizedBox(width: 8 * scale),
+              Icon(Icons.chevron_right,
+                  color: GestaoEntryScreen._muted, size: 22 * scale),
+            ],
+          ),
+        ),
       ),
     );
   }

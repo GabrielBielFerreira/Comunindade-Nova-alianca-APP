@@ -130,5 +130,13 @@ service cloud.firestore {
       allow delete: if isSignedIn()
                     && resource.data.destinatario_id == request.auth.uid;
     }
+
+    // ── Auditoria (aprovação/recusa de cadastros, etc.) ────────────────
+    // Somente liderança grava e lê; imutável (sem update/delete pelo cliente).
+    match /auditoria/{logId} {
+      allow read: if isLider();
+      allow create: if isLider();
+      allow update, delete: if false;
+    }
   }
 }

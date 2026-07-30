@@ -31,6 +31,7 @@ import 'screens/notificacoes_screen.dart';
 import 'screens/configuracoes_screen.dart';
 import 'screens/visualizar_outra_igreja_screen.dart';
 import 'screens/dados_pessoais_screen.dart';
+import '../features/admin/screens/cadastros_pendentes_screen.dart';
 import '../features/biblia/screens/biblia_home_screen.dart';
 import '../features/cantor/screens/cantor_home_screen.dart';
 
@@ -85,6 +86,7 @@ abstract class VisualRoutes {
   static const dadosPessoais = '/dados-pessoais';
   static const biblia = '/biblia';
   static const cantorCristao = '/cantor-cristao';
+  static const cadastrosPendentes = '/cadastros-pendentes';
 }
 
 final Map<String, WidgetBuilder> visualRoutes = {
@@ -161,4 +163,5 @@ final Map<String, WidgetBuilder> visualRoutes = {
   VisualRoutes.dadosPessoais: (_) => const DadosPessoaisScreen(),
   VisualRoutes.biblia: (_) => const BibliaHomeScreen(),
   VisualRoutes.cantorCristao: (_) => const CantorHomeScreen(),
+  VisualRoutes.cadastrosPendentes: (_) => const CadastrosPendentesScreen(),
 };
