@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/utils/formatters.dart';
+import '../../features/eventos/data/evento_model.dart';
+import '../../features/eventos/providers/eventos_providers.dart';
 import '../mock/programacao_mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
@@ -11,7 +15,35 @@ import '../widgets/programacao_card.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 import 'programacao_detalhes_screen.dart';
 
-class ProgramacaoScreen extends StatefulWidget {
+String _categoriaEvento(TipoEvento t) => switch (t) {
+      TipoEvento.culto => 'Culto',
+      TipoEvento.ministerio => 'Ministério',
+      TipoEvento.eventoEspecial => 'Evento especial',
+    };
+
+ProgramacaoEventData _eventoParaCard(EventoModel e) => ProgramacaoEventData(
+      category: _categoriaEvento(e.tipo),
+      title: e.titulo,
+      time: e.horario,
+      location: e.local,
+      reminderEnabled: false,
+    );
+
+ProgramacaoDetalhesData _eventoParaDetalhes(EventoModel e) =>
+    ProgramacaoDetalhesData(
+      title: e.titulo,
+      dayTimeSummary: '${Formatters.data(e.data)} • ${e.horario}',
+      locationSummary: e.local,
+      description: e.descricao,
+      date: Formatters.data(e.data),
+      time: e.horario,
+      audience: e.publico ? 'Aberto a todos' : 'Membros',
+      locationName: e.local,
+      address: '',
+      hasLiveStream: false,
+    );
+
+class ProgramacaoScreen extends ConsumerStatefulWidget {
   const ProgramacaoScreen({
     super.key,
     required this.isLeader,
@@ -22,10 +54,10 @@ class ProgramacaoScreen extends StatefulWidget {
   final bool isVisitor;
 
   @override
-  State<ProgramacaoScreen> createState() => _ProgramacaoScreenState();
+  ConsumerState<ProgramacaoScreen> createState() => _ProgramacaoScreenState();
 }
 
-class _ProgramacaoScreenState extends State<ProgramacaoScreen> {
+class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -36,15 +68,6 @@ class _ProgramacaoScreenState extends State<ProgramacaoScreen> {
   static const _soft = Color(0xFFF5E6EC);
 
   int _selectedDay = ProgramacaoMockData.eventDay;
-  late List<ProgramacaoEventData> _events;
-
-  @override
-  void initState() {
-    super.initState();
-    _events = List<ProgramacaoEventData>.of(ProgramacaoMockData.events);
-  }
-
-  bool get _hasEvents => _selectedDay == ProgramacaoMockData.eventDay;
 
   void _showMessage(String message) {
     final bottomMargin = MediaQuery.paddingOf(context).bottom + 76;
@@ -60,19 +83,65 @@ class _ProgramacaoScreenState extends State<ProgramacaoScreen> {
       );
   }
 
-  void _toggleReminder(int index) {
-    setState(() {
-      _events[index] = _events[index].copyWith(
-        reminderEnabled: !_events[index].reminderEnabled,
-      );
-    });
-    _showMessage('Lembrete atualizado visualmente');
-  }
-
   void _goToNotices() {
     Navigator.pushNamed(
       context,
       widget.isLeader ? VisualRoutes.avisosLeader : VisualRoutes.avisos,
+    );
+  }
+
+  Widget _buildEventos(double scale) {
+    final async = ref.watch(eventosStreamProvider);
+    return async.when(
+      loading: () => Padding(
+        padding: EdgeInsets.symmetric(vertical: 48 * scale),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => Padding(
+        padding: EdgeInsets.symmetric(vertical: 24 * scale),
+        child: Text(
+          'Não foi possível carregar a programação. Verifique sua conexão.',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.inter(fontSize: 15 * scale, color: _body),
+        ),
+      ),
+      data: (eventos) {
+        final lista =
+            widget.isVisitor ? eventos.where((e) => e.publico).toList() : eventos;
+        if (lista.isEmpty) {
+          return _EmptyProgramacao(
+            scale: scale,
+            onNextEvents: () => _showMessage('Nenhum evento futuro no momento.'),
+            onNotices: _goToNotices,
+          );
+        }
+        return Column(
+          children: [
+            for (var index = 0; index < lista.length; index++) ...[
+              ProgramacaoCard(
+                event: _eventoParaCard(lista[index]),
+                scale: scale,
+                onReminderTap: () => _showMessage(
+                  'Você receberá um lembrete por notificação.',
+                ),
+                onDetailsTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    settings: const RouteSettings(
+                      name: VisualRoutes.programacaoDetalhes,
+                    ),
+                    builder: (_) => ProgramacaoDetalhesScreen(
+                      details: _eventoParaDetalhes(lista[index]),
+                      isLeader: widget.isLeader,
+                    ),
+                  ),
+                ),
+              ),
+              if (index < lista.length - 1) SizedBox(height: 16 * scale),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -137,49 +206,7 @@ class _ProgramacaoScreenState extends State<ProgramacaoScreen> {
                                 },
                               ),
                               SizedBox(height: 22 * scale),
-                              if (_hasEvents)
-                                for (
-                                  var index = 0;
-                                  index < _events.length;
-                                  index++
-                                ) ...[
-                                  ProgramacaoCard(
-                                    event: _events[index],
-                                    scale: scale,
-                                    onReminderTap: () => _toggleReminder(index),
-                                    onDetailsTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute<void>(
-                                        settings: const RouteSettings(
-                                          name:
-                                              VisualRoutes.programacaoDetalhes,
-                                        ),
-                                        builder: (_) =>
-                                            ProgramacaoDetalhesScreen(
-                                              details: index == 0
-                                                  ? ProgramacaoMockData
-                                                        .liveDetails
-                                                  : ProgramacaoMockData
-                                                        .standardDetails,
-                                              isLeader: widget.isLeader,
-                                            ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (index < _events.length - 1)
-                                    SizedBox(height: 16 * scale),
-                                ]
-                              else
-                                _EmptyProgramacao(
-                                  scale: scale,
-                                  onNextEvents: () {
-                                    setState(
-                                      () => _selectedDay =
-                                          ProgramacaoMockData.eventDay,
-                                    );
-                                  },
-                                  onNotices: _goToNotices,
-                                ),
+                              _buildEventos(scale),
                             ],
                           ),
                         ),
