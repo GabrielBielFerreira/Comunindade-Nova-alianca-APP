@@ -9,6 +9,7 @@ import '../../core/constants/igreja_info.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
+import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -156,14 +157,15 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
   const _TopBar({required this.scale, required this.topPadding});
 
   final double scale;
   final double topPadding;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final naoLidas = ref.watch(naoLidasCountProvider);
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -205,7 +207,7 @@ class _TopBar extends StatelessWidget {
               asset: HomeAssets.notification,
               width: 16,
               height: 20,
-              showDot: true,
+              badgeCount: naoLidas,
               onTap: () =>
                   Navigator.pushNamed(context, VisualRoutes.notificacoes),
             ),
@@ -229,7 +231,7 @@ class _TopIconButton extends StatelessWidget {
     required this.asset,
     required this.width,
     required this.height,
-    this.showDot = false,
+    this.badgeCount = 0,
     this.onTap,
   });
 
@@ -237,7 +239,7 @@ class _TopIconButton extends StatelessWidget {
   final String asset;
   final double width;
   final double height;
-  final bool showDot;
+  final int badgeCount;
   final VoidCallback? onTap;
 
   @override
@@ -250,16 +252,28 @@ class _TopIconButton extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           AuthAssetImage(asset, width: width * scale, height: height * scale),
-          if (showDot)
+          if (badgeCount > 0)
             Positioned(
-              top: 7 * scale,
-              right: 6 * scale,
+              top: 2 * scale,
+              right: 0,
               child: Container(
-                width: 8 * scale,
-                height: 8 * scale,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFDC2626),
-                  shape: BoxShape.circle,
+                padding: EdgeInsets.symmetric(horizontal: 4 * scale),
+                constraints: BoxConstraints(minWidth: 15 * scale),
+                height: 15 * scale,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDC2626),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: Colors.white, width: 1.2 * scale),
+                ),
+                child: Text(
+                  badgeCount > 9 ? '9+' : '$badgeCount',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 9 * scale,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
                 ),
               ),
             ),
