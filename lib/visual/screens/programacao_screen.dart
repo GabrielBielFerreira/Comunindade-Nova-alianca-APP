@@ -176,7 +176,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                         scale: scale,
                         topPadding: topPadding,
                         onCalendar: () => _showMessage(
-                          'Calendário completo será conectado futuramente',
+                          'Veja a lista de eventos abaixo.',
                         ),
                       ),
                       Expanded(
@@ -194,7 +194,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                               _WeekHeading(
                                 scale: scale,
                                 onWeekChange: () => _showMessage(
-                                  'Troca de semana será conectada futuramente',
+                                  'Mostrando os próximos eventos.',
                                 ),
                               ),
                               SizedBox(height: 24 * scale),

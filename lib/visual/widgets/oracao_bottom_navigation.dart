@@ -174,7 +174,7 @@ class _OracaoNavigationItem extends StatelessWidget {
           ..hideCurrentSnackBar()
           ..showSnackBar(
             const SnackBar(
-              content: Text('Tela visual será conectada futuramente'),
+              content: Text('Seção indisponível.'),
               behavior: SnackBarBehavior.floating,
             ),
           );

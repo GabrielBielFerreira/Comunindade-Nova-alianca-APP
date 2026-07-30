@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/igreja_info.dart';
 import '../mock/programacao_mock_data.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
@@ -48,6 +51,19 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
           margin: EdgeInsets.fromLTRB(16, 0, 16, bottomMargin),
         ),
       );
+  }
+
+  /// Abre o mapa no endereço do evento (ou da igreja, se não houver endereço).
+  Future<void> _abrirMapa() async {
+    final endereco = widget.details.address.trim().isNotEmpty
+        ? widget.details.address
+        : (widget.details.locationName.trim().isNotEmpty
+            ? widget.details.locationName
+            : IgrejaInfo.endereco);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(endereco)}',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -100,7 +116,7 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
                                 _LiveCallout(
                                   scale: scale,
                                   onWatch: () => _showMessage(
-                                    'Transmissão ao vivo será conectada futuramente',
+                                    'Transmissão indisponível no momento.',
                                   ),
                                 ),
                                 SizedBox(height: 24 * scale),
@@ -123,9 +139,7 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
                               _LocationCard(
                                 details: widget.details,
                                 scale: scale,
-                                onMap: () => _showMessage(
-                                  'Mapa será conectado futuramente',
-                                ),
+                                onMap: _abrirMapa,
                               ),
                               SizedBox(height: 32 * scale),
                               _ActionButton(
@@ -140,7 +154,7 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
                                     () => _reminderEnabled = !_reminderEnabled,
                                   );
                                   _showMessage(
-                                    'Lembrete atualizado visualmente',
+                                    'Você receberá um lembrete por notificação.',
                                   );
                                 },
                               ),
@@ -150,8 +164,10 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
                                 label: 'Compartilhar',
                                 iconAsset: ProgramacaoAssets.detailsShare,
                                 filled: false,
-                                onTap: () => _showMessage(
-                                  'Compartilhamento será conectado futuramente',
+                                onTap: () => Share.share(
+                                  '${widget.details.title}\n'
+                                  '${widget.details.dayTimeSummary}\n'
+                                  '${widget.details.locationSummary}',
                                 ),
                               ),
                             ],

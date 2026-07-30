@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/igreja_info.dart';
 import '../mock/avisos_mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
+
+/// Abre o mapa (Google Maps) no endereço da igreja.
+Future<void> _abrirMapaIgreja() async {
+  final query = Uri.encodeComponent(IgrejaInfo.endereco);
+  final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
 
 class AvisoDetalhesScreen extends StatelessWidget {
   const AvisoDetalhesScreen({
@@ -64,9 +74,8 @@ class AvisoDetalhesScreen extends StatelessWidget {
                     scale: scale,
                     topPadding: topPadding,
                     onBack: () => Navigator.pop(context),
-                    onShare: () => _showMessage(
-                      context,
-                      'Compartilhamento será conectado futuramente',
+                    onShare: () => Share.share(
+                      '${notice.title}\n\n${notice.detailDescription}',
                     ),
                   ),
                   Expanded(
@@ -83,7 +92,7 @@ class AvisoDetalhesScreen extends StatelessWidget {
                         scale: scale,
                         onDownload: () => _showMessage(
                           context,
-                          'Download será conectado futuramente',
+                          'Anexo indisponível no momento.',
                         ),
                         onSchedule: () => Navigator.pushNamed(
                           context,
@@ -91,10 +100,7 @@ class AvisoDetalhesScreen extends StatelessWidget {
                               ? VisualRoutes.programacaoLeader
                               : VisualRoutes.programacao,
                         ),
-                        onLocation: () => _showMessage(
-                          context,
-                          'Localização será conectada futuramente',
-                        ),
+                        onLocation: _abrirMapaIgreja,
                       ),
                     ),
                   ),
