@@ -32,4 +32,15 @@ class AppConfig {
     'BIBLE_TRANSLATION',
     defaultValue: 'almeida',
   );
+
+  /// Habilita pagamentos online (PIX dinâmico / cartão / boleto via Cloud
+  /// Functions do Mercado Pago). Desligado por padrão: enquanto as Functions
+  /// não estiverem publicadas, o app mantém o PIX manual honesto.
+  static const bool pagamentosOnlineHabilitado = bool.fromEnvironment(
+    'PAGAMENTOS_ONLINE',
+    defaultValue: false,
+  );
+
+  /// Região das Cloud Functions.
+  static const String functionsRegion = 'southamerica-east1';
 }

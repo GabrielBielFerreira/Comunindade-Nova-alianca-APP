@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/root_gate.dart';
+import 'core/services/navigation_service.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'visual/visual_router.dart';
@@ -55,6 +56,7 @@ class NovaAliancaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Nova Aliança',
       debugShowCheckedModeBanner: false,
+      navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme,
       // A rota raiz '/' é o RootGate (decide a tela por sessão/perfil). As
       // demais rotas nomeadas vêm do mapa visual; a tela de login continua
