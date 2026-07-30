@@ -62,8 +62,50 @@ const eventos = [
   },
 ];
 
+const ministerios = [
+  {
+    nome: "Ministério de Louvor",
+    descricao:
+        "Conduz a igreja em adoração nos cultos e eventos. Reúne cantores e instrumentistas.",
+  },
+  {
+    nome: "Ministério Infantil",
+    descricao:
+        "Cuida do ensino bíblico das crianças com amor, segurança e criatividade.",
+  },
+  {
+    nome: "Mídia da Igreja",
+    descricao:
+        "Responsável por transmissão, fotografia, redes sociais e projeção nos cultos.",
+  },
+  {
+    nome: "Grupo de Jovens",
+    descricao:
+        "Espaço de comunhão, discipulado e serviço para a juventude da comunidade.",
+  },
+];
+
+const devocionais = [
+  {
+    titulo: "Descanse no Pastor",
+    corpo:
+        "O Senhor é o teu pastor e nada te faltará. Entregue hoje suas preocupações a Ele e caminhe em paz, confiando no seu cuidado constante.",
+    autor: "Pr. José Victor",
+    referencia: "Salmos 23:1",
+    destaque: true,
+  },
+  {
+    titulo: "A força que vem de Deus",
+    corpo:
+        "Tudo posso naquele que me fortalece. Nas dificuldades desta semana, lembre-se de que sua força vem do Senhor, não das circunstâncias.",
+    autor: "Equipe Pastoral",
+    referencia: "Filipenses 4:13",
+    destaque: false,
+  },
+];
+
 async function limpar() {
-  for (const col of ["avisos", "eventos"]) {
+  for (const col of ["avisos", "eventos", "ministerios", "devocionais"]) {
     const snap = await db.collection(col).where("_seed", "==", TAG).get();
     for (const doc of snap.docs) await doc.reference.delete();
     console.log(`Removidos ${snap.size} de ${col}`);
@@ -89,7 +131,27 @@ async function popular() {
       _seed: TAG,
     });
   }
-  console.log(`Inseridos ${avisos.length} avisos e ${eventos.length} eventos.`);
+  for (const m of ministerios) {
+    await db.collection("ministerios").add({
+      ...m,
+      lider_id: "seed",
+      membros_count: 0,
+      ativo: true,
+      criado_em: now,
+      _seed: TAG,
+    });
+  }
+  for (const d of devocionais) {
+    await db.collection("devocionais").add({
+      ...d,
+      data: now,
+      _seed: TAG,
+    });
+  }
+  console.log(
+    `Inseridos ${avisos.length} avisos, ${eventos.length} eventos, ` +
+      `${ministerios.length} ministérios e ${devocionais.length} devocionais.`
+  );
 }
 
 (async () => {

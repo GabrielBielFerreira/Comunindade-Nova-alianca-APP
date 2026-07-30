@@ -34,6 +34,9 @@ import 'screens/dados_pessoais_screen.dart';
 import '../features/admin/screens/cadastros_pendentes_screen.dart';
 import '../features/biblia/screens/biblia_home_screen.dart';
 import '../features/cantor/screens/cantor_home_screen.dart';
+import '../features/devocionais/screens/devocionais_screen.dart';
+import '../features/escola_louvor/screens/escola_louvor_screen.dart';
+import '../features/ministerios/screens/meu_ministerio_screen.dart';
 
 abstract class VisualRoutes {
   static const entraconta = '/';
@@ -87,6 +90,9 @@ abstract class VisualRoutes {
   static const biblia = '/biblia';
   static const cantorCristao = '/cantor-cristao';
   static const cadastrosPendentes = '/cadastros-pendentes';
+  static const meuMinisterio = '/meu-ministerio';
+  static const devocionais = '/devocionais';
+  static const escolaLouvor = '/escola-louvor';
 }
 
 final Map<String, WidgetBuilder> visualRoutes = {
@@ -164,4 +170,7 @@ final Map<String, WidgetBuilder> visualRoutes = {
   VisualRoutes.biblia: (_) => const BibliaHomeScreen(),
   VisualRoutes.cantorCristao: (_) => const CantorHomeScreen(),
   VisualRoutes.cadastrosPendentes: (_) => const CadastrosPendentesScreen(),
+  VisualRoutes.meuMinisterio: (_) => const MeuMinisterioScreen(),
+  VisualRoutes.devocionais: (_) => const DevocionaisScreen(),
+  VisualRoutes.escolaLouvor: (_) => const EscolaLouvorScreen(),
 };

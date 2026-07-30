@@ -43,4 +43,12 @@ class AppConfig {
 
   /// Região das Cloud Functions.
   static const String functionsRegion = 'southamerica-east1';
+
+  /// Escola de Louvor: só aparece na Home quando houver conteúdo configurado.
+  /// Desligada por padrão (evita atalho morto). Ative com
+  /// --dart-define=ESCOLA_LOUVOR=true quando o conteúdo estiver no Firebase.
+  static const bool escolaDeLouvorHabilitada = bool.fromEnvironment(
+    'ESCOLA_LOUVOR',
+    defaultValue: false,
+  );
 }

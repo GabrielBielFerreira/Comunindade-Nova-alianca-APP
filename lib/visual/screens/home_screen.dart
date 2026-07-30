@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_config.dart';
+import '../../core/constants/igreja_info.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
@@ -21,8 +23,6 @@ class HomeScreen extends ConsumerWidget {
     this.showSecondaryCard = true,
     this.showBottomNavigation = true,
     this.muralRoute = VisualRoutes.muralOracao,
-    this.onMuralTap,
-    this.onContribuirCardTap,
   });
 
   final String greeting;
@@ -31,19 +31,15 @@ class HomeScreen extends ConsumerWidget {
   final bool showSecondaryCard;
   final bool showBottomNavigation;
   final String muralRoute;
-  final void Function(BuildContext context)? onMuralTap;
-  final void Function(BuildContext context)? onContribuirCardTap;
 
   static const _designWidth = 394.0;
   static const _background = Color(0xFFFAFAFA);
   static const _topTitle = Color(0xFF510014);
-  static const _primary = Color(0xFF7A0022);
   static const _hero = Color(0xFF510014);
   static const _title = Color(0xFF1A1A1A);
   static const _body = Color(0xFF584142);
   static const _muted = Color(0xFF6B7280);
   static const _line = Color(0xFFE5E7EB);
-  static const _soft = Color(0xFFF5E6EC);
   static const _iconBackground = Color(0xFFE8E8E8);
   static const _success = Color(0xFF16A34A);
   static const _danger = Color(0xFFB02D21);
@@ -98,8 +94,6 @@ class HomeScreen extends ConsumerWidget {
                             secondaryCardLabel: secondaryCardLabel,
                             showSecondaryCard: showSecondaryCard,
                             muralRoute: muralRoute,
-                            onMuralTap: onMuralTap,
-                            onContribuirCardTap: onContribuirCardTap,
                           ),
                         ),
                       ),
@@ -291,8 +285,6 @@ class _HomeContent extends ConsumerWidget {
     required this.secondaryCardLabel,
     required this.showSecondaryCard,
     required this.muralRoute,
-    required this.onMuralTap,
-    required this.onContribuirCardTap,
   });
 
   final String greeting;
@@ -300,8 +292,6 @@ class _HomeContent extends ConsumerWidget {
   final String secondaryCardLabel;
   final bool showSecondaryCard;
   final String muralRoute;
-  final void Function(BuildContext context)? onMuralTap;
-  final void Function(BuildContext context)? onContribuirCardTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -355,14 +345,9 @@ class _HomeContent extends ConsumerWidget {
             statusColor: HomeScreen._danger,
           ),
         ],
-        SizedBox(height: 20 * scale),
-        _QuickLinksSection(
-          scale: scale,
-          muralRoute: muralRoute,
-          onMuralTap: onMuralTap,
-          onContribuirCardTap: onContribuirCardTap,
-        ),
-        SizedBox(height: 20 * scale),
+        SizedBox(height: 24 * scale),
+        _VidaNaComunidadeSection(scale: scale, muralRoute: muralRoute),
+        SizedBox(height: 24 * scale),
         _PalavraELouvorSection(scale: scale),
       ],
     );
@@ -371,6 +356,71 @@ class _HomeContent extends ConsumerWidget {
 
 /// Seção "PALAVRA E LOUVOR" com atalhos grandes para Bíblia e Cantor Cristão,
 /// acessíveis a visitantes, membros e liderança.
+/// Atalho de seção da Home.
+class _Atalho {
+  const _Atalho(this.icone, this.titulo, this.subtitulo, this.onTap);
+  final IconData icone;
+  final String titulo;
+  final String subtitulo;
+  final VoidCallback onTap;
+}
+
+/// Grade de atalhos (2 colunas) com título de seção.
+class _SecaoAtalhos extends StatelessWidget {
+  const _SecaoAtalhos({
+    required this.titulo,
+    required this.scale,
+    required this.itens,
+  });
+
+  final String titulo;
+  final double scale;
+  final List<_Atalho> itens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          titulo,
+          style: GoogleFonts.montserrat(
+            fontSize: 14 * scale,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: const Color(0xFF1A1A1A),
+          ),
+        ),
+        SizedBox(height: 12 * scale),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final itemWidth = (constraints.maxWidth - 12 * scale) / 2;
+            return Wrap(
+              spacing: 12 * scale,
+              runSpacing: 12 * scale,
+              children: [
+                for (final it in itens)
+                  SizedBox(
+                    width: itemWidth,
+                    child: _PalavraLouvorCard(
+                      scale: scale,
+                      icone: it.icone,
+                      titulo: it.titulo,
+                      subtitulo: it.subtitulo,
+                      onTap: it.onTap,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// Seção "Palavra e Louvor": Bíblia, Cantor Cristão, Devocionais e Escola de
+/// Louvor (esta só aparece quando habilitada por feature flag).
 class _PalavraELouvorSection extends StatelessWidget {
   const _PalavraELouvorSection({required this.scale});
 
@@ -380,52 +430,59 @@ class _PalavraELouvorSection extends StatelessWidget {
   static const _soft = Color(0xFFF5E6EC);
   static const _title = Color(0xFF1A1A1A);
   static const _border = Color(0xFFE5E7EB);
+  static const _cardColors = (_primary, _soft, _title, _border);
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'PALAVRA E LOUVOR',
-          style: GoogleFonts.montserrat(
-            fontSize: 14 * scale,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
-            color: _title,
-          ),
-        ),
-        SizedBox(height: 12 * scale),
-        Row(
-          children: [
-            Expanded(
-              child: _PalavraLouvorCard(
-                scale: scale,
-                icone: Icons.menu_book_rounded,
-                titulo: 'Bíblia',
-                subtitulo: 'Leia e favorite',
-                onTap: () =>
-                    Navigator.pushNamed(context, VisualRoutes.biblia),
-              ),
-            ),
-            SizedBox(width: 12 * scale),
-            Expanded(
-              child: _PalavraLouvorCard(
-                scale: scale,
-                icone: Icons.library_music_rounded,
-                titulo: 'Cantor Cristão',
-                subtitulo: 'Hinos por número',
-                onTap: () =>
-                    Navigator.pushNamed(context, VisualRoutes.cantorCristao),
-              ),
-            ),
-          ],
-        ),
+    return _SecaoAtalhos(
+      titulo: 'PALAVRA E LOUVOR',
+      scale: scale,
+      itens: [
+        _Atalho(Icons.menu_book_rounded, 'Bíblia', 'Leia e favorite',
+            () => Navigator.pushNamed(context, VisualRoutes.biblia)),
+        _Atalho(Icons.library_music_rounded, 'Cantor Cristão',
+            'Hinos por número',
+            () => Navigator.pushNamed(context, VisualRoutes.cantorCristao)),
+        _Atalho(Icons.auto_stories_rounded, 'Devocionais', 'Palavra diária',
+            () => Navigator.pushNamed(context, VisualRoutes.devocionais)),
+        if (AppConfig.escolaDeLouvorHabilitada)
+          _Atalho(Icons.school_rounded, 'Escola de Louvor', 'Formação musical',
+              () => Navigator.pushNamed(context, VisualRoutes.escolaLouvor)),
       ],
     );
   }
+}
 
-  static const _cardColors = (_primary, _soft, _title, _border);
+/// Seção "Vida na Comunidade": Meu Ministério, Mural de Oração, Ao Vivo,
+/// Instagram.
+class _VidaNaComunidadeSection extends StatelessWidget {
+  const _VidaNaComunidadeSection({required this.scale, required this.muralRoute});
+
+  final double scale;
+  final String muralRoute;
+
+  Future<void> _abrir(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri != null) await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _SecaoAtalhos(
+      titulo: 'VIDA NA COMUNIDADE',
+      scale: scale,
+      itens: [
+        _Atalho(Icons.groups_rounded, 'Meu Ministério', 'Sirva na igreja',
+            () => Navigator.pushNamed(context, VisualRoutes.meuMinisterio)),
+        _Atalho(Icons.favorite_rounded, 'Mural de Oração', 'Ore em comunidade',
+            () => Navigator.pushNamed(context, muralRoute)),
+        _Atalho(Icons.live_tv_rounded, 'Ao Vivo', 'Acompanhe o culto',
+            () => _abrir(IgrejaInfo.instagramUrl)),
+        _Atalho(Icons.camera_alt_rounded, 'Instagram', IgrejaInfo.instagram,
+            () => _abrir(IgrejaInfo.instagramUrl)),
+      ],
+    );
+  }
 }
 
 class _PalavraLouvorCard extends StatelessWidget {
@@ -747,232 +804,3 @@ class _InfoCard extends StatelessWidget {
     );
   }
 }
-
-class _QuickLinksSection extends StatelessWidget {
-  const _QuickLinksSection({
-    required this.scale,
-    required this.muralRoute,
-    required this.onMuralTap,
-    required this.onContribuirCardTap,
-  });
-
-  final double scale;
-  final String muralRoute;
-  final void Function(BuildContext context)? onMuralTap;
-  final void Function(BuildContext context)? onContribuirCardTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              HomeMockData.nextStepsTitle,
-              style: GoogleFonts.montserrat(
-                fontSize: 18 * scale,
-                fontWeight: FontWeight.w700,
-                height: 27 / 18,
-                letterSpacing: -0.45 * scale,
-                color: HomeScreen._title,
-              ),
-            ),
-            Text(
-              HomeMockData.seeAll,
-              style: GoogleFonts.inter(
-                fontSize: 12 * scale,
-                fontWeight: FontWeight.w500,
-                height: 18 / 12,
-                color: HomeScreen._primary,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 16 * scale),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final itemWidth = (constraints.maxWidth - 12 * scale) / 2;
-
-            return Wrap(
-              spacing: 12 * scale,
-              runSpacing: 12 * scale,
-              children: [
-                for (final item in HomeMockData.quickLinks)
-                  SizedBox(
-                    width: itemWidth,
-                    height: 114 * scale,
-                    child: _QuickLinkCard(
-                      item: item,
-                      scale: scale,
-                      muralRoute: muralRoute,
-                      onMuralTap: onMuralTap,
-                      onContribuirCardTap: onContribuirCardTap,
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _QuickLinkCard extends StatelessWidget {
-  const _QuickLinkCard({
-    required this.item,
-    required this.scale,
-    required this.muralRoute,
-    required this.onMuralTap,
-    required this.onContribuirCardTap,
-  });
-
-  final HomeQuickLinkData item;
-  final double scale;
-  final String muralRoute;
-  final void Function(BuildContext context)? onMuralTap;
-  final void Function(BuildContext context)? onContribuirCardTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final asset = item.asset;
-    final icon = item.icon;
-    final isMural = asset == HomeAssets.mural;
-    final iconFrameSize = 48.0;
-    final iconCircleSize = 48.0;
-    final iconWidth = isMural ? 24.0 : item.iconWidth;
-    final iconHeight = isMural ? 24.0 : item.iconHeight;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: HomeScreen._line),
-        borderRadius: BorderRadius.circular(16 * scale),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: Offset(0, 1 * scale),
-            blurRadius: 1 * scale,
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (isMural) {
-              if (onMuralTap != null) {
-                onMuralTap!(context);
-              } else {
-                Navigator.pushNamed(context, muralRoute);
-              }
-              return;
-            }
-
-            if (asset == HomeAssets.instagram) {
-              _openInstagram(context);
-              return;
-            }
-
-            if (item.label == 'Contribuir') {
-              if (onContribuirCardTap != null) {
-                onContribuirCardTap!(context);
-                return;
-              }
-              final route =
-                  ModalRoute.of(context)?.settings.name ==
-                      VisualRoutes.homeLeader
-                  ? VisualRoutes.contribuirLeader
-                  : VisualRoutes.contribuir;
-              Navigator.pushNamed(context, route);
-            }
-          },
-          borderRadius: BorderRadius.circular(16 * scale),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 9 * scale,
-              vertical: 10 * scale,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: iconFrameSize * scale,
-                  height: 56 * scale,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: item.iconIncludesCircle && asset != null
-                        ? AuthAssetImage(
-                            asset,
-                            width: iconCircleSize * scale,
-                            height: iconCircleSize * scale,
-                          )
-                        : Container(
-                            width: iconCircleSize * scale,
-                            height: iconCircleSize * scale,
-                            alignment: Alignment.center,
-                            decoration: const BoxDecoration(
-                              color: HomeScreen._soft,
-                              shape: BoxShape.circle,
-                            ),
-                            child: asset != null
-                                ? AuthAssetImage(
-                                    asset,
-                                    width: iconWidth * scale,
-                                    height: iconHeight * scale,
-                                  )
-                                : Icon(
-                                    icon,
-                                    size: iconHeight * scale,
-                                    color: HomeScreen._primary,
-                                  ),
-                          ),
-                  ),
-                ),
-                SizedBox(height: 8 * scale),
-                SizedBox(
-                  width: double.infinity,
-                  height: 22 * scale,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      item.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 12 * scale,
-                        fontWeight: FontWeight.w500,
-                        height: 18 / 12,
-                        color: HomeScreen._title,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openInstagram(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final uri = Uri.parse('https://www.instagram.com/novaaliancaolinda/');
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-    if (!opened) {
-      messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Não foi possível abrir o Instagram agora.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-    }
-  }
-}
-

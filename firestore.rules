@@ -138,5 +138,25 @@ service cloud.firestore {
       allow create: if isLider();
       allow update, delete: if false;
     }
+
+    // ── Devocionais ────────────────────────────────────────────────────
+    match /devocionais/{devId} {
+      allow read: if isAprovado();
+      allow write: if isLider();
+    }
+
+    // ── Interesse em ministério (membro demonstra interesse) ───────────
+    match /interesses_ministerio/{id} {
+      allow create: if isAprovado()
+                    && request.resource.data.usuario_id == request.auth.uid;
+      allow read: if isLider();
+      allow update, delete: if isLider();
+    }
+
+    // ── Configurações públicas do app (ex.: Escola de Louvor) ──────────
+    match /configuracoes/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isLider();
+    }
   }
 }
