@@ -14,6 +14,7 @@ import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/app_bottom_navigation.dart';
+import '../widgets/mais_menu.dart';
 import '../widgets/auth_widgets.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -166,6 +167,7 @@ class _TopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final naoLidas = ref.watch(naoLidasCountProvider);
+    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -217,6 +219,7 @@ class _TopBar extends ConsumerWidget {
               asset: HomeAssets.menu,
               width: 18,
               height: 12,
+              onTap: () => showMaisMenu(context, isLider: isLider),
             ),
           ],
         ),

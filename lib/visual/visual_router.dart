@@ -23,6 +23,8 @@ import 'screens/programacao_screen.dart';
 import 'screens/recuperar_senha_screen.dart';
 import 'screens/revisar_contribuicao_screen.dart';
 import 'screens/select_church_screen.dart';
+import 'screens/sobre_comunidade_screen.dart';
+import 'screens/ajuda_screen.dart';
 import 'screens/status_contribuicao_screen.dart';
 import 'screens/welcome_access_screen.dart';
 import 'screens/home_visitante_screen.dart';
@@ -95,6 +97,8 @@ abstract class VisualRoutes {
   static const devocionais = '/devocionais';
   static const escolaLouvor = '/escola-louvor';
   static const moderacaoOracao = '/moderacao-oracao';
+  static const sobreComunidade = '/sobre-comunidade';
+  static const ajuda = '/ajuda';
 }
 
 final Map<String, WidgetBuilder> visualRoutes = {
@@ -176,4 +180,6 @@ final Map<String, WidgetBuilder> visualRoutes = {
   VisualRoutes.devocionais: (_) => const DevocionaisScreen(),
   VisualRoutes.escolaLouvor: (_) => const EscolaLouvorScreen(),
   VisualRoutes.moderacaoOracao: (_) => const ModeracaoOracaoScreen(),
+  VisualRoutes.sobreComunidade: (_) => const SobreComunidadeScreen(),
+  VisualRoutes.ajuda: (_) => const AjudaScreen(),
 };
