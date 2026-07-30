@@ -1,20 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/oracao/providers/oracao_providers.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/oracao_bottom_navigation.dart';
 
-class OracaoNovoPedidoScreen extends StatefulWidget {
+class OracaoNovoPedidoScreen extends ConsumerStatefulWidget {
   const OracaoNovoPedidoScreen({super.key, required this.isLeader});
 
   final bool isLeader;
 
   @override
-  State<OracaoNovoPedidoScreen> createState() => _OracaoNovoPedidoScreenState();
+  ConsumerState<OracaoNovoPedidoScreen> createState() =>
+      _OracaoNovoPedidoScreenState();
 }
 
-class _OracaoNovoPedidoScreenState extends State<OracaoNovoPedidoScreen> {
+class _OracaoNovoPedidoScreenState
+    extends ConsumerState<OracaoNovoPedidoScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _header = Color(0xFFFCF9F8);
@@ -24,13 +29,15 @@ class _OracaoNovoPedidoScreenState extends State<OracaoNovoPedidoScreen> {
   static const _muted = Color(0xFF6B7280);
   static const _line = Color(0xFFE5E7EB);
 
-  final _nameController = TextEditingController(text: 'Gabriel');
+  final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
 
   String? _category;
   bool _wantsVisit = false;
   bool _wantsCall = false;
   bool _publishToMural = false;
+  bool _saving = false;
+  bool _nomePreenchido = false;
 
   @override
   void dispose() {
@@ -47,27 +54,57 @@ class _OracaoNovoPedidoScreenState extends State<OracaoNovoPedidoScreen> {
       );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_saving) return;
     if (_nameController.text.trim().isEmpty) {
       _showMessage('Informe seu nome');
       return;
     }
-
     if (_category == null) {
       _showMessage('Selecione o motivo da oração');
       return;
     }
-
     if (_descriptionController.text.trim().isEmpty) {
       _showMessage('Descreva o seu pedido');
       return;
     }
 
-    _showMessage('Pedido visual enviado');
+    final usuario = ref.read(usuarioProvider);
+    if (usuario == null) {
+      _showMessage('Faça login para enviar seu pedido.');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final texto = '[$_category] ${_descriptionController.text.trim()}';
+      await ref.read(oracaoRepositoryProvider).criarPedido(
+            autorId: usuario.uid,
+            autorNome: _nameController.text.trim(),
+            texto: texto,
+            // "Publicar no mural" => público; caso contrário, privado.
+            privado: !_publishToMural,
+          );
+      if (!mounted) return;
+      _showMessage('Pedido enviado com fé!');
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Não foi possível enviar. Tente novamente.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Preenche o nome com o do usuário logado na primeira montagem.
+    if (!_nomePreenchido) {
+      final nome = ref.read(usuarioProvider)?.nome;
+      if (nome != null && nome.isNotEmpty) _nameController.text = nome;
+      _nomePreenchido = true;
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,

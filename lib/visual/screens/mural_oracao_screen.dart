@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/utils/formatters.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/oracao/data/pedido_oracao_model.dart';
+import '../../features/oracao/providers/oracao_providers.dart';
 import '../mock/oracao_mock_data.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/oracao_bottom_navigation.dart';
 import 'oracao_novo_pedido_screen.dart';
+
+/// Converte um pedido do Firestore no formato usado pelos cards visuais.
+OracaoRequestData _paraCard(PedidoOracaoModel p) => OracaoRequestData(
+      author: p.nomeExibicao,
+      time: Formatters.dataRelativa(p.criadoEm),
+      text: p.texto,
+      prayerCount: p.oramCount,
+      label: p.urgente ? OracaoMockData.muralHighlightLabel : null,
+    );
 
 class MuralOracaoScreen extends StatefulWidget {
   const MuralOracaoScreen({super.key, required this.isLeader});
@@ -30,41 +44,6 @@ class _MuralOracaoScreenState extends State<MuralOracaoScreen> {
   static const _avatar = Color(0xFFEACDD6);
 
   int _selectedTab = 0;
-  final Set<String> _praying = <String>{};
-
-  void _togglePrayer(OracaoRequestData request) {
-    final key = _requestKey(request);
-    final isPraying = _praying.contains(key);
-
-    setState(() {
-      if (isPraying) {
-        _praying.remove(key);
-      } else {
-        _praying.add(key);
-      }
-    });
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            isPraying
-                ? 'Oração removida visualmente'
-                : 'Você marcou que está orando',
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
-  String _requestKey(OracaoRequestData request) =>
-      '${request.author}-${request.time}-${request.text}';
-
-  int _visibleCount(OracaoRequestData request) {
-    final isPraying = _praying.contains(_requestKey(request));
-    return request.prayerCount + (isPraying ? 1 : 0);
-  }
 
   void _openNewRequest() {
     Navigator.of(context).push(
@@ -136,16 +115,10 @@ class _MuralOracaoScreenState extends State<MuralOracaoScreen> {
                               ),
                               SizedBox(height: 32 * scale),
                               if (_selectedTab == 0)
-                                _CommunityMural(
-                                  scale: scale,
-                                  visibleCount: _visibleCount,
-                                  onPray: _togglePrayer,
-                                )
+                                _CommunityMural(scale: scale)
                               else
                                 _MyMural(
                                   scale: scale,
-                                  visibleCount: _visibleCount,
-                                  onPray: _togglePrayer,
                                   onNewRequest: _openNewRequest,
                                 ),
                             ],
@@ -321,87 +294,149 @@ class _MuralTabButton extends StatelessWidget {
   }
 }
 
-class _CommunityMural extends StatelessWidget {
-  const _CommunityMural({
-    required this.scale,
-    required this.visibleCount,
-    required this.onPray,
-  });
+class _CommunityMural extends ConsumerWidget {
+  const _CommunityMural({required this.scale});
 
   final double scale;
-  final int Function(OracaoRequestData request) visibleCount;
-  final ValueChanged<OracaoRequestData> onPray;
 
   @override
-  Widget build(BuildContext context) {
-    final recent = OracaoMockData.muralRecentRequests;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(muralPedidosProvider);
+    final uid = ref.watch(authStateProvider).valueOrNull?.uid;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _MuralRequestCard(
-          scale: scale,
-          request: OracaoMockData.muralHighlight,
-          prayerCount: visibleCount(OracaoMockData.muralHighlight),
-          onPray: () => onPray(OracaoMockData.muralHighlight),
-        ),
-        SizedBox(height: 32 * scale),
-        Text(
-          OracaoMockData.muralRecentTitle,
-          style: GoogleFonts.inter(
-            fontSize: 16 * scale,
-            fontWeight: FontWeight.w400,
-            height: 24 / 16,
-            color: _MuralOracaoScreenState._title,
-          ),
-        ),
-        SizedBox(height: 24 * scale),
-        for (var i = 0; i < recent.length; i++) ...[
-          _MuralRequestCard(
+    return async.when(
+      loading: () => Padding(
+        padding: EdgeInsets.symmetric(vertical: 48 * scale),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => _MuralMensagem(
+        scale: scale,
+        texto: 'Não foi possível carregar o mural. Verifique sua conexão.',
+      ),
+      data: (pedidos) {
+        if (pedidos.isEmpty) {
+          return _MuralMensagem(
             scale: scale,
-            request: recent[i],
-            prayerCount: visibleCount(recent[i]),
-            onPray: () => onPray(recent[i]),
-          ),
-          if (i < recent.length - 1) SizedBox(height: 20 * scale),
-        ],
-      ],
+            texto: 'Ainda não há pedidos no mural da comunidade.',
+          );
+        }
+        final destaque =
+            pedidos.firstWhere((p) => p.urgente, orElse: () => pedidos.first);
+        final recentes = pedidos.where((p) => p.id != destaque.id).toList();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _MuralRequestCard(
+              scale: scale,
+              request: _paraCard(destaque),
+              prayerCount: destaque.oramCount,
+              onPray: () => _orar(ref, destaque, uid),
+            ),
+            SizedBox(height: 32 * scale),
+            if (recentes.isNotEmpty) ...[
+              Text(
+                OracaoMockData.muralRecentTitle,
+                style: GoogleFonts.inter(
+                  fontSize: 16 * scale,
+                  fontWeight: FontWeight.w400,
+                  height: 24 / 16,
+                  color: _MuralOracaoScreenState._title,
+                ),
+              ),
+              SizedBox(height: 24 * scale),
+              for (var i = 0; i < recentes.length; i++) ...[
+                _MuralRequestCard(
+                  scale: scale,
+                  request: _paraCard(recentes[i]),
+                  prayerCount: recentes[i].oramCount,
+                  onPray: () => _orar(ref, recentes[i], uid),
+                ),
+                if (i < recentes.length - 1) SizedBox(height: 20 * scale),
+              ],
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
-class _MyMural extends StatelessWidget {
-  const _MyMural({
-    required this.scale,
-    required this.visibleCount,
-    required this.onPray,
-    required this.onNewRequest,
-  });
+void _orar(WidgetRef ref, PedidoOracaoModel pedido, String? uid) {
+  if (uid == null) return;
+  ref.read(oracaoRepositoryProvider).estouOrando(
+        pedidoId: pedido.id,
+        uid: uid,
+        jaOrou: pedido.orouUsuario(uid),
+      );
+}
+
+class _MyMural extends ConsumerWidget {
+  const _MyMural({required this.scale, required this.onNewRequest});
 
   final double scale;
-  final int Function(OracaoRequestData request) visibleCount;
-  final ValueChanged<OracaoRequestData> onPray;
   final VoidCallback onNewRequest;
 
   @override
-  Widget build(BuildContext context) {
-    final requests = OracaoMockData.myMuralRequests;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(meusPedidosProvider);
+    final uid = ref.watch(authStateProvider).valueOrNull?.uid;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < requests.length; i++) ...[
-          _MuralRequestCard(
-            scale: scale,
-            request: requests[i],
-            prayerCount: visibleCount(requests[i]),
-            onPray: () => onPray(requests[i]),
-          ),
-          if (i < requests.length - 1) SizedBox(height: 20 * scale),
-        ],
-        if (requests.isEmpty)
-          _EmptyMyRequestsCard(scale: scale, onNewRequest: onNewRequest),
-      ],
+    return async.when(
+      loading: () => Padding(
+        padding: EdgeInsets.symmetric(vertical: 48 * scale),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => _MuralMensagem(
+        scale: scale,
+        texto: 'Não foi possível carregar seus pedidos.',
+      ),
+      data: (pedidos) {
+        if (pedidos.isEmpty) {
+          return _EmptyMyRequestsCard(scale: scale, onNewRequest: onNewRequest);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < pedidos.length; i++) ...[
+              _MuralRequestCard(
+                scale: scale,
+                request: _paraCard(pedidos[i]),
+                prayerCount: pedidos[i].oramCount,
+                onPray: () => _orar(ref, pedidos[i], uid),
+              ),
+              if (i < pedidos.length - 1) SizedBox(height: 20 * scale),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MuralMensagem extends StatelessWidget {
+  const _MuralMensagem({required this.scale, required this.texto});
+  final double scale;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(24 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _MuralOracaoScreenState._line),
+        borderRadius: BorderRadius.circular(12 * scale),
+      ),
+      child: Text(
+        texto,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          fontSize: 15 * scale,
+          color: _MuralOracaoScreenState._muted,
+        ),
+      ),
     );
   }
 }
