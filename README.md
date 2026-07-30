@@ -132,6 +132,54 @@ lib/
 - Cartão/boleto via Mercado Pago devem passar por Cloud Functions — **nunca**
   processe dados de cartão nem exponha access token no app.
 
+## Bíblia (Palavra e Louvor)
+
+- **Tradução:** João Ferreira de Almeida (**domínio público**).
+- **Provedor:** [bible-api.com](https://bible-api.com) — **gratuito e sem chave de API**.
+- **Configuração** (opcional, para trocar provedor/tradução):
+  ```bash
+  flutter run \
+    --dart-define=BIBLE_API_BASE_URL=https://bible-api.com \
+    --dart-define=BIBLE_TRANSLATION=almeida
+  ```
+- **Arquitetura:** `BibleRepository` (interface agnóstica) →
+  `BibleApiRepository` (HTTP) + `BibleLocalStore` (cache offline via
+  SharedPreferences). Trocar de provedor não afeta a UI.
+- **Recursos:** AT/NT, livro/capítulo, versículos numerados, capítulo
+  anterior/seguinte (cruza livros), busca por referência, favoritos, histórico,
+  último capítulo lido, tamanho de fonte, copiar/compartilhar versículo,
+  loading/erro/offline (capítulos já lidos funcionam sem internet).
+- **Limitações:** a bible-api.com não oferece busca textual — a busca é por
+  referência (ex.: "João 3", "Salmos 23"). Nenhum versículo é inventado; o
+  texto vem sempre do provedor. A Bíblia inteira **não** é armazenada no
+  Firestore; apenas os capítulos acessados são cacheados localmente.
+
+## Cantor Cristão
+
+- **Conteúdo:** deve ser fornecido pelo responsável em arquivo **autorizado**
+  `assets/hinos/cantor_cristao.json` (ver formato em
+  `assets/hinos/cantor_cristao.exemplo.json`). **Nenhuma letra é embutida ou
+  inventada** — sem o arquivo autorizado, o módulo exibe um estado vazio honesto.
+- **Formato JSON:**
+  ```json
+  {
+    "edicao": "Cantor Cristão — edição autorizada",
+    "direitos": "detentor / licença",
+    "hinos": [
+      {"numero": 1, "titulo": "...", "autoria": "...",
+       "coro": "...", "estrofes": ["estrofe 1", "estrofe 2"]}
+    ]
+  }
+  ```
+- **Arquitetura:** `HymnalRepository` → `AssetHymnalRepository` (lê e valida o
+  JSON) + `HymnalLocalStore` (favoritos/histórico/fonte). Validador em
+  `validarHinario` (número, título, estrofes, duplicidade).
+- **Recursos:** lista por número, busca por número/título, página do hino
+  (número/título em destaque, estrofes, coro), anterior/seguinte, favoritos,
+  histórico, tamanho de fonte, compartilhamento apenas da **referência**
+  (número/título) para respeitar direitos. Áudio/partituras/cifras fora do escopo.
+- **Pendência externa:** fornecer `assets/hinos/cantor_cristao.json` autorizado.
+
 ## Documentos relacionados
 - `AUDITORIA_TECNICA_CNA_APP.md` — inventário e estado de cada tela/feature.
 - `PLANO_FECHAMENTO_CNA_APP.md` — backlog P0–P3 e critérios de aceite.

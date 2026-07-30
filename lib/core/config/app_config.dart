@@ -19,4 +19,17 @@ class AppConfig {
     'MULTI_IGREJA',
     defaultValue: false,
   );
+
+  /// Provedor da Bíblia (agnóstico). Padrão: bible-api.com, gratuito e sem
+  /// chave de API. A tradução padrão é a João Ferreira de Almeida (domínio
+  /// público). Configuráveis por --dart-define para trocar provedor/tradução.
+  static const String bibleApiBaseUrl = String.fromEnvironment(
+    'BIBLE_API_BASE_URL',
+    defaultValue: 'https://bible-api.com',
+  );
+
+  static const String bibleTranslation = String.fromEnvironment(
+    'BIBLE_TRANSLATION',
+    defaultValue: 'almeida',
+  );
 }

@@ -1,0 +1,17 @@
+{
+  "_leia_me": "EXEMPLO DE FORMATO. Renomeie para cantor_cristao.json e substitua pelo conteúdo AUTORIZADO. NÃO use letras copiadas de terceiros sem licença. O texto abaixo é apenas um marcador de posição.",
+  "edicao": "Cantor Cristão — edição autorizada (preencher)",
+  "direitos": "Detentor dos direitos / licença (preencher)",
+  "hinos": [
+    {
+      "numero": 1,
+      "titulo": "TÍTULO DO HINO (exemplo)",
+      "autoria": "Autor / tradutor (exemplo)",
+      "coro": "TEXTO DO CORO — substitua pelo conteúdo autorizado.",
+      "estrofes": [
+        "PRIMEIRA ESTROFE — substitua pelo conteúdo autorizado.",
+        "SEGUNDA ESTROFE — substitua pelo conteúdo autorizado."
+      ]
+    }
+  ]
+}

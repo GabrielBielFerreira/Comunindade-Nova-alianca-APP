@@ -341,7 +341,140 @@ class _HomeContent extends StatelessWidget {
           onMuralTap: onMuralTap,
           onContribuirCardTap: onContribuirCardTap,
         ),
+        SizedBox(height: 20 * scale),
+        _PalavraELouvorSection(scale: scale),
       ],
+    );
+  }
+}
+
+/// Seção "PALAVRA E LOUVOR" com atalhos grandes para Bíblia e Cantor Cristão,
+/// acessíveis a visitantes, membros e liderança.
+class _PalavraELouvorSection extends StatelessWidget {
+  const _PalavraELouvorSection({required this.scale});
+
+  final double scale;
+
+  static const _primary = Color(0xFF7A0022);
+  static const _soft = Color(0xFFF5E6EC);
+  static const _title = Color(0xFF1A1A1A);
+  static const _border = Color(0xFFE5E7EB);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'PALAVRA E LOUVOR',
+          style: GoogleFonts.montserrat(
+            fontSize: 14 * scale,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.5,
+            color: _title,
+          ),
+        ),
+        SizedBox(height: 12 * scale),
+        Row(
+          children: [
+            Expanded(
+              child: _PalavraLouvorCard(
+                scale: scale,
+                icone: Icons.menu_book_rounded,
+                titulo: 'Bíblia',
+                subtitulo: 'Leia e favorite',
+                onTap: () =>
+                    Navigator.pushNamed(context, VisualRoutes.biblia),
+              ),
+            ),
+            SizedBox(width: 12 * scale),
+            Expanded(
+              child: _PalavraLouvorCard(
+                scale: scale,
+                icone: Icons.library_music_rounded,
+                titulo: 'Cantor Cristão',
+                subtitulo: 'Hinos por número',
+                onTap: () =>
+                    Navigator.pushNamed(context, VisualRoutes.cantorCristao),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static const _cardColors = (_primary, _soft, _title, _border);
+}
+
+class _PalavraLouvorCard extends StatelessWidget {
+  const _PalavraLouvorCard({
+    required this.scale,
+    required this.icone,
+    required this.titulo,
+    required this.subtitulo,
+    required this.onTap,
+  });
+
+  final double scale;
+  final IconData icone;
+  final String titulo;
+  final String subtitulo;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (primary, soft, title, border) =
+        _PalavraELouvorSection._cardColors;
+    return Semantics(
+      button: true,
+      label: titulo,
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16 * scale),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16 * scale),
+          onTap: onTap,
+          child: Container(
+            padding: EdgeInsets.all(16 * scale),
+            decoration: BoxDecoration(
+              border: Border.all(color: border),
+              borderRadius: BorderRadius.circular(16 * scale),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48 * scale,
+                  height: 48 * scale,
+                  decoration: BoxDecoration(
+                    color: soft,
+                    borderRadius: BorderRadius.circular(12 * scale),
+                  ),
+                  child: Icon(icone, color: primary, size: 26 * scale),
+                ),
+                SizedBox(height: 12 * scale),
+                Text(
+                  titulo,
+                  style: GoogleFonts.montserrat(
+                    fontSize: 16 * scale,
+                    fontWeight: FontWeight.w700,
+                    color: title,
+                  ),
+                ),
+                SizedBox(height: 2 * scale),
+                Text(
+                  subtitulo,
+                  style: GoogleFonts.inter(
+                    fontSize: 12 * scale,
+                    color: const Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
