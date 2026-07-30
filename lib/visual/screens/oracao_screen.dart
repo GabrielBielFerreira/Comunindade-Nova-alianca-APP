@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock/oracao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -518,14 +520,17 @@ class _PageHeader extends StatelessWidget {
   }
 }
 
-class _WordCard extends StatelessWidget {
+class _WordCard extends ConsumerWidget {
   const _WordCard({required this.scale, required this.onTap});
 
   final double scale;
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palavra = ref.watch(palavraDoDiaProvider).valueOrNull;
+    final verso = palavra != null ? '"${palavra.texto}"' : OracaoMockData.verse;
+    final referencia = palavra?.referencia ?? OracaoMockData.verseReference;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -581,7 +586,7 @@ class _WordCard extends StatelessWidget {
               ),
               SizedBox(height: 14 * scale),
               Text(
-                OracaoMockData.verse,
+                verso,
                 style: GoogleFonts.montserrat(
                   fontSize: 18 * scale,
                   fontWeight: FontWeight.w500,
@@ -591,7 +596,7 @@ class _WordCard extends StatelessWidget {
               ),
               SizedBox(height: 10 * scale),
               Text(
-                OracaoMockData.verseReference,
+                referencia,
                 style: GoogleFonts.inter(
                   fontSize: 12 * scale,
                   fontWeight: FontWeight.w400,

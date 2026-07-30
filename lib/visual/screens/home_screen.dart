@@ -9,6 +9,7 @@ import '../../core/constants/igreja_info.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
+import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/app_bottom_navigation.dart';
@@ -598,13 +599,16 @@ class _Greeting extends StatelessWidget {
   }
 }
 
-class _WordCard extends StatelessWidget {
+class _WordCard extends ConsumerWidget {
   const _WordCard({required this.scale});
 
   final double scale;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palavra = ref.watch(palavraDoDiaProvider).valueOrNull;
+    final verso = palavra != null ? '"${palavra.texto}"' : HomeMockData.verse;
+    final referencia = palavra?.referencia ?? HomeMockData.verseReference;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24 * scale),
@@ -655,7 +659,7 @@ class _WordCard extends StatelessWidget {
           ),
           SizedBox(height: 16 * scale),
           Text(
-            HomeMockData.verse,
+            verso,
             style: GoogleFonts.montserrat(
               fontSize: 20 * scale,
               fontWeight: FontWeight.w500,
@@ -665,7 +669,7 @@ class _WordCard extends StatelessWidget {
           ),
           SizedBox(height: 8 * scale),
           Text(
-            HomeMockData.verseReference,
+            referencia,
             style: GoogleFonts.inter(
               fontSize: 14 * scale,
               fontWeight: FontWeight.w400,
