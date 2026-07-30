@@ -34,7 +34,7 @@ android {
     defaultConfig {
         applicationId = "br.com.novaalianca.nova_alianca_app"
         // minSdk 23: requisito confortável para Firebase Auth/Firestore e FCM.
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
