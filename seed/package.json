@@ -1,0 +1,8 @@
+{
+  "name": "nova-alianca-seed",
+  "description": "Popula Avisos/Eventos de exemplo no Firestore",
+  "private": true,
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

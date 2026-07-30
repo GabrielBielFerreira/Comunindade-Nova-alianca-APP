@@ -65,3 +65,10 @@ android/key.properties
 !lib/firebase_options.dart.example
 !android/app/google-services.json.example
 !android/key.properties.example
+
+# Cloud Functions / Seed (Node)
+functions/node_modules/
+functions/.env
+functions/.env.*
+seed/node_modules/
+**/serviceAccountKey.json
