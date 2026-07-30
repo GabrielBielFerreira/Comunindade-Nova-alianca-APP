@@ -3,25 +3,29 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/perfil/providers/perfil_providers.dart';
 import '../profile_photo_notifier.dart';
 import '../widgets/internal_header.dart';
 
 /// Tela "Dados pessoais" — versão digital da ficha cadastral.
 ///
-/// Tela interna (push), sem bottom navigation. Protótipo visual: o estado é
-/// local (`setState`) para as perguntas condicionais e para a foto escolhida;
-/// não há persistência. Nenhum Radio/Dropdown vem pré-selecionado.
-class DadosPessoaisScreen extends StatefulWidget {
+/// Carrega e salva os dados no Firestore (`usuarios/{uid}.dados_pessoais`).
+/// A foto é mantida localmente por enquanto (upload ao Firebase Storage
+/// depende do plano Blaze — ver STATUS_FINAL_CNA_APP.md).
+class DadosPessoaisScreen extends ConsumerStatefulWidget {
   const DadosPessoaisScreen({super.key});
 
   @override
-  State<DadosPessoaisScreen> createState() => _DadosPessoaisScreenState();
+  ConsumerState<DadosPessoaisScreen> createState() =>
+      _DadosPessoaisScreenState();
 }
 
-class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
+class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
   static const _designWidth = 394.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -65,6 +69,25 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
   String? _lastQueriedCep;
   bool _loadingCep = false;
 
+  // ---------- Demais campos de texto ----------
+  final _nomeCtrl = TextEditingController();
+  final _sobrenomeCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _cpfCtrl = TextEditingController();
+  final _telefoneCtrl = TextEditingController();
+  final _nascimentoCtrl = TextEditingController();
+  final _conjugeNomeCtrl = TextEditingController();
+  final _qualIgrejaCtrl = TextEditingController();
+  final _dataBatismoCtrl = TextEditingController();
+  final _tempoEvangelhoCtrl = TextEditingController();
+  final _tempoIgrejaCtrl = TextEditingController();
+  final _qualGrupoCtrl = TextEditingController();
+  final _profissaoCtrl = TextEditingController();
+  final _numeroCtrl = TextEditingController();
+  final _complementoCtrl = TextEditingController();
+
+  bool _saving = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +97,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
         _buscarCep(_cepController.text);
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _carregar());
   }
 
   @override
@@ -84,7 +108,126 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
     _cidadeController.dispose();
     _estadoController.dispose();
     _cepFocus.dispose();
+    for (final c in [
+      _nomeCtrl,
+      _sobrenomeCtrl,
+      _emailCtrl,
+      _cpfCtrl,
+      _telefoneCtrl,
+      _nascimentoCtrl,
+      _conjugeNomeCtrl,
+      _qualIgrejaCtrl,
+      _dataBatismoCtrl,
+      _tempoEvangelhoCtrl,
+      _tempoIgrejaCtrl,
+      _qualGrupoCtrl,
+      _profissaoCtrl,
+      _numeroCtrl,
+      _complementoCtrl,
+    ]) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  /// Carrega os dados atuais do Firestore para os campos.
+  Future<void> _carregar() async {
+    final usuario = ref.read(usuarioProvider);
+    if (usuario == null) return;
+    try {
+      final dados = await ref.read(perfilRepositoryProvider).carregar(usuario.uid);
+      final dp = (dados['dados_pessoais'] as Map?)?.cast<String, dynamic>() ??
+          <String, dynamic>{};
+      if (!mounted) return;
+      setState(() {
+        // Nome/telefone/email vêm do topo do documento; o resto de dados_pessoais.
+        _nomeCtrl.text = (dados['nome'] as String?) ?? usuario.nome;
+        _sobrenomeCtrl.text = (dp['sobrenome'] as String?) ?? '';
+        _emailCtrl.text = (dados['email'] as String?) ?? usuario.email;
+        _cpfCtrl.text = (dp['cpf'] as String?) ?? '';
+        _telefoneCtrl.text = (dados['telefone'] as String?) ?? usuario.telefone;
+        _nascimentoCtrl.text = (dp['nascimento'] as String?) ?? '';
+        _sexo = dp['sexo'] as String?;
+        _estadoCivil = dp['estado_civil'] as String?;
+        _conjugeNomeCtrl.text = (dp['conjuge_nome'] as String?) ?? '';
+        _conjugeCristao = dp['conjuge_cristao'] as String?;
+        _batizado = dp['batizado'] as String?;
+        _batizadoNestaIgreja = dp['batizado_nesta_igreja'] as String?;
+        _qualIgrejaCtrl.text = (dp['qual_igreja'] as String?) ?? '';
+        _dataBatismoCtrl.text = (dp['data_batismo'] as String?) ?? '';
+        _tempoEvangelhoCtrl.text = (dp['tempo_evangelho'] as String?) ?? '';
+        _tempoIgrejaCtrl.text = (dp['tempo_igreja'] as String?) ?? '';
+        _cargo = dp['cargo'] as String?;
+        _ehLider = dp['eh_lider'] as String?;
+        _qualGrupoCtrl.text = (dp['qual_grupo'] as String?) ?? '';
+        _situacaoProfissional = dp['situacao_profissional'] as String?;
+        _profissaoCtrl.text = (dp['profissao'] as String?) ?? '';
+        _cepController.text = (dp['cep'] as String?) ?? '';
+        _logradouroController.text = (dp['logradouro'] as String?) ?? '';
+        _numeroCtrl.text = (dp['numero'] as String?) ?? '';
+        _complementoCtrl.text = (dp['complemento'] as String?) ?? '';
+        _bairroController.text = (dp['bairro'] as String?) ?? '';
+        _cidadeController.text = (dp['cidade'] as String?) ?? '';
+        _estadoController.text = (dp['estado'] as String?) ?? '';
+      });
+    } catch (_) {
+      // Mantém o formulário vazio se a leitura falhar.
+    }
+  }
+
+  /// Salva todos os campos no Firestore.
+  Future<void> _salvar() async {
+    if (_saving) return;
+    final usuario = ref.read(usuarioProvider);
+    if (usuario == null) {
+      _showMessage('Faça login para salvar seus dados.');
+      return;
+    }
+    if (_nomeCtrl.text.trim().isEmpty) {
+      _showMessage('Informe seu nome');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await ref.read(perfilRepositoryProvider).salvar(
+            usuario.uid,
+            nome: _nomeCtrl.text.trim(),
+            telefone: _telefoneCtrl.text.trim(),
+            dadosPessoais: {
+              'sobrenome': _sobrenomeCtrl.text.trim(),
+              'cpf': _cpfCtrl.text.trim(),
+              'nascimento': _nascimentoCtrl.text.trim(),
+              'sexo': _sexo,
+              'estado_civil': _estadoCivil,
+              'conjuge_nome': _conjugeNomeCtrl.text.trim(),
+              'conjuge_cristao': _conjugeCristao,
+              'batizado': _batizado,
+              'batizado_nesta_igreja': _batizadoNestaIgreja,
+              'qual_igreja': _qualIgrejaCtrl.text.trim(),
+              'data_batismo': _dataBatismoCtrl.text.trim(),
+              'tempo_evangelho': _tempoEvangelhoCtrl.text.trim(),
+              'tempo_igreja': _tempoIgrejaCtrl.text.trim(),
+              'cargo': _cargo,
+              'eh_lider': _ehLider,
+              'qual_grupo': _qualGrupoCtrl.text.trim(),
+              'situacao_profissional': _situacaoProfissional,
+              'profissao': _profissaoCtrl.text.trim(),
+              'cep': _cepController.text.trim(),
+              'logradouro': _logradouroController.text.trim(),
+              'numero': _numeroCtrl.text.trim(),
+              'complemento': _complementoCtrl.text.trim(),
+              'bairro': _bairroController.text.trim(),
+              'cidade': _cidadeController.text.trim(),
+              'estado': _estadoController.text.trim(),
+            },
+          );
+      if (!mounted) return;
+      _showMessage('Dados salvos com sucesso!');
+    } catch (_) {
+      if (mounted) _showMessage('Não foi possível salvar. Tente novamente.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _showMessage(String message) {
@@ -208,7 +351,8 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           ),
         ),
         bottomNavigationBar: _SaveBar(
-          onSave: () => _showMessage('Dados salvos (protótipo visual)'),
+          onSave: _salvar,
+          saving: _saving,
         ),
       ),
     );
@@ -234,18 +378,19 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
         _FormTextField(
           label: 'Nome *',
           scale: scale,
-          initialValue: 'Gabriel',
+          controller: _nomeCtrl,
         ),
         _FormTextField(
           label: 'Sobrenome *',
           scale: scale,
-          initialValue: 'Ferreira',
+          controller: _sobrenomeCtrl,
         ),
         _FormTextField(
           label: 'Email',
           scale: scale,
           hint: 'seu@email.com',
           keyboardType: TextInputType.emailAddress,
+          controller: _emailCtrl,
         ),
         _FormTextField(
           label: 'CPF',
@@ -253,6 +398,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           hint: '000.000.000-00',
           keyboardType: TextInputType.number,
           inputFormatters: [_MaskTextInputFormatter('###.###.###-##')],
+          controller: _cpfCtrl,
         ),
         _FormTextField(
           label: 'Telefone',
@@ -261,6 +407,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           keyboardType: TextInputType.phone,
           inputFormatters: [_MaskTextInputFormatter('(##) #####-####')],
           prefix: _PhonePrefix(scale: scale),
+          controller: _telefoneCtrl,
         ),
         _FormTextField(
           label: 'Data de nascimento',
@@ -269,6 +416,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           keyboardType: TextInputType.datetime,
           prefixIcon: Icons.calendar_today_outlined,
           inputFormatters: [_MaskTextInputFormatter('##/##/####')],
+          controller: _nascimentoCtrl,
         ),
         _RadioField(
           label: 'Sexo',
@@ -303,7 +451,10 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           onChanged: (value) => setState(() => _estadoCivil = value),
         ),
         if (_isCasado) ...[
-          _FormTextField(label: 'Nome do cônjuge', scale: scale),
+          _FormTextField(
+              label: 'Nome do cônjuge',
+              scale: scale,
+              controller: _conjugeNomeCtrl),
           _RadioField(
             label: 'Cônjuge é cristão?',
             scale: scale,
@@ -329,22 +480,28 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
                 setState(() => _batizadoNestaIgreja = value),
           ),
           if (_batizadoFora)
-            _FormTextField(label: 'Qual igreja?', scale: scale),
+            _FormTextField(
+                label: 'Qual igreja?',
+                scale: scale,
+                controller: _qualIgrejaCtrl),
           _FormTextField(
             label: 'Data de batismo ou quantos anos faz',
             scale: scale,
             hint: 'Ex.: 27 anos',
+            controller: _dataBatismoCtrl,
           ),
         ],
         _FormTextField(
           label: 'Quanto tempo no evangelho?',
           scale: scale,
           hint: 'Ex.: 27 anos',
+          controller: _tempoEvangelhoCtrl,
         ),
         _FormTextField(
           label: 'Quanto tempo nesta igreja?',
           scale: scale,
           hint: 'Ex.: 3 anos',
+          controller: _tempoIgrejaCtrl,
         ),
         _DropdownField(
           label: 'Cargo eclesiástico',
@@ -370,7 +527,10 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           onChanged: (value) => setState(() => _ehLider = value),
         ),
         if (_isLider)
-          _FormTextField(label: 'De qual grupo?', scale: scale),
+          _FormTextField(
+              label: 'De qual grupo?',
+              scale: scale,
+              controller: _qualGrupoCtrl),
         SizedBox(height: 12 * scale),
 
         // ================= Bloco 3: Ocupação =================
@@ -391,7 +551,8 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
           onChanged: (value) =>
               setState(() => _situacaoProfissional = value),
         ),
-        _FormTextField(label: 'Profissão', scale: scale),
+        _FormTextField(
+            label: 'Profissão', scale: scale, controller: _profissaoCtrl),
         SizedBox(height: 12 * scale),
 
         // ================= Bloco 4: Endereço =================
@@ -422,6 +583,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
                 scale: scale,
                 hint: '000',
                 keyboardType: TextInputType.number,
+                controller: _numeroCtrl,
               ),
             ),
             SizedBox(width: 12 * scale),
@@ -431,6 +593,7 @@ class _DadosPessoaisScreenState extends State<DadosPessoaisScreen> {
                 label: 'Complemento',
                 scale: scale,
                 hint: 'Apto, bloco… (opcional)',
+                controller: _complementoCtrl,
               ),
             ),
           ],
@@ -619,7 +782,6 @@ class _FormTextField extends StatelessWidget {
   const _FormTextField({
     required this.label,
     required this.scale,
-    this.initialValue,
     this.hint,
     this.keyboardType,
     this.prefixIcon,
@@ -632,7 +794,6 @@ class _FormTextField extends StatelessWidget {
 
   final String label;
   final double scale;
-  final String? initialValue;
   final String? hint;
   final TextInputType? keyboardType;
   final IconData? prefixIcon;
@@ -658,7 +819,6 @@ class _FormTextField extends StatelessWidget {
           TextFormField(
             controller: controller,
             focusNode: focusNode,
-            initialValue: controller == null ? initialValue : null,
             keyboardType: keyboardType,
             inputFormatters: inputFormatters,
             onChanged: onChanged,
@@ -921,9 +1081,10 @@ class _LinkedChurchField extends StatelessWidget {
 
 /// Barra fixa no rodapé com o botão "Salvar".
 class _SaveBar extends StatelessWidget {
-  const _SaveBar({required this.onSave});
+  const _SaveBar({required this.onSave, this.saving = false});
 
   final VoidCallback onSave;
+  final bool saving;
 
   @override
   Widget build(BuildContext context) {
@@ -953,7 +1114,7 @@ class _SaveBar extends StatelessWidget {
             width: double.infinity,
             height: 52 * scale,
             child: ElevatedButton(
-              onPressed: onSave,
+              onPressed: saving ? null : onSave,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _DadosPessoaisScreenState._primary,
                 foregroundColor: Colors.white,
@@ -962,13 +1123,22 @@ class _SaveBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12 * scale),
                 ),
               ),
-              child: Text(
-                'Salvar',
-                style: GoogleFonts.inter(
-                  fontSize: 16 * scale,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: saving
+                  ? SizedBox(
+                      width: 22 * scale,
+                      height: 22 * scale,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      'Salvar',
+                      style: GoogleFonts.inter(
+                        fontSize: 16 * scale,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),
