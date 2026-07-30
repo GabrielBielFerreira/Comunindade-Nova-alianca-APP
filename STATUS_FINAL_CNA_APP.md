@@ -1,6 +1,41 @@
 # Status Final — Comunidade Nova Aliança App
 
-Resumo honesto do que foi feito nesta sessão, o que ficou pendente e o que
+## Atualização — 30/07/2026 (Firebase ativo + Palavra e Louvor + Firestore)
+
+Desde a versão inicial, o ambiente passou a ter **Flutter 3.44.8 instalado** e o
+**Firebase configurado** (projeto `nova-alianca-app`, plano Spark). Foram então
+implementados e **verificados** (`flutter analyze` = 0 problemas; `flutter test`
+= 45/45 passando; APK gerado):
+
+- **Firebase real conectado**: `flutterfire configure` executado, `main.dart` usa
+  `DefaultFirebaseOptions`, regras do Firestore publicadas (`firebase deploy`).
+- **Bíblia (completa)**: `BibleRepository` agnóstico + bible-api.com (Almeida,
+  domínio público) + cache offline; AT/NT, livro, capítulo, leitor com
+  versículos numerados, navegação, busca por referência, favoritos, histórico,
+  último lido, fonte, copiar/compartilhar. Sem chave de API.
+- **Cantor Cristão (módulo completo)**: `HymnalRepository` + validador + telas
+  (lista, busca nº/título, hino, favoritos, histórico, fonte); estado vazio
+  honesto aguardando `assets/hinos/cantor_cristao.json` autorizado.
+- **Home "PALAVRA E LOUVOR"** com atalhos Bíblia e Cantor.
+- **Firestore ligado** (mocks removidos como fonte de produção):
+  - **Oração**: criar pedido, mural real, meus pedidos, "estou orando"
+    idempotente, privado protegido, urgente registrado (push depende de Function).
+  - **Perfil/Dados Pessoais**: carrega e salva todos os campos em
+    `usuarios/{uid}.dados_pessoais` (foto local; Storage pendente de Blaze).
+  - **Avisos**: stream real, filtros, loading/vazio/erro (vazio até a liderança publicar).
+  - **Programação**: stream de eventos futuros, visitante vê só públicos, detalhe
+    mapeado, loading/vazio/erro.
+  - **Notificações**: Central com lida/não lida, separada de Avisos, contador de não lidas.
+
+**Percentual real de conclusão da V1: ~75–80%.** Pendências externas: conteúdo do
+Cantor Cristão; Mercado Pago (cartão/boleto via Cloud Functions); Firebase Storage
+(foto de perfil, requer Blaze); entrega de push FCM (Cloud Functions); conteúdo de
+Avisos/Programação (criado pela liderança). Detalhes de cada bloco no restante do
+documento e nos commits do git.
+
+---
+
+Resumo honesto do que foi feito na sessão inicial, o que ficou pendente e o que
 depende de recursos externos. Escopo acordado: **Núcleo Estrutural (P0/P1)**,
 modo **"codificar agora, compilar/validar depois"** (a máquina de trabalho não
 tinha Flutter/Dart/Java/Android SDK instalados).
