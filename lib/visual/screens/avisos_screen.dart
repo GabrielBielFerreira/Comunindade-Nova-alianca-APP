@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/utils/formatters.dart';
+import '../../features/avisos/data/aviso_model.dart';
+import '../../features/avisos/providers/avisos_providers.dart';
 import '../mock/avisos_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -11,34 +15,54 @@ import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import 'aviso_detalhes_screen.dart';
 
-class AvisosScreen extends StatefulWidget {
+/// Converte o aviso do Firestore no formato usado pelo card visual.
+AvisoData _avisoParaCard(AvisoModel m) {
+  final filtro = m.segmento == SegmentoAviso.ministerio
+      ? AvisoFilter.ministerios
+      : AvisoFilter.comunidade;
+  final categoria = switch (m.segmento) {
+    SegmentoAviso.ministerio => 'Ministério',
+    SegmentoAviso.lideres => 'Liderança',
+    SegmentoAviso.jovens => 'Jovens',
+    SegmentoAviso.todos => 'Igreja',
+  };
+  return AvisoData(
+    filter: filtro,
+    category: categoria,
+    title: m.titulo,
+    description: m.conteudo,
+    publishedAt: 'Publicado ${Formatters.dataRelativa(m.publicadoEm)}',
+    publishedMetadata: '',
+    detailDescription: m.conteudo,
+    detailDate: Formatters.data(m.publicadoEm),
+    detailTime: Formatters.hora(m.publicadoEm),
+    detailLocation: '',
+    detailAddress: '',
+  );
+}
+
+class AvisosScreen extends ConsumerStatefulWidget {
   const AvisosScreen({super.key, required this.isLeader});
 
   final bool isLeader;
 
   @override
-  State<AvisosScreen> createState() => _AvisosScreenState();
+  ConsumerState<AvisosScreen> createState() => _AvisosScreenState();
 }
 
-class _AvisosScreenState extends State<AvisosScreen> {
+class _AvisosScreenState extends ConsumerState<AvisosScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _title = Color(0xFF510014);
   static const _body = Color(0xFF6B7280);
-  static const _primary = Color(0xFF7A0022);
   static const _line = Color(0xFFE5E7EB);
 
   AvisoFilter _selectedFilter = AvisoFilter.todos;
-  bool _loading = false;
 
-  List<AvisoData> get _visibleNotices {
-    if (_selectedFilter == AvisoFilter.todos) {
-      return AvisosMockData.notices;
-    }
-
-    return AvisosMockData.notices
-        .where((notice) => notice.filter == _selectedFilter)
-        .toList(growable: false);
+  List<AvisoData> _filtrar(List<AvisoModel> avisos) {
+    final cards = avisos.map(_avisoParaCard).toList();
+    if (_selectedFilter == AvisoFilter.todos) return cards;
+    return cards.where((c) => c.filter == _selectedFilter).toList();
   }
 
   void _showMessage(String message) {
@@ -49,19 +73,57 @@ class _AvisosScreenState extends State<AvisosScreen> {
       );
   }
 
-  Future<void> _loadMore() async {
-    if (_loading) {
-      return;
-    }
-
-    setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 450));
-    if (!mounted) {
-      return;
-    }
-
-    setState(() => _loading = false);
-    _showMessage('Todos os avisos foram carregados');
+  Widget _buildNotices(double scale) {
+    final async = ref.watch(avisosStreamProvider);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16 * scale),
+      child: async.when(
+        loading: () => Padding(
+          padding: EdgeInsets.symmetric(vertical: 48 * scale),
+          child: const Center(child: CircularProgressIndicator()),
+        ),
+        error: (_, _) => _MensagemAvisos(
+          scale: scale,
+          texto:
+              'Não foi possível carregar os avisos. Verifique sua conexão.',
+        ),
+        data: (avisos) {
+          final cards = _filtrar(avisos);
+          if (cards.isEmpty) {
+            return _MensagemAvisos(
+              scale: scale,
+              texto: 'Nenhum aviso publicado ainda.',
+            );
+          }
+          return Column(
+            children: [
+              for (var index = 0; index < cards.length; index++) ...[
+                AvisoCard(
+                  notice: cards[index],
+                  scale: scale,
+                  onDetails: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      settings: const RouteSettings(
+                        name: VisualRoutes.avisoDetalhes,
+                      ),
+                      builder: (_) => AvisoDetalhesScreen(
+                        notice: cards[index],
+                        isLeader: widget.isLeader,
+                      ),
+                    ),
+                  ),
+                  onScale: () => _showMessage(
+                    'Escalas serão abertas pela área de Gestão',
+                  ),
+                ),
+                if (index < cards.length - 1) SizedBox(height: 16 * scale),
+              ],
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -142,48 +204,7 @@ class _AvisosScreenState extends State<AvisosScreen> {
                                 },
                               ),
                               SizedBox(height: 8 * scale),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16 * scale,
-                                ),
-                                child: Column(
-                                  children: [
-                                    for (
-                                      var index = 0;
-                                      index < _visibleNotices.length;
-                                      index++
-                                    ) ...[
-                                      AvisoCard(
-                                        notice: _visibleNotices[index],
-                                        scale: scale,
-                                        onDetails: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute<void>(
-                                            settings: const RouteSettings(
-                                              name: VisualRoutes.avisoDetalhes,
-                                            ),
-                                            builder: (_) => AvisoDetalhesScreen(
-                                              notice: _visibleNotices[index],
-                                              isLeader: widget.isLeader,
-                                            ),
-                                          ),
-                                        ),
-                                        onScale: () => _showMessage(
-                                          'Escalas serão abertas pela área de Gestão',
-                                        ),
-                                      ),
-                                      if (index < _visibleNotices.length - 1)
-                                        SizedBox(height: 16 * scale),
-                                    ],
-                                    SizedBox(height: 12 * scale),
-                                    _LoadMoreButton(
-                                      scale: scale,
-                                      loading: _loading,
-                                      onTap: _loadMore,
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              _buildNotices(scale),
                             ],
                           ),
                         ),
@@ -391,46 +412,37 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton({
-    required this.scale,
-    required this.loading,
-    required this.onTap,
-  });
+class _MensagemAvisos extends StatelessWidget {
+  const _MensagemAvisos({required this.scale, required this.texto});
 
   final double scale;
-  final bool loading;
-  final VoidCallback onTap;
+  final String texto;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 191 * scale,
-        height: 38 * scale,
-        child: OutlinedButton(
-          onPressed: loading ? null : onTap,
-          style: OutlinedButton.styleFrom(
-            foregroundColor: _AvisosScreenState._primary,
-            side: const BorderSide(color: _AvisosScreenState._line),
-            shape: const StadiumBorder(),
-            padding: EdgeInsets.zero,
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(top: 24 * scale),
+      padding: EdgeInsets.all(24 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _AvisosScreenState._line),
+        borderRadius: BorderRadius.circular(12 * scale),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.campaign_outlined,
+              size: 40 * scale, color: _AvisosScreenState._body),
+          SizedBox(height: 12 * scale),
+          Text(
+            texto,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 15 * scale,
+              color: _AvisosScreenState._body,
+            ),
           ),
-          child: loading
-              ? SizedBox(
-                  width: 16 * scale,
-                  height: 16 * scale,
-                  child: const CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(
-                  'Carregar mais avisos',
-                  style: GoogleFonts.inter(
-                    fontSize: 14 * scale,
-                    fontWeight: FontWeight.w500,
-                    height: 21 / 14,
-                  ),
-                ),
-        ),
+        ],
       ),
     );
   }
