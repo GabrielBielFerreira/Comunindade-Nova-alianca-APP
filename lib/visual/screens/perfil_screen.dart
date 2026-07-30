@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/auth/providers/auth_controller.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../mock_data.dart';
 import '../profile_photo_notifier.dart';
 import '../visual_router.dart';
@@ -242,13 +243,17 @@ class _ProfileContent extends StatelessWidget {
   }
 }
 
-class _ProfileHero extends StatelessWidget {
+class _ProfileHero extends ConsumerWidget {
   const _ProfileHero({required this.scale});
 
   final double scale;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final usuario = ref.watch(usuarioProvider);
+    final nome = (usuario != null && usuario.nome.trim().isNotEmpty)
+        ? usuario.nome
+        : 'Membro';
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 24 * scale),
       child: Column(
@@ -283,7 +288,7 @@ class _ProfileHero extends StatelessWidget {
           ),
           SizedBox(height: 24 * scale),
           Text(
-            'Gabriel Ferreira',
+            nome,
             textAlign: TextAlign.center,
             style: GoogleFonts.montserrat(
               fontSize: 24 * scale,

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/utils/formatters.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/eventos/providers/eventos_providers.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/auth_widgets.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({
     super.key,
     this.greeting = HomeMockData.greeting,
@@ -45,7 +49,14 @@ class HomeScreen extends StatelessWidget {
   static const _danger = Color(0xFFB02D21);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Saudação com o nome real do usuário autenticado (usuarios/{uid}).
+    final usuario = ref.watch(usuarioProvider);
+    final saudacao =
+        (usuario != null && usuario.primeiroNome.trim().isNotEmpty)
+            ? 'OLÁ, ${usuario.primeiroNome.toUpperCase()}!'
+            : greeting;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -82,7 +93,7 @@ class HomeScreen extends StatelessWidget {
                             navHeight + 20 * scale,
                           ),
                           child: _HomeContent(
-                            greeting: greeting,
+                            greeting: saudacao,
                             greetingSubtitle: greetingSubtitle,
                             secondaryCardLabel: secondaryCardLabel,
                             showSecondaryCard: showSecondaryCard,
@@ -273,7 +284,7 @@ class _TopIconButton extends StatelessWidget {
   }
 }
 
-class _HomeContent extends StatelessWidget {
+class _HomeContent extends ConsumerWidget {
   const _HomeContent({
     required this.greeting,
     required this.greetingSubtitle,
@@ -293,10 +304,14 @@ class _HomeContent extends StatelessWidget {
   final void Function(BuildContext context)? onContribuirCardTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scale = (MediaQuery.sizeOf(context).width / HomeScreen._designWidth)
         .clamp(0.86, 1.0)
         .toDouble();
+
+    // Próximo culto: primeiro evento futuro do Firestore (sem horário fixo).
+    final eventos = ref.watch(eventosStreamProvider).valueOrNull ?? [];
+    final proximo = eventos.isNotEmpty ? eventos.first : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,16 +324,22 @@ class _HomeContent extends StatelessWidget {
         SizedBox(height: 20 * scale),
         _WordCard(scale: scale),
         SizedBox(height: 20 * scale),
-        _InfoCard(
-          scale: scale,
-          iconAsset: HomeAssets.calendar,
-          iconWidth: 18,
-          iconHeight: 20,
-          label: HomeMockData.nextServiceLabel,
-          title: HomeMockData.nextServiceTitle,
-          status: HomeMockData.nextServiceStatus,
-          statusAsset: HomeAssets.check,
-          statusColor: HomeScreen._success,
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.pushNamed(context, VisualRoutes.programacao),
+          child: _InfoCard(
+            scale: scale,
+            iconAsset: HomeAssets.calendar,
+            iconWidth: 18,
+            iconHeight: 20,
+            label: HomeMockData.nextServiceLabel,
+            title: proximo?.titulo ?? 'Nenhum culto agendado',
+            status: proximo != null
+                ? '${Formatters.data(proximo.data)} • ${proximo.horario}'
+                : 'Confira a programação',
+            statusAsset: HomeAssets.check,
+            statusColor: HomeScreen._success,
+          ),
         ),
         if (showSecondaryCard) ...[
           SizedBox(height: 16 * scale),

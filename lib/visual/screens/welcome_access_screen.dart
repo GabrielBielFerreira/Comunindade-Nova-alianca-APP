@@ -21,7 +21,7 @@ class _WelcomeAccessScreenState extends State<WelcomeAccessScreen> {
   static const _topHeight = 337.59;
   static const _cardOverlap = 40.59;
 
-  bool _acceptedTerms = true;
+  bool _acceptedTerms = false;
 
   @override
   Widget build(BuildContext context) {
