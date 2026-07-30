@@ -6,10 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/root_gate.dart';
 import 'core/theme/app_theme.dart';
+import 'firebase_options.dart';
 import 'visual/visual_router.dart';
-
-// Descomentar após rodar `flutterfire configure` (gera lib/firebase_options.dart):
-// import 'firebase_options.dart';
 
 /// Handler de mensagens FCM recebidas com o app em background/terminado.
 /// Precisa ser uma função top-level anotada com vm:entry-point.
@@ -38,9 +36,9 @@ Future<void> main() async {
   // firebase_options.dart não estiverem configurados, a inicialização falha —
   // o app ainda abre (degradado) e o RootGate exibe a tela pública.
   try {
-    // Após `flutterfire configure`, prefira:
-    // await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   } catch (e) {
     debugPrint('Falha ao inicializar o Firebase: $e');
