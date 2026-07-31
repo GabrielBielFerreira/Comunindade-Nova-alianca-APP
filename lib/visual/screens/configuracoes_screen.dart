@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/igreja_info.dart';
+import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
 import '../widgets/internal_header.dart';
 
@@ -32,6 +33,29 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   bool _liveNotifications = true;
   bool _eventNotifications = true;
   bool _communicationNotifications = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarPreferencias();
+  }
+
+  Future<void> _carregarPreferencias() async {
+    final valores = await NotificationPreferences.lerTodas();
+    if (!mounted) return;
+    setState(() {
+      _liveNotifications =
+          valores[NotificationPreferences.chaveTransmissoes] ?? true;
+      _eventNotifications =
+          valores[NotificationPreferences.chaveEventos] ?? true;
+      _communicationNotifications =
+          valores[NotificationPreferences.chaveComunicacoes] ?? true;
+    });
+  }
+
+  Future<void> _definirNotificacao(String chave, bool valor) async {
+    await NotificationPreferences.definir(chave, valor);
+  }
 
   Future<void> _openChurchSelection() async {
     final result = await Navigator.pushNamed(
@@ -185,25 +209,41 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                                 scale: scale,
                                 label: 'Notificações de transmissões ao vivo',
                                 value: _liveNotifications,
-                                onChanged: (value) =>
-                                    setState(() => _liveNotifications = value),
+                                onChanged: (value) {
+                                  setState(() => _liveNotifications = value);
+                                  _definirNotificacao(
+                                    NotificationPreferences.chaveTransmissoes,
+                                    value,
+                                  );
+                                },
                               ),
                               _Divider(scale: scale),
                               _SwitchRow(
                                 scale: scale,
                                 label: 'Notificações de eventos',
                                 value: _eventNotifications,
-                                onChanged: (value) =>
-                                    setState(() => _eventNotifications = value),
+                                onChanged: (value) {
+                                  setState(() => _eventNotifications = value);
+                                  _definirNotificacao(
+                                    NotificationPreferences.chaveEventos,
+                                    value,
+                                  );
+                                },
                               ),
                               _Divider(scale: scale),
                               _SwitchRow(
                                 scale: scale,
                                 label: 'Notificações de comunicações',
                                 value: _communicationNotifications,
-                                onChanged: (value) => setState(
-                                  () => _communicationNotifications = value,
-                                ),
+                                onChanged: (value) {
+                                  setState(
+                                    () => _communicationNotifications = value,
+                                  );
+                                  _definirNotificacao(
+                                    NotificationPreferences.chaveComunicacoes,
+                                    value,
+                                  );
+                                },
                               ),
                             ],
                           ),

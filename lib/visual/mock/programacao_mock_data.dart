@@ -69,6 +69,8 @@ class ProgramacaoDetalhesData {
     required this.locationName,
     required this.address,
     required this.hasLiveStream,
+    this.eventoId,
+    this.dataEvento,
   });
 
   final String title;
@@ -81,6 +83,11 @@ class ProgramacaoDetalhesData {
   final String locationName;
   final String address;
   final bool hasLiveStream;
+
+  /// Id e data reais do evento (nulos no mock estático) — usados para agendar
+  /// o lembrete local.
+  final String? eventoId;
+  final DateTime? dataEvento;
 }
 
 class ProgramacaoMockData {

@@ -4,6 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
 import 'navigation_service.dart';
+import 'notification_preferences.dart';
 
 class FcmService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -18,6 +19,9 @@ class FcmService {
 
     final token = await _messaging.getToken();
     if (token != null) await _salvarToken(token);
+
+    // Reaplica as preferências de notificação (inscrição nos tópicos).
+    await NotificationPreferences.aplicarTodas();
 
     _messaging.onTokenRefresh.listen(_salvarToken);
 

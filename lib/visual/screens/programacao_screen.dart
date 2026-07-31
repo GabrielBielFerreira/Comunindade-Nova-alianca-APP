@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/services/reminder_service.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/eventos/data/evento_model.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
@@ -42,6 +43,8 @@ ProgramacaoDetalhesData _eventoParaDetalhes(EventoModel e) =>
       locationName: e.local,
       address: '',
       hasLiveStream: false,
+      eventoId: e.id,
+      dataEvento: e.data,
     );
 
 class ProgramacaoScreen extends ConsumerStatefulWidget {
@@ -95,6 +98,21 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
     Navigator.pushNamed(
       context,
       widget.isLeader ? VisualRoutes.avisosLeader : VisualRoutes.avisos,
+    );
+  }
+
+  Future<void> _agendarLembrete(EventoModel evento) async {
+    final quando = await ReminderService.agendarEvento(
+      id: ReminderService.idDoEvento(evento.id),
+      titulo: evento.titulo,
+      dataEvento: evento.data,
+      local: evento.local,
+    );
+    if (!mounted) return;
+    _showMessage(
+      quando != null
+          ? 'Lembrete agendado para ${Formatters.dataHora(quando)}.'
+          : 'Este evento já está próximo ou já ocorreu.',
     );
   }
 
@@ -170,9 +188,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                 child: ProgramacaoCard(
                   event: _eventoParaCard(doDia[index]),
                   scale: scale,
-                  onReminderTap: () => _showMessage(
-                    'Você receberá um lembrete por notificação.',
-                  ),
+                  onReminderTap: () => _agendarLembrete(doDia[index]),
                   onDetailsTap: () => Navigator.push(
                     context,
                     MaterialPageRoute<void>(

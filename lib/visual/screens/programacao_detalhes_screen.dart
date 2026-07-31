@@ -5,6 +5,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/igreja_info.dart';
+import '../../core/services/reminder_service.dart';
+import '../../core/utils/formatters.dart';
 import '../mock/programacao_mock_data.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
@@ -51,6 +53,40 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
           margin: EdgeInsets.fromLTRB(16, 0, 16, bottomMargin),
         ),
       );
+  }
+
+  /// Agenda ou cancela um lembrete local real para o evento.
+  Future<void> _alternarLembrete() async {
+    final data = widget.details.dataEvento;
+    final eventoId = widget.details.eventoId;
+    if (data == null || eventoId == null) {
+      // Sem data/id reais (ex.: rota estática) — não promete o que não cumpre.
+      _showMessage('Abra o evento pela programação para ativar o lembrete.');
+      return;
+    }
+
+    final notifId = ReminderService.idDoEvento(eventoId);
+    if (_reminderEnabled) {
+      await ReminderService.cancelar(notifId);
+      if (!mounted) return;
+      setState(() => _reminderEnabled = false);
+      _showMessage('Lembrete cancelado.');
+      return;
+    }
+
+    final quando = await ReminderService.agendarEvento(
+      id: notifId,
+      titulo: widget.details.title,
+      dataEvento: data,
+      local: widget.details.locationName,
+    );
+    if (!mounted) return;
+    if (quando != null) {
+      setState(() => _reminderEnabled = true);
+      _showMessage('Lembrete agendado para ${Formatters.dataHora(quando)}.');
+    } else {
+      _showMessage('Este evento já está próximo ou já ocorreu.');
+    }
   }
 
   /// Abre o mapa no endereço do evento (ou da igreja, se não houver endereço).
@@ -149,14 +185,7 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
                                     : 'Lembrar-me',
                                 iconAsset: ProgramacaoAssets.detailsBell,
                                 filled: !_reminderEnabled,
-                                onTap: () {
-                                  setState(
-                                    () => _reminderEnabled = !_reminderEnabled,
-                                  );
-                                  _showMessage(
-                                    'Você receberá um lembrete por notificação.',
-                                  );
-                                },
+                                onTap: _alternarLembrete,
                               ),
                               SizedBox(height: 16 * scale),
                               _ActionButton(

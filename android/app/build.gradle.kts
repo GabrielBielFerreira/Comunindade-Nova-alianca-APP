@@ -23,6 +23,8 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // Necessário para flutter_local_notifications (APIs de data/hora Java 8+).
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -77,4 +79,9 @@ if (file("google-services.json").exists()) {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Suporte às APIs de data/hora Java 8+ em Android antigos.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
