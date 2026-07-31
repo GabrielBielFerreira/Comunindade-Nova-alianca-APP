@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -217,19 +218,16 @@ class _CampaignImage extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: radius,
-      child: Image.network(
-        url,
+      child: CachedNetworkImage(
+        imageUrl: url,
         height: 180 * scale,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => placeholder,
-        loadingBuilder: (context, child, progress) {
-          if (progress == null) return child;
-          return SizedBox(
-            height: 180 * scale,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        },
+        errorWidget: (_, _, _) => placeholder,
+        placeholder: (_, _) => SizedBox(
+          height: 180 * scale,
+          child: const Center(child: CircularProgressIndicator()),
+        ),
       ),
     );
   }

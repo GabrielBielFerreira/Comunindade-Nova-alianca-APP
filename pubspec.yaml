@@ -79,6 +79,10 @@ flutter:
   uses-material-design: true
 
   assets:
+    # Fontes Montserrat/Inter empacotadas (estáticas, geradas a partir das
+    # fontes variáveis oficiais OFL). O google_fonts as usa localmente em vez
+    # de baixá-las — app mais rápido e funciona offline no primeiro acesso.
+    - assets/fonts/
     - assets/images/
     - assets/images/figma/
     - assets/images/figma/auth/
