@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Notificações push no Android 13+ (solicitada em runtime pelo FCM) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Busca por voz na Bíblia (fala → texto), solicitada em runtime -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <application
         android:label="@string/app_name"
@@ -50,6 +52,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Reconhecimento de voz (speech_to_text) no Android 11+ -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>

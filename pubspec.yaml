@@ -57,6 +57,9 @@ dependencies:
   # Compartilhamento
   share_plus: ^10.0.2
 
+  # Acessibilidade: busca por voz (fala → texto)
+  speech_to_text: ^7.0.0
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
