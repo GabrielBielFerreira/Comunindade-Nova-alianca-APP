@@ -72,6 +72,7 @@ android {
 // para não quebrar o build antes de o Firebase estar configurado.
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 flutter {

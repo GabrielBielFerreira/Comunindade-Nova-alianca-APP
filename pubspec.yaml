@@ -19,6 +19,8 @@ dependencies:
   firebase_storage: ^12.3.4
   firebase_messaging: ^15.1.3
   cloud_functions: ^5.1.3
+  firebase_crashlytics: ^4.1.3
+  firebase_analytics: ^11.3.3
 
   # Estado
   flutter_riverpod: ^2.5.1
