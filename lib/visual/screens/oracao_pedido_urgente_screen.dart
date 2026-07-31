@@ -72,9 +72,11 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
         body: SafeArea(
           top: false,
           bottom: false,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = (constraints.maxWidth / _designWidth)
+          // Tamanho de tela (estável com o teclado aberto) evita reconstruir a
+          // árvore a cada quadro da animação do teclado.
+          child: Builder(
+            builder: (context) {
+              final scale = (MediaQuery.sizeOf(context).width / _designWidth)
                   .clamp(0.86, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;

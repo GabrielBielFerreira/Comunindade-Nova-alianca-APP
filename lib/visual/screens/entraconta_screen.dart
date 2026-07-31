@@ -86,12 +86,17 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final scale = (constraints.maxWidth / 391).clamp(0.86, 1.0);
+        // Usa o tamanho de tela (estável quando o teclado abre) em vez de
+        // LayoutBuilder — assim a árvore NÃO é reconstruída a cada quadro da
+        // animação do teclado (evita a lentidão). O SingleChildScrollView
+        // continua permitindo rolar até o campo focado.
+        child: Builder(
+          builder: (context) {
+            final screen = MediaQuery.sizeOf(context);
+            final scale = (screen.width / 391).clamp(0.86, 1.0);
             final headerHeight = 287.0 * scale;
             final figmaCardHeight = 534.0 * scale;
-            final remainingHeight = constraints.maxHeight - headerHeight;
+            final remainingHeight = screen.height - headerHeight;
             final cardHeight = remainingHeight > figmaCardHeight
                 ? remainingHeight
                 : figmaCardHeight;
@@ -99,7 +104,7 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
             return SingleChildScrollView(
               physics: const ClampingScrollPhysics(),
               child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                constraints: BoxConstraints(minHeight: screen.height),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [

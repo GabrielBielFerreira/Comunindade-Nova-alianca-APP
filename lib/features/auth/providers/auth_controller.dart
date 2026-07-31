@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/fcm_service.dart';
@@ -42,10 +44,14 @@ class AuthActions {
   /// Logout completo: desativa o token FCM do dispositivo antes de encerrar a
   /// sessão para não continuar recebendo notificações após sair.
   Future<void> sair() async {
+    // A desativação do token FCM depende de rede (getToken + Firestore) e pode
+    // demorar/travar; ela NUNCA deve bloquear o logout. Limitamos o tempo e
+    // ignoramos falhas — o token é reconciliado no próximo login.
     try {
-      await FcmService.desativarToken();
+      await FcmService.desativarToken()
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
     } catch (_) {
-      // Falha ao desativar token não deve impedir o logout.
+      // Timeout/falha ao desativar token não deve impedir o logout.
     }
     await _auth.logout();
   }
