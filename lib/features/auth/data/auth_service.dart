@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'usuario_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -43,12 +45,55 @@ class AuthService {
     return credential;
   }
 
+  /// Login/cadastro com Google. Retorna `null` se o usuário cancelar.
+  /// Se for o primeiro acesso, provisiona `usuarios/{uid}` como membro pendente
+  /// (mesma esteira de aprovação do cadastro por e-mail).
+  Future<UserCredential?> entrarComGoogle() async {
+    final googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) return null; // cancelado pelo usuário
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCred = await _auth.signInWithCredential(credential);
+    await _garantirDocumentoUsuario(userCred.user!);
+    return userCred;
+  }
+
+  /// Cria o documento do usuário na primeira vez (perfil membro, status
+  /// pendente). Se já existir, não altera nada.
+  Future<void> _garantirDocumentoUsuario(User user) async {
+    final ref = _db.collection('usuarios').doc(user.uid);
+    final doc = await ref.get();
+    if (doc.exists) return;
+
+    final usuario = UsuarioModel(
+      uid: user.uid,
+      nome: user.displayName ?? '',
+      email: user.email ?? '',
+      telefone: user.phoneNumber ?? '',
+      fotoUrl: user.photoURL,
+      dataCadastro: DateTime.now(),
+      perfil: PerfilUsuario.membro,
+      status: StatusUsuario.pendente,
+    );
+    await ref.set(usuario.toMap());
+  }
+
   Future<void> esqueciSenha(String email) {
     return _auth.sendPasswordResetEmail(email: email);
   }
 
-  Future<void> logout() {
-    return _auth.signOut();
+  Future<void> logout() async {
+    // Desconecta também do Google para permitir trocar de conta no próximo
+    // acesso. Falha aqui não deve impedir o logout do Firebase.
+    try {
+      await _googleSignIn.signOut();
+    } catch (_) {}
+    await _auth.signOut();
   }
 
   Future<UsuarioModel?> getUsuarioAtual() async {

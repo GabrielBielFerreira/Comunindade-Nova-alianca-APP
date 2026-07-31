@@ -106,6 +106,24 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
     }
   }
 
+  Future<void> _submitGoogle() async {
+    if (_loading) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _loading = true);
+    try {
+      final ok = await ref.read(authActionsProvider).entrarComGoogle();
+      // Sucesso: o RootGate reage à sessão; voltamos à raiz. Cancelamento
+      // (ok == false) não faz nada.
+      if (ok && mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) _showMessage(mensagemErroAuth(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -154,6 +172,7 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
                               () => _obscurePassword = !_obscurePassword,
                             ),
                             onSubmit: _submitLogin,
+                            onGoogle: _submitGoogle,
                           ),
                         ],
                       ),
@@ -259,6 +278,7 @@ class _LoginCard extends StatelessWidget {
     required this.loading,
     required this.onTogglePassword,
     required this.onSubmit,
+    required this.onGoogle,
   });
 
   final double scale;
@@ -269,6 +289,7 @@ class _LoginCard extends StatelessWidget {
   final bool loading;
   final VoidCallback onTogglePassword;
   final VoidCallback onSubmit;
+  final VoidCallback onGoogle;
 
   @override
   Widget build(BuildContext context) {
@@ -328,6 +349,25 @@ class _LoginCard extends StatelessWidget {
           ),
           SizedBox(height: 20 * scale),
           _SubmitButton(scale: scale, onTap: onSubmit, loading: loading),
+          SizedBox(height: 14 * scale),
+          Row(
+            children: [
+              const Expanded(child: Divider(color: EntracontaScreen._border)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10 * scale),
+                child: Text(
+                  'ou',
+                  style: GoogleFonts.inter(
+                    fontSize: 13 * scale,
+                    color: EntracontaScreen._muted,
+                  ),
+                ),
+              ),
+              const Expanded(child: Divider(color: EntracontaScreen._border)),
+            ],
+          ),
+          SizedBox(height: 14 * scale),
+          _GoogleButton(scale: scale, onTap: loading ? null : onGoogle),
           SizedBox(height: 16 * scale),
           GestureDetector(
             onTap: () =>
@@ -515,6 +555,46 @@ class _FormFieldBlock extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Botão "Continuar com Google". Serve tanto para entrar quanto para cadastrar
+/// (novos usuários entram na esteira de aprovação como membro pendente).
+class _GoogleButton extends StatelessWidget {
+  const _GoogleButton({required this.scale, required this.onTap});
+
+  final double scale;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52 * scale,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(
+          Icons.g_mobiledata_rounded,
+          size: 32 * scale,
+          color: const Color(0xFF4285F4),
+        ),
+        label: Text(
+          'Continuar com Google',
+          style: GoogleFonts.inter(
+            fontSize: 15 * scale,
+            fontWeight: FontWeight.w600,
+            color: EntracontaScreen._text,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: EntracontaScreen._border),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16 * scale),
+          ),
+        ),
+      ),
     );
   }
 }

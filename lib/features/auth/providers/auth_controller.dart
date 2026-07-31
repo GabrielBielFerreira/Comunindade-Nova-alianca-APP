@@ -41,6 +41,12 @@ class AuthActions {
     return _auth.esqueciSenha(email);
   }
 
+  /// Retorna `false` se o usuário cancelar o fluxo do Google (sem erro).
+  Future<bool> entrarComGoogle() async {
+    final cred = await _auth.entrarComGoogle();
+    return cred != null;
+  }
+
   /// Logout completo: desativa o token FCM do dispositivo antes de encerrar a
   /// sessão para não continuar recebendo notificações após sair.
   Future<void> sair() async {
