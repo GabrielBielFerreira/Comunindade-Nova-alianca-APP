@@ -2,7 +2,7 @@ name: nova_alianca_app
 description: "Nova Aliança App — plataforma digital da Comunidade Nova Aliança (Olinda-PE)"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.11.4
