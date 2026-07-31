@@ -31,13 +31,6 @@ class ProgramacaoAssets {
       'assets/images/figma/programacao/details_share.svg';
 }
 
-class ProgramacaoDayData {
-  const ProgramacaoDayData(this.weekday, this.day);
-
-  final String weekday;
-  final int day;
-}
-
 class ProgramacaoEventData {
   const ProgramacaoEventData({
     required this.category,
@@ -93,8 +86,6 @@ class ProgramacaoDetalhesData {
 class ProgramacaoMockData {
   const ProgramacaoMockData._();
 
-  static const weekLabel = '10 a 16 de junho';
-  static const eventDay = 15;
   static const _detailsDescription =
       'Junte-se a nós para o Culto da Família neste domingo. Devido a um '
       'evento especial de liderança à tarde, nosso horário noturno foi '
@@ -128,37 +119,4 @@ class ProgramacaoMockData {
     address: _detailsAddress,
     hasLiveStream: false,
   );
-
-  static const days = <ProgramacaoDayData>[
-    ProgramacaoDayData('SEG', 10),
-    ProgramacaoDayData('TER', 11),
-    ProgramacaoDayData('QUA', 12),
-    ProgramacaoDayData('QUI', 13),
-    ProgramacaoDayData('SEX', 14),
-    ProgramacaoDayData('SAB', 15),
-  ];
-
-  static const events = <ProgramacaoEventData>[
-    ProgramacaoEventData(
-      category: 'PROGRAMAÇÃO',
-      title: 'Culto de doutrina',
-      time: '17h',
-      location: 'igreja sede',
-      reminderEnabled: true,
-    ),
-    ProgramacaoEventData(
-      category: 'PROGRAMAÇÃO',
-      title: 'Sala de Oração',
-      time: '20h',
-      location: 'igreja sede',
-      reminderEnabled: true,
-    ),
-    ProgramacaoEventData(
-      category: 'REUNIÃO',
-      title: 'Reunião de Planejamento',
-      time: '22h',
-      location: 'Casa do pastor',
-      reminderEnabled: false,
-    ),
-  ];
 }

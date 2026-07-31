@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/avisos/data/aviso_model.dart';
 import '../../features/avisos/providers/avisos_providers.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../mock/avisos_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -13,6 +15,7 @@ import '../widgets/auth_widgets.dart';
 import '../widgets/aviso_card.dart';
 import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../widgets/mais_menu.dart';
 import 'aviso_detalhes_screen.dart';
 
 /// Converte o aviso do Firestore no formato usado pelo card visual.
@@ -32,7 +35,7 @@ AvisoData _avisoParaCard(AvisoModel m) {
     title: m.titulo,
     description: m.conteudo,
     publishedAt: 'Publicado ${Formatters.dataRelativa(m.publicadoEm)}',
-    publishedMetadata: '',
+    publishedMetadata: 'Publicado em ${Formatters.dataHora(m.publicadoEm)}',
     detailDescription: m.conteudo,
     detailDate: Formatters.data(m.publicadoEm),
     detailTime: Formatters.hora(m.publicadoEm),
@@ -153,7 +156,11 @@ class _AvisosScreenState extends ConsumerState<AvisosScreen> {
                 children: [
                   Column(
                     children: [
-                      _AvisosTopBar(scale: scale, topPadding: topPadding),
+                      _AvisosTopBar(
+                        scale: scale,
+                        topPadding: topPadding,
+                        isLeader: widget.isLeader,
+                      ),
                       Expanded(
                         child: SingleChildScrollView(
                           physics: const ClampingScrollPhysics(),
@@ -234,14 +241,21 @@ class _AvisosScreenState extends ConsumerState<AvisosScreen> {
   }
 }
 
-class _AvisosTopBar extends StatelessWidget {
-  const _AvisosTopBar({required this.scale, required this.topPadding});
+class _AvisosTopBar extends ConsumerWidget {
+  const _AvisosTopBar({
+    required this.scale,
+    required this.topPadding,
+    required this.isLeader,
+  });
 
   final double scale;
   final double topPadding;
+  final bool isLeader;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final naoLidas = ref.watch(naoLidasCountProvider);
+    final isLider = ref.watch(usuarioProvider)?.isLider ?? isLeader;
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -282,7 +296,7 @@ class _AvisosTopBar extends StatelessWidget {
               scale: scale,
               width: 16,
               height: 20,
-              showDot: true,
+              showDot: naoLidas > 0,
               onTap: () =>
                   Navigator.pushNamed(context, VisualRoutes.notificacoes),
             ),
@@ -292,6 +306,7 @@ class _AvisosTopBar extends StatelessWidget {
               scale: scale,
               width: 18,
               height: 12,
+              onTap: () => showMaisMenu(context, isLider: isLider),
             ),
           ],
         ),

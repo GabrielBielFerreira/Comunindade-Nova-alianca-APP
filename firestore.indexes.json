@@ -9,14 +9,6 @@
       ]
     },
     {
-      "collectionGroup": "eventos",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "ativo", "order": "ASCENDING" },
-        { "fieldPath": "data_inicio", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "pedidos_oracao",
       "queryScope": "COLLECTION",
       "fields": [

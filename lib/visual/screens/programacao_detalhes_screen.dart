@@ -681,7 +681,9 @@ class _LocationCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  details.locationName,
+                  details.locationName.trim().isNotEmpty
+                      ? details.locationName
+                      : 'Local a confirmar',
                   style: GoogleFonts.inter(
                     fontSize: 16 * scale,
                     fontWeight: FontWeight.w400,
@@ -689,16 +691,18 @@ class _LocationCard extends StatelessWidget {
                     color: _ProgramacaoDetalhesScreenState._title,
                   ),
                 ),
-                SizedBox(height: 4 * scale),
-                Text(
-                  details.address,
-                  style: GoogleFonts.inter(
-                    fontSize: 12 * scale,
-                    fontWeight: FontWeight.w400,
-                    height: 20 / 12,
-                    color: _ProgramacaoDetalhesScreenState._title,
+                if (details.address.trim().isNotEmpty) ...[
+                  SizedBox(height: 4 * scale),
+                  Text(
+                    details.address,
+                    style: GoogleFonts.inter(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w400,
+                      height: 20 / 12,
+                      color: _ProgramacaoDetalhesScreenState._title,
+                    ),
                   ),
-                ),
+                ],
                 SizedBox(height: 4 * scale),
                 InkWell(
                   onTap: onMap,

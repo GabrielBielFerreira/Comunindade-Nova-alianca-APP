@@ -232,6 +232,8 @@ class _DetailsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final imageAsset = notice.imageAsset;
+    final hasLocation = notice.detailLocation.trim().isNotEmpty ||
+        notice.detailAddress.trim().isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,7 +283,7 @@ class _DetailsContent extends StatelessWidget {
           ),
         ),
         SizedBox(height: 23 * scale),
-        _InformationCard(notice: notice, scale: scale),
+        _InformationCard(notice: notice, scale: scale, hasLocation: hasLocation),
         if (notice.attachments.isNotEmpty) ...[
           SizedBox(height: 23 * scale),
           Text(
@@ -308,6 +310,7 @@ class _DetailsContent extends StatelessWidget {
         SizedBox(height: 23 * scale),
         _DetailsActions(
           scale: scale,
+          hasLocation: hasLocation,
           onSchedule: onSchedule,
           onLocation: onLocation,
         ),
@@ -387,10 +390,15 @@ class _NoticeHeading extends StatelessWidget {
 }
 
 class _InformationCard extends StatelessWidget {
-  const _InformationCard({required this.notice, required this.scale});
+  const _InformationCard({
+    required this.notice,
+    required this.scale,
+    required this.hasLocation,
+  });
 
   final AvisoData notice;
   final double scale;
+  final bool hasLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -441,30 +449,36 @@ class _InformationCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 16 * scale),
-          Container(
-            width: double.infinity,
-            height: 1,
-            color: AvisoDetalhesScreen._softBorder,
-          ),
-          SizedBox(height: 16 * scale),
-          _InformationItem(
-            label: 'LOCAL',
-            value: notice.detailLocation,
-            asset: AvisosMockData.detailsHomeAsset,
-            iconWidth: 9.33,
-            iconHeight: 10.5,
-            scale: scale,
-          ),
-          SizedBox(height: 16 * scale),
-          _InformationItem(
-            label: 'ENDEREÇO',
-            value: notice.detailAddress,
-            asset: AvisosMockData.detailsLocationAsset,
-            iconWidth: 9.33,
-            iconHeight: 11.67,
-            scale: scale,
-          ),
+          if (hasLocation) ...[
+            if (notice.detailLocation.trim().isNotEmpty) ...[
+              SizedBox(height: 16 * scale),
+              Container(
+                width: double.infinity,
+                height: 1,
+                color: AvisoDetalhesScreen._softBorder,
+              ),
+              SizedBox(height: 16 * scale),
+              _InformationItem(
+                label: 'LOCAL',
+                value: notice.detailLocation,
+                asset: AvisosMockData.detailsHomeAsset,
+                iconWidth: 9.33,
+                iconHeight: 10.5,
+                scale: scale,
+              ),
+            ],
+            if (notice.detailAddress.trim().isNotEmpty) ...[
+              SizedBox(height: 16 * scale),
+              _InformationItem(
+                label: 'ENDEREÇO',
+                value: notice.detailAddress,
+                asset: AvisosMockData.detailsLocationAsset,
+                iconWidth: 9.33,
+                iconHeight: 11.67,
+                scale: scale,
+              ),
+            ],
+          ],
         ],
       ),
     );
@@ -605,11 +619,13 @@ class _AttachmentCard extends StatelessWidget {
 class _DetailsActions extends StatelessWidget {
   const _DetailsActions({
     required this.scale,
+    required this.hasLocation,
     required this.onSchedule,
     required this.onLocation,
   });
 
   final double scale;
+  final bool hasLocation;
   final VoidCallback onSchedule;
   final VoidCallback onLocation;
 
@@ -633,14 +649,16 @@ class _DetailsActions extends StatelessWidget {
             filled: true,
             onTap: onSchedule,
           ),
-          SizedBox(height: 8 * scale),
-          _ActionButton(
-            scale: scale,
-            label: 'Abrir localização',
-            iconAsset: AvisosMockData.detailsLocationAsset,
-            filled: false,
-            onTap: onLocation,
-          ),
+          if (hasLocation) ...[
+            SizedBox(height: 8 * scale),
+            _ActionButton(
+              scale: scale,
+              label: 'Abrir localização',
+              iconAsset: AvisosMockData.detailsLocationAsset,
+              filled: false,
+              onTap: onLocation,
+            ),
+          ],
         ],
       ),
     );

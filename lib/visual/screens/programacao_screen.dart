@@ -67,7 +67,14 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
   static const _line = Color(0xFFE5E7EB);
   static const _soft = Color(0xFFF5E6EC);
 
-  int _selectedDay = ProgramacaoMockData.eventDay;
+  /// Dia selecionado (apenas data, sem horário). `null` = usa o primeiro dia
+  /// disponível na lista real de eventos.
+  DateTime? _selectedDay;
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  static String _capitalizar(String s) =>
+      s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
 
   void _showMessage(String message) {
     final bottomMargin = MediaQuery.paddingOf(context).bottom + 76;
@@ -90,7 +97,9 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
     );
   }
 
-  Widget _buildEventos(double scale) {
+  /// Corpo da programação: trata loading/erro/vazio e, com dados, monta o
+  /// seletor de dias REAL (derivado das datas dos eventos) filtrando a lista.
+  Widget _buildBody(double scale) {
     final async = ref.watch(eventosStreamProvider);
     return async.when(
       loading: () => Padding(
@@ -115,11 +124,48 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
             onNotices: _goToNotices,
           );
         }
+
+        // Dias distintos (ordenados) a partir das datas reais dos eventos.
+        final dias = <DateTime>[];
+        for (final e in lista) {
+          final chave = _dateOnly(e.data);
+          if (!dias.contains(chave)) dias.add(chave);
+        }
+        dias.sort();
+
+        final selecionado =
+            (_selectedDay != null && dias.contains(_selectedDay))
+                ? _selectedDay!
+                : dias.first;
+        final idx = dias.indexOf(selecionado);
+        final doDia =
+            lista.where((e) => _dateOnly(e.data) == selecionado).toList();
+
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (var index = 0; index < lista.length; index++) ...[
+            _WeekHeading(
+              scale: scale,
+              label: _capitalizar(Formatters.mes(selecionado)),
+              showArrows: dias.length > 1,
+              onPrev: idx > 0
+                  ? () => setState(() => _selectedDay = dias[idx - 1])
+                  : null,
+              onNext: idx < dias.length - 1
+                  ? () => setState(() => _selectedDay = dias[idx + 1])
+                  : null,
+            ),
+            SizedBox(height: 24 * scale),
+            _DaySelector(
+              scale: scale,
+              dias: dias,
+              selecionado: selecionado,
+              onSelected: (d) => setState(() => _selectedDay = d),
+            ),
+            SizedBox(height: 22 * scale),
+            for (var index = 0; index < doDia.length; index++) ...[
               ProgramacaoCard(
-                event: _eventoParaCard(lista[index]),
+                event: _eventoParaCard(doDia[index]),
                 scale: scale,
                 onReminderTap: () => _showMessage(
                   'Você receberá um lembrete por notificação.',
@@ -131,13 +177,13 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                       name: VisualRoutes.programacaoDetalhes,
                     ),
                     builder: (_) => ProgramacaoDetalhesScreen(
-                      details: _eventoParaDetalhes(lista[index]),
+                      details: _eventoParaDetalhes(doDia[index]),
                       isLeader: widget.isLeader,
                     ),
                   ),
                 ),
               ),
-              if (index < lista.length - 1) SizedBox(height: 16 * scale),
+              if (index < doDia.length - 1) SizedBox(height: 16 * scale),
             ],
           ],
         );
@@ -175,9 +221,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                       _ProgramacaoHeader(
                         scale: scale,
                         topPadding: topPadding,
-                        onCalendar: () => _showMessage(
-                          'Veja a lista de eventos abaixo.',
-                        ),
+                        onCalendar: () => setState(() => _selectedDay = null),
                       ),
                       Expanded(
                         child: SingleChildScrollView(
@@ -188,27 +232,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
                             16 * scale,
                             navigationHeight + 24 * scale,
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _WeekHeading(
-                                scale: scale,
-                                onWeekChange: () => _showMessage(
-                                  'Mostrando os próximos eventos.',
-                                ),
-                              ),
-                              SizedBox(height: 24 * scale),
-                              _DaySelector(
-                                scale: scale,
-                                selectedDay: _selectedDay,
-                                onSelected: (day) {
-                                  setState(() => _selectedDay = day);
-                                },
-                              ),
-                              SizedBox(height: 22 * scale),
-                              _buildEventos(scale),
-                            ],
-                          ),
+                          child: _buildBody(scale),
                         ),
                       ),
                     ],
@@ -328,10 +352,19 @@ class _HeaderButton extends StatelessWidget {
 }
 
 class _WeekHeading extends StatelessWidget {
-  const _WeekHeading({required this.scale, required this.onWeekChange});
+  const _WeekHeading({
+    required this.scale,
+    required this.label,
+    required this.showArrows,
+    this.onPrev,
+    this.onNext,
+  });
 
   final double scale;
-  final VoidCallback onWeekChange;
+  final String label;
+  final bool showArrows;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +372,7 @@ class _WeekHeading extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            'Visão Semanal',
+            'Próximos eventos',
             style: GoogleFonts.montserrat(
               fontSize: 20 * scale,
               fontWeight: FontWeight.w600,
@@ -348,14 +381,17 @@ class _WeekHeading extends StatelessWidget {
             ),
           ),
         ),
-        _WeekArrow(
-          scale: scale,
-          asset: ProgramacaoAssets.weekLeft,
-          onTap: onWeekChange,
-        ),
-        SizedBox(width: 8 * scale),
+        if (showArrows) ...[
+          _WeekArrow(
+            scale: scale,
+            asset: ProgramacaoAssets.weekLeft,
+            enabled: onPrev != null,
+            onTap: onPrev,
+          ),
+          SizedBox(width: 8 * scale),
+        ],
         Text(
-          ProgramacaoMockData.weekLabel,
+          label,
           style: GoogleFonts.inter(
             fontSize: 14 * scale,
             fontWeight: FontWeight.w600,
@@ -363,12 +399,15 @@ class _WeekHeading extends StatelessWidget {
             color: _ProgramacaoScreenState._darkPrimary,
           ),
         ),
-        SizedBox(width: 8 * scale),
-        _WeekArrow(
-          scale: scale,
-          asset: ProgramacaoAssets.weekRight,
-          onTap: onWeekChange,
-        ),
+        if (showArrows) ...[
+          SizedBox(width: 8 * scale),
+          _WeekArrow(
+            scale: scale,
+            asset: ProgramacaoAssets.weekRight,
+            enabled: onNext != null,
+            onTap: onNext,
+          ),
+        ],
       ],
     );
   }
@@ -378,39 +417,51 @@ class _WeekArrow extends StatelessWidget {
   const _WeekArrow({
     required this.scale,
     required this.asset,
+    required this.enabled,
     required this.onTap,
   });
 
   final double scale;
   final String asset;
-  final VoidCallback onTap;
+  final bool enabled;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: SizedBox(
-        width: 16 * scale,
-        height: 32 * scale,
-        child: Center(
-          child: AuthAssetImage(asset, width: 6.2 * scale, height: 10 * scale),
+    return Opacity(
+      opacity: enabled ? 1 : 0.3,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(999),
+        child: SizedBox(
+          width: 16 * scale,
+          height: 32 * scale,
+          child: Center(
+            child:
+                AuthAssetImage(asset, width: 6.2 * scale, height: 10 * scale),
+          ),
         ),
       ),
     );
   }
 }
 
+/// Seletor de dias construído a partir das datas REAIS dos eventos.
 class _DaySelector extends StatelessWidget {
   const _DaySelector({
     required this.scale,
-    required this.selectedDay,
+    required this.dias,
+    required this.selecionado,
     required this.onSelected,
   });
 
   final double scale;
-  final int selectedDay;
-  final ValueChanged<int> onSelected;
+  final List<DateTime> dias;
+  final DateTime selecionado;
+  final ValueChanged<DateTime> onSelected;
+
+  // Abreviações pt-BR indexadas por DateTime.weekday (1=segunda … 7=domingo).
+  static const _semana = ['SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB', 'DOM'];
 
   @override
   Widget build(BuildContext context) {
@@ -419,14 +470,14 @@ class _DaySelector extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: ProgramacaoMockData.days.length,
+        itemCount: dias.length,
         separatorBuilder: (_, index) => SizedBox(width: 6.4 * scale),
         itemBuilder: (context, index) {
-          final day = ProgramacaoMockData.days[index];
-          final selected = day.day == selectedDay;
+          final dia = dias[index];
+          final selected = dia == selecionado;
 
           return InkWell(
-            onTap: () => onSelected(day.day),
+            onTap: () => onSelected(dia),
             borderRadius: BorderRadius.circular(12 * scale),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
@@ -441,7 +492,7 @@ class _DaySelector extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    day.weekday,
+                    _semana[dia.weekday - 1],
                     style: GoogleFonts.inter(
                       fontSize: 12 * scale,
                       fontWeight: FontWeight.w400,
@@ -453,7 +504,7 @@ class _DaySelector extends StatelessWidget {
                   ),
                   SizedBox(height: 5 * scale),
                   Text(
-                    '${day.day}',
+                    '${dia.day}',
                     style: GoogleFonts.montserrat(
                       fontSize: 20 * scale,
                       fontWeight: FontWeight.w600,
