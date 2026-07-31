@@ -141,17 +141,6 @@ class StatusContribuicaoScreen extends StatelessWidget {
     );
   }
 
-  static void showFutureHistoryMessage(BuildContext context) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text('Histórico será conectado na próxima etapa'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   static void openHistory(
     BuildContext context, {
     required bool isLeader,

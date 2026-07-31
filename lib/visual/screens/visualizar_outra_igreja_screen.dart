@@ -64,17 +64,6 @@ class _VisualizarOutraIgrejaScreenState
         .toList();
   }
 
-  void _showFutureMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   /// Abre o bottom sheet de confirmação. Ao confirmar, fecha o sheet com o
   /// nome da igreja e devolve esse nome para a tela de Configurações.
   Future<void> _showChurchDetails(ChurchOptionData church) async {
@@ -143,13 +132,6 @@ class _VisualizarOutraIgrejaScreenState
                             controller: _searchController,
                             onChanged: (value) =>
                                 setState(() => _query = value),
-                          ),
-                          SizedBox(height: 12 * scale),
-                          _LocationButton(
-                            scale: scale,
-                            onTap: () => _showFutureMessage(
-                              'Localização atual será conectada futuramente',
-                            ),
                           ),
                           SizedBox(height: 12 * scale),
                           _InfoCard(scale: scale),
@@ -250,47 +232,6 @@ class _SearchField extends StatelessWidget {
           borderRadius: BorderRadius.circular(12 * scale),
           borderSide: const BorderSide(
             color: _VisualizarOutraIgrejaScreenState._primary,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationButton extends StatelessWidget {
-  const _LocationButton({required this.scale, required this.onTap});
-
-  final double scale;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: _VisualizarOutraIgrejaScreenState._soft,
-      borderRadius: BorderRadius.circular(12 * scale),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12 * scale),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 14 * scale),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.my_location,
-                size: 20 * scale,
-                color: _VisualizarOutraIgrejaScreenState._primary,
-              ),
-              SizedBox(width: 8 * scale),
-              Text(
-                'Usar localização atual',
-                style: GoogleFonts.inter(
-                  fontSize: 14 * scale,
-                  fontWeight: FontWeight.w600,
-                  color: _VisualizarOutraIgrejaScreenState._primary,
-                ),
-              ),
-            ],
           ),
         ),
       ),

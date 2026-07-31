@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/constants/igreja_info.dart';
+import '../../features/contribuir/data/pix_payload.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
-import 'status_contribuicao_screen.dart';
 
+/// PIX **manual e honesto**: mostra o QR Code e o "copia e cola" gerados a
+/// partir da chave pública da igreja. Não há confirmação automática — o
+/// recebimento é conferido pela tesouraria. Nenhum segredo trafega no app.
 class PagamentoPixScreen extends StatelessWidget {
   const PagamentoPixScreen({
     super.key,
@@ -19,7 +24,6 @@ class PagamentoPixScreen extends StatelessWidget {
   });
 
   static const _designWidth = 390.0;
-  static const _pixKey = 'cnarecife01@gmail.com';
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
   static const _primaryDark = Color(0xFF510014);
@@ -28,7 +32,6 @@ class PagamentoPixScreen extends StatelessWidget {
   static const _mutedBrown = Color(0xFF584142);
   static const _line = Color(0xFFE5E7EB);
   static const _fieldBackground = Color(0xFFF6F3F2);
-  static const _soft = Color(0xFFF5E6EC);
   static const _green = Color(0xFF16A34A);
 
   final bool isLeader;
@@ -36,8 +39,22 @@ class PagamentoPixScreen extends StatelessWidget {
   final String valueLabel;
   final ContribuicaoCampaignData? campaign;
 
+  double get _valorReais {
+    final digits = valueLabel.replaceAll(RegExp(r'\D'), '');
+    return (int.tryParse(digits) ?? 0) / 100;
+  }
+
+  String get _payload => PixPayload.gerar(
+        chave: IgrejaInfo.pixChave,
+        valor: _valorReais > 0 ? _valorReais : null,
+        nomeRecebedor: IgrejaInfo.nome,
+        cidade: 'Olinda',
+        txid: campaign?.campanhaId ?? '***',
+      );
+
   @override
   Widget build(BuildContext context) {
+    final payload = _payload;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -50,9 +67,9 @@ class PagamentoPixScreen extends StatelessWidget {
         body: SafeArea(
           top: false,
           bottom: false,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = (constraints.maxWidth / _designWidth)
+          child: Builder(
+            builder: (context) {
+              final scale = (MediaQuery.sizeOf(context).width / _designWidth)
                   .clamp(0.86, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
@@ -80,15 +97,15 @@ class PagamentoPixScreen extends StatelessWidget {
                                 type: campaign == null
                                     ? contributionType
                                     : 'Campanha',
+                                destination:
+                                    campaign?.title ?? IgrejaInfo.nome,
                                 valueLabel: valueLabel,
                               ),
                               SizedBox(height: 24 * scale),
-                              _PixCopyCard(
+                              _PixQrCard(
                                 scale: scale,
-                                isLeader: isLeader,
-                                contributionType: contributionType,
-                                valueLabel: valueLabel,
-                                campaign: campaign,
+                                payload: payload,
+                                onConcluir: () => _concluir(context),
                               ),
                             ],
                           ),
@@ -118,42 +135,39 @@ class PagamentoPixScreen extends StatelessWidget {
     );
   }
 
-  static Future<void> copyPixKey(BuildContext context) async {
-    await Clipboard.setData(const ClipboardData(text: _pixKey));
-    if (!context.mounted) {
-      return;
-    }
-
+  void _concluir(BuildContext context) {
+    // PIX manual: não simulamos confirmação. Voltamos ao início da aba
+    // Contribuir com uma mensagem honesta de agradecimento.
+    Navigator.of(context).popUntil((route) {
+      return route.settings.name == VisualRoutes.contribuir ||
+          route.settings.name == VisualRoutes.contribuirLeader ||
+          route.isFirst;
+    });
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text('Chave PIX copiada'),
+          content: Text(
+            'Obrigado! Assim que a tesouraria confirmar o PIX, sua contribuição '
+            'será registrada.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
   }
 
-  static void verifyPayment(
-    BuildContext context, {
-    required bool isLeader,
-    required String contributionType,
-    required String valueLabel,
-    ContribuicaoCampaignData? campaign,
-  }) {
-    // Futuramente este botão consultará o backend/status do Mercado Pago.
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => StatusContribuicaoScreen(
-          isLeader: isLeader,
-          contributionType: contributionType,
-          valueLabel: valueLabel,
-          paymentMethod: 'PIX',
-          identifier: 'CNA-2026-0001',
-          campaign: campaign,
+  static Future<void> copiarPayload(
+      BuildContext context, String payload) async {
+    await Clipboard.setData(ClipboardData(text: payload));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Código PIX copiado. Cole no app do seu banco.'),
+          behavior: SnackBarBehavior.floating,
         ),
-      ),
-    );
+      );
   }
 }
 
@@ -215,11 +229,13 @@ class _PixSummaryCard extends StatelessWidget {
   const _PixSummaryCard({
     required this.scale,
     required this.type,
+    required this.destination,
     required this.valueLabel,
   });
 
   final double scale;
   final String type;
+  final String destination;
   final String valueLabel;
 
   @override
@@ -245,6 +261,12 @@ class _PixSummaryCard extends StatelessWidget {
             scale: scale,
             label: 'Tipo',
             value: type,
+            showDivider: true,
+          ),
+          _PixSummaryRow(
+            scale: scale,
+            label: 'Destino',
+            value: destination,
             showDivider: true,
           ),
           _PixSummaryRow(
@@ -321,67 +343,150 @@ class _PixSummaryRow extends StatelessWidget {
               color: PagamentoPixScreen._mutedBrown,
             ),
           ),
-          const Spacer(),
-          valueWidget ??
-              Text(
-                value ?? '',
-                textAlign: TextAlign.right,
-                style: GoogleFonts.inter(
-                  fontSize: 16 * scale,
-                  fontWeight: FontWeight.w500,
-                  height: 24 / 16,
-                  color: PagamentoPixScreen._title,
-                ),
-              ),
+          SizedBox(width: 12 * scale),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: valueWidget ??
+                  Text(
+                    value ?? '',
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 16 * scale,
+                      fontWeight: FontWeight.w500,
+                      height: 24 / 16,
+                      color: PagamentoPixScreen._title,
+                    ),
+                  ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _PixCopyCard extends StatelessWidget {
-  const _PixCopyCard({
+class _PixQrCard extends StatelessWidget {
+  const _PixQrCard({
     required this.scale,
-    required this.isLeader,
-    required this.contributionType,
-    required this.valueLabel,
-    required this.campaign,
+    required this.payload,
+    required this.onConcluir,
   });
 
   final double scale;
-  final bool isLeader;
-  final String contributionType;
-  final String valueLabel;
-  final ContribuicaoCampaignData? campaign;
+  final String payload;
+  final VoidCallback onConcluir;
 
   @override
   Widget build(BuildContext context) {
+    final qrSize = 220 * scale;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(25 * scale),
       decoration: _cardDecoration(scale),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Chave PIX',
-            style: GoogleFonts.inter(
-              fontSize: 14 * scale,
-              fontWeight: FontWeight.w500,
-              height: 20 / 14,
-              color: PagamentoPixScreen._mutedBrown,
+          Center(
+            child: Text(
+              'Escaneie o QR Code no app do seu banco',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 14 * scale,
+                fontWeight: FontWeight.w500,
+                height: 20 / 14,
+                color: PagamentoPixScreen._mutedBrown,
+              ),
             ),
           ),
-          SizedBox(height: 8 * scale),
-          _PixKeyField(scale: scale),
-          SizedBox(height: 32 * scale),
+          SizedBox(height: 16 * scale),
+          Center(
+            child: Container(
+              padding: EdgeInsets.all(12 * scale),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: PagamentoPixScreen._line),
+                borderRadius: BorderRadius.circular(16 * scale),
+              ),
+              child: QrImageView(
+                data: payload,
+                version: QrVersions.auto,
+                size: qrSize,
+                gapless: false,
+                backgroundColor: Colors.white,
+                eyeStyle: const QrEyeStyle(
+                  eyeShape: QrEyeShape.square,
+                  color: PagamentoPixScreen._primaryDark,
+                ),
+                dataModuleStyle: const QrDataModuleStyle(
+                  dataModuleShape: QrDataModuleShape.square,
+                  color: PagamentoPixScreen._primaryDark,
+                ),
+                errorStateBuilder: (_, _) => SizedBox(
+                  width: qrSize,
+                  height: qrSize,
+                  child: const Center(
+                    child: Text('Não foi possível gerar o QR.'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 24 * scale),
+          Row(
+            children: [
+              Expanded(
+                child: Divider(color: PagamentoPixScreen._line),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12 * scale),
+                child: Text(
+                  'ou copie o código',
+                  style: GoogleFonts.inter(
+                    fontSize: 12 * scale,
+                    color: PagamentoPixScreen._body,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(color: PagamentoPixScreen._line),
+              ),
+            ],
+          ),
+          SizedBox(height: 16 * scale),
+          _PixCopyField(scale: scale, payload: payload),
+          SizedBox(height: 16 * scale),
           SizedBox(
             width: double.infinity,
             height: 52 * scale,
-            child: OutlinedButton.icon(
-              onPressed: () => PagamentoPixScreen.copyPixKey(context),
+            child: ElevatedButton.icon(
+              onPressed: () =>
+                  PagamentoPixScreen.copiarPayload(context, payload),
               icon: Icon(Icons.copy_rounded, size: 19 * scale),
-              label: const Text('Copiar chave PIX'),
+              label: const Text('Copiar código PIX (copia e cola)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PagamentoPixScreen._primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10 * scale),
+                ),
+                textStyle: GoogleFonts.inter(
+                  fontSize: 14 * scale,
+                  fontWeight: FontWeight.w600,
+                  height: 20 / 14,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 12 * scale),
+          SizedBox(
+            width: double.infinity,
+            height: 50 * scale,
+            child: OutlinedButton(
+              onPressed: onConcluir,
               style: OutlinedButton.styleFrom(
                 foregroundColor: PagamentoPixScreen._primaryDark,
                 side: const BorderSide(color: PagamentoPixScreen._primaryDark),
@@ -394,60 +499,40 @@ class _PixCopyCard extends StatelessWidget {
                   height: 20 / 14,
                 ),
               ),
+              child: const Text('Já fiz o PIX'),
             ),
           ),
-          SizedBox(height: 16 * scale),
-          SizedBox(
-            width: double.infinity,
-            height: 52 * scale,
-            child: ElevatedButton(
-              onPressed: () => PagamentoPixScreen.verifyPayment(
-                context,
-                isLeader: isLeader,
-                contributionType: contributionType,
-                valueLabel: valueLabel,
-                campaign: campaign,
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: PagamentoPixScreen._primary,
-                foregroundColor: Colors.white,
-                elevation: 1,
-                shadowColor: Colors.black.withValues(alpha: 0.12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10 * scale),
-                ),
-                textStyle: GoogleFonts.inter(
-                  fontSize: 14 * scale,
-                  fontWeight: FontWeight.w500,
-                  height: 20 / 14,
-                ),
-              ),
-              child: const Text('Verificar pagamento'),
+          SizedBox(height: 20 * scale),
+          Container(
+            padding: EdgeInsets.all(14 * scale),
+            decoration: BoxDecoration(
+              color: PagamentoPixScreen._fieldBackground,
+              borderRadius: BorderRadius.circular(12 * scale),
             ),
-          ),
-          SizedBox(height: 32 * scale),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 18 * scale,
-                color: PagamentoPixScreen._mutedBrown,
-              ),
-              SizedBox(width: 20 * scale),
-              Expanded(
-                child: Text(
-                  'Após a confirmação do pagamento, sua\ncontribuição aparecerá no histórico.',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 12 * scale,
-                    fontWeight: FontWeight.w400,
-                    height: 16 / 12,
-                    color: PagamentoPixScreen._mutedBrown,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18 * scale,
+                  color: PagamentoPixScreen._mutedBrown,
+                ),
+                SizedBox(width: 12 * scale),
+                Expanded(
+                  child: Text(
+                    'Este é um PIX manual. O pagamento não é confirmado '
+                    'automaticamente pelo app — a tesouraria confere o '
+                    'recebimento e registra sua contribuição.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w400,
+                      height: 17 / 12,
+                      color: PagamentoPixScreen._mutedBrown,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -455,15 +540,16 @@ class _PixCopyCard extends StatelessWidget {
   }
 }
 
-class _PixKeyField extends StatelessWidget {
-  const _PixKeyField({required this.scale});
+class _PixCopyField extends StatelessWidget {
+  const _PixCopyField({required this.scale, required this.payload});
 
   final double scale;
+  final String payload;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 52 * scale,
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
       decoration: BoxDecoration(
         color: PagamentoPixScreen._fieldBackground,
         border: Border.all(color: PagamentoPixScreen._line),
@@ -472,23 +558,20 @@ class _PixKeyField extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(left: 17 * scale),
-              child: Text(
-                PagamentoPixScreen._pixKey,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 14 * scale,
-                  fontWeight: FontWeight.w400,
-                  height: 20 / 14,
-                  color: PagamentoPixScreen._mutedBrown,
-                ),
+            child: Text(
+              payload,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.robotoMono(
+                fontSize: 12 * scale,
+                height: 16 / 12,
+                color: PagamentoPixScreen._mutedBrown,
               ),
             ),
           ),
+          SizedBox(width: 8 * scale),
           IconButton(
-            onPressed: () => PagamentoPixScreen.copyPixKey(context),
+            onPressed: () => PagamentoPixScreen.copiarPayload(context, payload),
             icon: Icon(
               Icons.copy_rounded,
               size: 20 * scale,
@@ -606,9 +689,7 @@ class _PixNavigationItem extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        if (selected) {
-          return;
-        }
+        if (selected) return;
 
         if (item.label == 'Início') {
           Navigator.pushNamedAndRemoveUntil(
@@ -618,35 +699,22 @@ class _PixNavigationItem extends StatelessWidget {
           );
           return;
         }
-
         if (item.label == 'Avisos') {
           Navigator.pushNamed(context, VisualRoutes.avisos);
           return;
         }
-
         if (item.label == 'Programação') {
           Navigator.pushNamed(context, VisualRoutes.programacao);
           return;
         }
-
         if (item.label == 'Oração') {
           Navigator.pushNamed(context, VisualRoutes.oracao);
           return;
         }
-
         if (item.asset == HomeAssets.profile) {
           Navigator.pushNamed(context, VisualRoutes.perfil);
           return;
         }
-
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('Tela visual será conectada futuramente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
       },
       child: Center(
         child: selected
@@ -655,7 +723,7 @@ class _PixNavigationItem extends StatelessWidget {
                 height: 41 * scale,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: PagamentoPixScreen._soft,
+                  color: const Color(0xFFF5E6EC),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: content,

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/constants/igreja_info.dart';
 import '../visual_router.dart';
 import '../widgets/internal_header.dart';
 
@@ -41,15 +44,85 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
     }
   }
 
-  void _showFutureMessage(String label) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('"$label" será conectado futuramente'),
-          behavior: SnackBarBehavior.floating,
+  void _onLinkTap(String label) {
+    switch (label) {
+      case 'Compartilhar este aplicativo':
+        Share.share(
+          'Conheça o app da ${IgrejaInfo.nome}. Baixe e participe: '
+          '${IgrejaInfo.instagramUrl}',
+        );
+      case 'Sobre o desenvolvedor':
+        _showInfoDialog(
+          'Sobre',
+          'App ${IgrejaInfo.nome} (${IgrejaInfo.sigla}).\n\nVersão 1.0.0.\n\n'
+              'Desenvolvido para uso da comunidade.',
+        );
+      case 'Política de privacidade':
+        _showInfoDialog(
+          'Política de privacidade',
+          'Seus dados são usados apenas para o funcionamento do app e a '
+              'organização da comunidade, e não são compartilhados com '
+              'terceiros para fins comerciais. Para detalhes ou solicitações '
+              'sobre seus dados, fale com a liderança pelo e-mail '
+              '${IgrejaInfo.pixChave}.',
+        );
+      case 'Termos de serviço':
+        _showInfoDialog(
+          'Termos de serviço',
+          'Ao usar este aplicativo, você concorda em utilizá-lo para os fins '
+              'da comunidade, respeitando os demais membros. O conteúdo é de '
+              'uso interno da ${IgrejaInfo.nome}. Dúvidas: '
+              '${IgrejaInfo.pixChave}.',
+        );
+    }
+  }
+
+  void _showInfoDialog(String title, String message) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: SingleChildScrollView(child: Text(message)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmarExclusao() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Excluir minha conta'),
+        content: Text(
+          'A exclusão da conta é feita pela liderança, mediante solicitação, '
+          'para preservar os registros da comunidade. Deseja enviar um pedido '
+          'de exclusão por e-mail para ${IgrejaInfo.pixChave}?',
         ),
-      );
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Enviar pedido'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+    final uri = Uri.parse(
+      'mailto:${IgrejaInfo.pixChave}'
+      '?subject=${Uri.encodeComponent('Pedido de exclusão de conta')}'
+      '&body=${Uri.encodeComponent('Olá, gostaria de solicitar a exclusão da minha conta no app.')}',
+    );
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -147,7 +220,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                                 _LinkRow(
                                   scale: scale,
                                   label: label,
-                                  onTap: () => _showFutureMessage(label),
+                                  onTap: () => _onLinkTap(label),
                                 ),
                                 if (label != 'Compartilhar este aplicativo')
                                   _Divider(scale: scale),
@@ -162,8 +235,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                                 scale: scale,
                                 label: 'Excluir minha conta',
                                 color: _danger,
-                                onTap: () =>
-                                    _showFutureMessage('Excluir minha conta'),
+                                onTap: _confirmarExclusao,
                               ),
                             ],
                           ),

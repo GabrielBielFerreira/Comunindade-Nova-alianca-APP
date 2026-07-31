@@ -36,36 +36,11 @@ class HistoricoContribuicoesScreen extends StatefulWidget {
   static const _cancelledText = Color(0xFF6B7280);
   static const _cancelledBg = Color(0xFFF3F4F6);
 
-  static const _baseContributions = <ContribuicaoVisualModel>[
-    ContribuicaoVisualModel(
-      id: 'CNA-2026-0001',
-      type: 'Dízimo',
-      valueLabel: 'R\$ 250,00',
-      method: 'PIX',
-      status: ContribuicaoVisualStatus.aprovado,
-      dateLabel: 'Hoje 10:30',
-      church: HomeMockData.communityName,
-    ),
-    ContribuicaoVisualModel(
-      id: 'CNA-2026-0002',
-      type: 'Oferta',
-      valueLabel: 'R\$ 100,00',
-      method: 'Cartão',
-      status: ContribuicaoVisualStatus.pendente,
-      dateLabel: 'Ontem 19:20',
-      church: HomeMockData.communityName,
-    ),
-    ContribuicaoVisualModel(
-      id: 'CNA-2026-0003',
-      type: 'Campanha',
-      campaignName: 'Reforma do Teto Principal',
-      valueLabel: 'R\$ 50,00',
-      method: 'PIX',
-      status: ContribuicaoVisualStatus.aprovado,
-      dateLabel: '12/06/2026',
-      church: HomeMockData.communityName,
-    ),
-  ];
+  // Sem dados fabricados: o histórico mostra apenas contribuições reais. Como
+  // a confirmação do PIX manual é feita pela tesouraria (fora do app) e o
+  // backend de pagamentos online ainda não está publicado, a lista começa
+  // vazia e exibe o estado vazio honesto.
+  static const _baseContributions = <ContribuicaoVisualModel>[];
 
   final bool isLeader;
   final ContribuicaoVisualModel? highlightedContribution;
@@ -186,7 +161,6 @@ class _HistoricoContribuicoesScreenState
                                       ),
                                       SizedBox(height: 16 * scale),
                                     ],
-                                    _LoadMoreButton(scale: scale),
                                   ],
                                 ),
                             ],
@@ -594,53 +568,6 @@ class _StatusPill extends StatelessWidget {
           height: 16 / 12,
           letterSpacing: 2.16 * scale,
           color: _statusColor(status),
-        ),
-      ),
-    );
-  }
-}
-
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton({required this.scale});
-
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.only(top: 8 * scale),
-        child: OutlinedButton(
-          onPressed: () {
-            ScaffoldMessenger.of(context)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Mais contribuições serão carregadas futuramente',
-                  ),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-          },
-          style: OutlinedButton.styleFrom(
-            foregroundColor: HistoricoContribuicoesScreen._figmaPrimaryDark,
-            backgroundColor: Colors.white,
-            side: const BorderSide(color: HistoricoContribuicoesScreen._line),
-            padding: EdgeInsets.symmetric(
-              horizontal: 25 * scale,
-              vertical: 9 * scale,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
-            ),
-            textStyle: GoogleFonts.inter(
-              fontSize: 14 * scale,
-              fontWeight: FontWeight.w500,
-              height: 19.6 / 14,
-            ),
-          ),
-          child: const Text('Carregar mais contribuições'),
         ),
       ),
     );

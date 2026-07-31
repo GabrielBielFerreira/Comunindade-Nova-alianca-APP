@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/config/app_config.dart';
+import '../../features/campanhas/providers/campanhas_providers.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
+import 'campanha_detalhes_screen.dart';
 import 'revisar_contribuicao_screen.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 
-class ContribuirScreen extends StatefulWidget {
+class ContribuirScreen extends ConsumerStatefulWidget {
   const ContribuirScreen({
     super.key,
     required this.isLeader,
@@ -21,10 +25,10 @@ class ContribuirScreen extends StatefulWidget {
   final bool isVisitor;
 
   @override
-  State<ContribuirScreen> createState() => _ContribuirScreenState();
+  ConsumerState<ContribuirScreen> createState() => _ContribuirScreenState();
 }
 
-class _ContribuirScreenState extends State<ContribuirScreen> {
+class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -118,9 +122,36 @@ class _ContribuirScreenState extends State<ContribuirScreen> {
     );
   }
 
-  void _selectCampaign(ContribuicaoCampaignData campaign) {
-    setState(() => _selectedCampaign = campaign);
-    _showMessage('Campanha selecionada: ${campaign.title}');
+  Future<void> _openCampaign(ContribuicaoCampaignData campaign) async {
+    final escolhida = await Navigator.of(context).push<ContribuicaoCampaignData>(
+      MaterialPageRoute<ContribuicaoCampaignData>(
+        builder: (_) => CampanhaDetalhesScreen(campaign: campaign),
+      ),
+    );
+    if (escolhida != null && mounted) {
+      setState(() => _selectedCampaign = escolhida);
+      _showMessage('Contribuindo para a campanha: ${escolhida.title}');
+    }
+  }
+
+  void _showTransparencia() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Transparência'),
+        content: const Text(
+          'A prestação de contas da comunidade é apresentada periodicamente '
+          'nos cultos e nas reuniões de membros. Para detalhes, fale com a '
+          'tesouraria ou a liderança.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -176,13 +207,25 @@ class _ContribuirScreenState extends State<ContribuirScreen> {
                                 },
                                 onContinue: _continueContribution,
                               ),
+                              if (_selectedCampaign != null) ...[
+                                SizedBox(height: 12 * scale),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16 * scale,
+                                  ),
+                                  child: _SelectedCampaignBanner(
+                                    scale: scale,
+                                    title: _selectedCampaign!.title,
+                                    onClear: () => setState(
+                                      () => _selectedCampaign = null,
+                                    ),
+                                  ),
+                                ),
+                              ],
                               SizedBox(height: 18 * scale),
                               _CampaignsSection(
                                 scale: scale,
-                                onSeeAll: () => _showMessage(
-                                  'Lista de campanhas será conectada futuramente',
-                                ),
-                                onSupport: _selectCampaign,
+                                onSupport: _openCampaign,
                               ),
                               SizedBox(height: 16 * scale),
                               Padding(
@@ -191,9 +234,7 @@ class _ContribuirScreenState extends State<ContribuirScreen> {
                                 ),
                                 child: _TransparencyCard(
                                   scale: scale,
-                                  onTap: () => _showMessage(
-                                    'Transparência será conectada futuramente',
-                                  ),
+                                  onTap: _showTransparencia,
                                 ),
                               ),
                               SizedBox(height: 16 * scale),
@@ -265,14 +306,6 @@ class _EscolherMetodoPagamentoScreenState
     extends State<EscolherMetodoPagamentoScreen> {
   String _selectedMethod = 'Pix';
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
-  }
-
   void _finishContribution() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -336,28 +369,6 @@ class _EscolherMetodoPagamentoScreenState
                                   setState(() => _selectedMethod = method);
                                 },
                                 onContribute: _finishContribution,
-                              ),
-                              SizedBox(height: 18 * scale),
-                              _CampaignsSection(
-                                scale: scale,
-                                onSeeAll: () => _showMessage(
-                                  'Lista de campanhas será conectada futuramente',
-                                ),
-                                onSupport: (campaign) => _showMessage(
-                                  'Campanha selecionada: ${campaign.title}',
-                                ),
-                              ),
-                              SizedBox(height: 16 * scale),
-                              Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 16 * scale,
-                                ),
-                                child: _TransparencyCard(
-                                  scale: scale,
-                                  onTap: () => _showMessage(
-                                    'Transparência será conectada futuramente',
-                                  ),
-                                ),
                               ),
                             ],
                           ),
@@ -514,37 +525,59 @@ class _PaymentMethodCard extends StatelessWidget {
             ],
           ),
           SizedBox(height: 24 * scale),
-          Row(
-            children: [
-              Expanded(
-                child: _PaymentMethodOption(
-                  scale: scale,
-                  label: 'Pix',
-                  icon: Icons.qr_code_2_rounded,
-                  selected: selectedMethod == 'Pix',
-                  onTap: () => onMethodChanged('Pix'),
+          if (AppConfig.pagamentosOnlineHabilitado) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _PaymentMethodOption(
+                    scale: scale,
+                    label: 'Pix',
+                    icon: Icons.qr_code_2_rounded,
+                    selected: selectedMethod == 'Pix',
+                    onTap: () => onMethodChanged('Pix'),
+                  ),
                 ),
-              ),
-              SizedBox(width: 12 * scale),
-              Expanded(
-                child: _PaymentMethodOption(
-                  scale: scale,
-                  label: 'Cartão',
-                  icon: Icons.credit_card_rounded,
-                  selected: selectedMethod == 'Cartão',
-                  onTap: () => onMethodChanged('Cartão'),
+                SizedBox(width: 12 * scale),
+                Expanded(
+                  child: _PaymentMethodOption(
+                    scale: scale,
+                    label: 'Cartão',
+                    icon: Icons.credit_card_rounded,
+                    selected: selectedMethod == 'Cartão',
+                    onTap: () => onMethodChanged('Cartão'),
+                  ),
                 ),
+              ],
+            ),
+            SizedBox(height: 12 * scale),
+            _PaymentMethodOption(
+              scale: scale,
+              label: 'Boleto',
+              icon: Icons.receipt_long_rounded,
+              selected: selectedMethod == 'Boleto',
+              onTap: () => onMethodChanged('Boleto'),
+            ),
+          ] else ...[
+            // Sem backend de pagamentos online, apenas o PIX manual está
+            // disponível (cartão/boleto ficam ocultos até serem habilitados).
+            _PaymentMethodOption(
+              scale: scale,
+              label: 'Pix',
+              icon: Icons.qr_code_2_rounded,
+              selected: true,
+              onTap: () => onMethodChanged('Pix'),
+            ),
+            SizedBox(height: 12 * scale),
+            Text(
+              'No momento, as contribuições são feitas por PIX.',
+              style: GoogleFonts.inter(
+                fontSize: 12 * scale,
+                fontWeight: FontWeight.w400,
+                height: 16 / 12,
+                color: _ContribuirScreenState._body,
               ),
-            ],
-          ),
-          SizedBox(height: 12 * scale),
-          _PaymentMethodOption(
-            scale: scale,
-            label: 'Boleto',
-            icon: Icons.receipt_long_rounded,
-            selected: selectedMethod == 'Boleto',
-            onTap: () => onMethodChanged('Boleto'),
-          ),
+            ),
+          ],
           const Spacer(),
           SizedBox(
             width: double.infinity,
@@ -1151,53 +1184,37 @@ class _TypePill extends StatelessWidget {
   }
 }
 
-class _CampaignsSection extends StatelessWidget {
+class _CampaignsSection extends ConsumerWidget {
   const _CampaignsSection({
     required this.scale,
-    required this.onSeeAll,
     required this.onSupport,
   });
 
   final double scale;
-  final VoidCallback onSeeAll;
   final ValueChanged<ContribuicaoCampaignData> onSupport;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final campanhas = ref.watch(campanhasAtivasProvider).valueOrNull ?? const [];
+    // Sem campanhas publicadas, a seção simplesmente não aparece (honesto).
+    if (campanhas.isEmpty) return const SizedBox.shrink();
+
+    final cards =
+        campanhas.map(ContribuicaoCampaignData.fromCampanha).toList();
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 * scale),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Campanhas',
-                style: GoogleFonts.montserrat(
-                  fontSize: 20 * scale,
-                  fontWeight: FontWeight.w600,
-                  height: 28 / 20,
-                  color: _ContribuirScreenState._title,
-                ),
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: onSeeAll,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4 * scale),
-                  child: Text(
-                    'Ver Todas',
-                    style: GoogleFonts.inter(
-                      fontSize: 14 * scale,
-                      fontWeight: FontWeight.w500,
-                      height: 20 / 14,
-                      color: _ContribuirScreenState._primaryDark,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Campanhas',
+            style: GoogleFonts.montserrat(
+              fontSize: 20 * scale,
+              fontWeight: FontWeight.w600,
+              height: 28 / 20,
+              color: _ContribuirScreenState._title,
+            ),
           ),
           SizedBox(height: 8 * scale),
           SizedBox(
@@ -1206,16 +1223,86 @@ class _CampaignsSection extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               clipBehavior: Clip.none,
-              itemCount: ContribuicaoMockData.campaigns.length,
+              itemCount: cards.length,
               separatorBuilder: (_, index) => SizedBox(width: 14 * scale),
               itemBuilder: (context, index) {
-                final campaign = ContribuicaoMockData.campaigns[index];
+                final campaign = cards[index];
                 return _CampaignCard(
                   scale: scale,
                   campaign: campaign,
                   onSupport: () => onSupport(campaign),
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Faixa que mostra a campanha selecionada acima do formulário, com opção de
+/// remover a vinculação.
+class _SelectedCampaignBanner extends StatelessWidget {
+  const _SelectedCampaignBanner({
+    required this.scale,
+    required this.title,
+    required this.onClear,
+  });
+
+  final double scale;
+  final String title;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
+      decoration: BoxDecoration(
+        color: _ContribuirScreenState._soft,
+        borderRadius: BorderRadius.circular(12 * scale),
+        border: Border.all(color: const Color(0x33EACDD6)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.volunteer_activism_rounded,
+            size: 20 * scale,
+            color: _ContribuirScreenState._primary,
+          ),
+          SizedBox(width: 10 * scale),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Contribuindo para a campanha',
+                  style: GoogleFonts.inter(
+                    fontSize: 11 * scale,
+                    fontWeight: FontWeight.w500,
+                    color: _ContribuirScreenState._body,
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 14 * scale,
+                    fontWeight: FontWeight.w700,
+                    color: _ContribuirScreenState._primaryDark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onClear,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18 * scale,
+              color: _ContribuirScreenState._primaryDark,
             ),
           ),
         ],
@@ -1265,12 +1352,7 @@ class _CampaignCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(
-                  campaign.imageAsset,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, error, stackTrace) =>
-                      Container(color: _ContribuirScreenState._line),
-                ),
+                _CampaignImage(scale: scale, campaign: campaign),
                 if (campaign.urgent)
                   Positioned(
                     top: 8 * scale,
@@ -1383,6 +1465,47 @@ class _CampaignCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Imagem do card de campanha: rede (campanhas reais), asset (mock) ou um
+/// placeholder on-brand quando não houver imagem.
+class _CampaignImage extends StatelessWidget {
+  const _CampaignImage({required this.scale, required this.campaign});
+
+  final double scale;
+  final ContribuicaoCampaignData campaign;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      color: _ContribuirScreenState._soft,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.volunteer_activism_rounded,
+        size: 36 * scale,
+        color: _ContribuirScreenState._primary,
+      ),
+    );
+
+    final url = campaign.imageUrl;
+    if (url != null && url.trim().isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+        loadingBuilder: (context, child, progress) =>
+            progress == null ? child : placeholder,
+      );
+    }
+    if (campaign.imageAsset.trim().isNotEmpty) {
+      return Image.asset(
+        campaign.imageAsset,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => placeholder,
+      );
+    }
+    return placeholder;
   }
 }
 
