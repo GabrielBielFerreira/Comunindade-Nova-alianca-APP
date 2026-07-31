@@ -10,6 +10,7 @@ import '../mock/programacao_mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../widgets/motion.dart';
 import '../widgets/programacao_bottom_navigation.dart';
 import '../widgets/programacao_card.dart';
 import '../widgets/visitor_bottom_navigation.dart';
@@ -164,21 +165,24 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
             ),
             SizedBox(height: 22 * scale),
             for (var index = 0; index < doDia.length; index++) ...[
-              ProgramacaoCard(
-                event: _eventoParaCard(doDia[index]),
-                scale: scale,
-                onReminderTap: () => _showMessage(
-                  'Você receberá um lembrete por notificação.',
-                ),
-                onDetailsTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    settings: const RouteSettings(
-                      name: VisualRoutes.programacaoDetalhes,
-                    ),
-                    builder: (_) => ProgramacaoDetalhesScreen(
-                      details: _eventoParaDetalhes(doDia[index]),
-                      isLeader: widget.isLeader,
+              FadeSlideIn(
+                delay: Duration(milliseconds: (index * 70).clamp(0, 420)),
+                child: ProgramacaoCard(
+                  event: _eventoParaCard(doDia[index]),
+                  scale: scale,
+                  onReminderTap: () => _showMessage(
+                    'Você receberá um lembrete por notificação.',
+                  ),
+                  onDetailsTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute<void>(
+                      settings: const RouteSettings(
+                        name: VisualRoutes.programacaoDetalhes,
+                      ),
+                      builder: (_) => ProgramacaoDetalhesScreen(
+                        details: _eventoParaDetalhes(doDia[index]),
+                        isLeader: widget.isLeader,
+                      ),
                     ),
                   ),
                 ),

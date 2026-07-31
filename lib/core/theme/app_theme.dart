@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../visual/widgets/motion.dart';
 import 'app_colors.dart';
 import 'app_text_theme.dart';
 
@@ -11,6 +12,19 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: AppColors.background,
+
+      // Uma única identidade de movimento para navegação em todas as
+      // plataformas (fade + leve deslize), no lugar das transições padrão.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CalmPageTransitionsBuilder(),
+          TargetPlatform.iOS: CalmPageTransitionsBuilder(),
+          TargetPlatform.windows: CalmPageTransitionsBuilder(),
+          TargetPlatform.macOS: CalmPageTransitionsBuilder(),
+          TargetPlatform.linux: CalmPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: CalmPageTransitionsBuilder(),
+        },
+      ),
 
       colorScheme: const ColorScheme.light(
         primary: AppColors.primary,

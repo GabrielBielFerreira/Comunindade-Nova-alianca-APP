@@ -15,6 +15,7 @@ import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/app_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
+import '../widgets/motion.dart';
 import '../widgets/auth_widgets.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -324,49 +325,66 @@ class _HomeContent extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Greeting(
-          scale: scale,
-          greeting: greeting,
-          subtitle: greetingSubtitle,
+        FadeSlideIn(
+          child: _Greeting(
+            scale: scale,
+            greeting: greeting,
+            subtitle: greetingSubtitle,
+          ),
         ),
         SizedBox(height: 20 * scale),
-        _WordCard(scale: scale),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 70),
+          child: _WordCard(scale: scale),
+        ),
         SizedBox(height: 20 * scale),
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () => Navigator.pushNamed(context, VisualRoutes.programacao),
-          child: _InfoCard(
-            scale: scale,
-            iconAsset: HomeAssets.calendar,
-            iconWidth: 18,
-            iconHeight: 20,
-            label: HomeMockData.nextServiceLabel,
-            title: proximo?.titulo ?? 'Nenhum culto agendado',
-            status: proximo != null
-                ? '${Formatters.data(proximo.data)} • ${proximo.horario}'
-                : 'Confira a programação',
-            statusAsset: HomeAssets.check,
-            statusColor: HomeScreen._success,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 140),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.pushNamed(context, VisualRoutes.programacao),
+            child: _InfoCard(
+              scale: scale,
+              iconAsset: HomeAssets.calendar,
+              iconWidth: 18,
+              iconHeight: 20,
+              label: HomeMockData.nextServiceLabel,
+              title: proximo?.titulo ?? 'Nenhum culto agendado',
+              status: proximo != null
+                  ? '${Formatters.data(proximo.data)} • ${proximo.horario}'
+                  : 'Confira a programação',
+              statusAsset: HomeAssets.check,
+              statusColor: HomeScreen._success,
+            ),
           ),
         ),
         if (showSecondaryCard) ...[
           SizedBox(height: 16 * scale),
-          _InfoCard(
-            scale: scale,
-            iconAsset: HomeAssets.scaleBell,
-            iconWidth: 16,
-            iconHeight: 20,
-            label: secondaryCardLabel,
-            title: HomeMockData.schedulesTitle,
-            status: HomeMockData.schedulesStatus,
-            statusAsset: HomeAssets.alert,
-            statusColor: HomeScreen._danger,
+          FadeSlideIn(
+            delay: const Duration(milliseconds: 200),
+            child: _InfoCard(
+              scale: scale,
+              iconAsset: HomeAssets.scaleBell,
+              iconWidth: 16,
+              iconHeight: 20,
+              label: secondaryCardLabel,
+              title: HomeMockData.schedulesTitle,
+              status: HomeMockData.schedulesStatus,
+              statusAsset: HomeAssets.alert,
+              statusColor: HomeScreen._danger,
+            ),
           ),
         ],
         SizedBox(height: 24 * scale),
-        _VidaNaComunidadeSection(scale: scale, muralRoute: muralRoute),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 260),
+          child: _VidaNaComunidadeSection(scale: scale, muralRoute: muralRoute),
+        ),
         SizedBox(height: 24 * scale),
-        _PalavraELouvorSection(scale: scale),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 320),
+          child: _PalavraELouvorSection(scale: scale),
+        ),
       ],
     );
   }

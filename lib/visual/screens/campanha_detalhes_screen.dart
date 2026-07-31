@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../mock/contribuicao_mock_data.dart';
 import '../widgets/internal_header.dart';
+import '../widgets/motion.dart';
 
 /// Detalhes de uma campanha. O botão "Contribuir para esta campanha" retorna a
 /// campanha selecionada ([ContribuicaoCampaignData]) para a tela Contribuir,
@@ -100,15 +101,10 @@ class CampanhaDetalhesScreen extends StatelessWidget {
                             ),
                           ),
                           SizedBox(height: 16 * scale),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              value: campaign.progress,
-                              minHeight: 10 * scale,
-                              backgroundColor: const Color(0xFFE5E2E1),
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(buttonColor),
-                            ),
+                          AnimatedProgressBar(
+                            value: campaign.progress,
+                            color: buttonColor,
+                            minHeight: 10 * scale,
                           ),
                           SizedBox(height: 8 * scale),
                           Row(

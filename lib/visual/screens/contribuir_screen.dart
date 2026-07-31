@@ -12,6 +12,7 @@ import 'campanha_detalhes_screen.dart';
 import 'revisar_contribuicao_screen.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../widgets/motion.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 
 class ContribuirScreen extends ConsumerStatefulWidget {
@@ -1398,14 +1399,10 @@ class _CampaignCard extends StatelessWidget {
                   ),
                 ),
                 SizedBox(height: 8 * scale),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: campaign.progress,
-                    minHeight: 8 * scale,
-                    backgroundColor: const Color(0xFFE5E2E1),
-                    valueColor: AlwaysStoppedAnimation<Color>(buttonColor),
-                  ),
+                AnimatedProgressBar(
+                  value: campaign.progress,
+                  color: buttonColor,
+                  minHeight: 8 * scale,
                 ),
                 SizedBox(height: 8 * scale),
                 Row(

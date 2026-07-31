@@ -16,6 +16,7 @@ import '../widgets/aviso_card.dart';
 import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
+import '../widgets/motion.dart';
 import 'aviso_detalhes_screen.dart';
 
 /// Converte o aviso do Firestore no formato usado pelo card visual.
@@ -101,7 +102,9 @@ class _AvisosScreenState extends ConsumerState<AvisosScreen> {
           return Column(
             children: [
               for (var index = 0; index < cards.length; index++) ...[
-                AvisoCard(
+                FadeSlideIn(
+                  delay: Duration(milliseconds: (index * 70).clamp(0, 420)),
+                  child: AvisoCard(
                   notice: cards[index],
                   scale: scale,
                   onDetails: () => Navigator.push(
@@ -118,6 +121,7 @@ class _AvisosScreenState extends ConsumerState<AvisosScreen> {
                   ),
                   onScale: () => _showMessage(
                     'Escalas serão abertas pela área de Gestão',
+                  ),
                   ),
                 ),
                 if (index < cards.length - 1) SizedBox(height: 16 * scale),
