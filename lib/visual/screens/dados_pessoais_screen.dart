@@ -435,7 +435,6 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         _LinkedChurchField(
           scale: scale,
           church: 'Nova Aliança Olinda',
-          onTap: () {},
         ),
         SizedBox(height: 18 * scale),
         _DropdownField(
@@ -1016,16 +1015,16 @@ class _DropdownField extends StatelessWidget {
 }
 
 /// Linha "Igreja vinculada" — nome à esquerda e botão "Alterar >" à direita.
+/// Igreja vinculada — somente leitura na V1 (app exclusivo da Comunidade Nova
+/// Aliança; sem troca de igreja). Exibe a igreja sem afordância de toque.
 class _LinkedChurchField extends StatelessWidget {
   const _LinkedChurchField({
     required this.scale,
     required this.church,
-    required this.onTap,
   });
 
   final double scale;
   final String church;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1033,47 +1032,35 @@ class _LinkedChurchField extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FieldLabel('Igreja vinculada', scale: scale),
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8 * scale),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 14 * scale,
-              vertical: 14 * scale,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: _DadosPessoaisScreenState._line),
-              borderRadius: BorderRadius.circular(8 * scale),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    church,
-                    style: GoogleFonts.inter(
-                      fontSize: 15 * scale,
-                      fontWeight: FontWeight.w600,
-                      color: _DadosPessoaisScreenState._title,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12 * scale),
-                Text(
-                  'Alterar',
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 14 * scale,
+            vertical: 14 * scale,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: _DadosPessoaisScreenState._line),
+            borderRadius: BorderRadius.circular(8 * scale),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.church_outlined,
+                size: 20 * scale,
+                color: _DadosPessoaisScreenState._muted,
+              ),
+              SizedBox(width: 10 * scale),
+              Expanded(
+                child: Text(
+                  church,
                   style: GoogleFonts.inter(
                     fontSize: 15 * scale,
-                    fontWeight: FontWeight.w400,
-                    color: _DadosPessoaisScreenState._muted,
+                    fontWeight: FontWeight.w600,
+                    color: _DadosPessoaisScreenState._title,
                   ),
                 ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20 * scale,
-                  color: _DadosPessoaisScreenState._muted,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ],

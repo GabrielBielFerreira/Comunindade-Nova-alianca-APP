@@ -354,10 +354,6 @@ class _ProfileOptionsCard extends StatelessWidget {
             : VisualRoutes.historicoContribuicoes,
       ),
       const _ProfileOptionData(
-        label: 'Minha Jornada',
-        icon: Icons.emoji_events_outlined,
-      ),
-      const _ProfileOptionData(
         label: 'Notifica\u00E7\u00F5es',
         icon: Icons.notifications_none_rounded,
         route: VisualRoutes.notificacoes,
@@ -413,13 +409,7 @@ class _ProfileOptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
-        if (data.route != null) {
-          Navigator.pushNamed(context, data.route!);
-          return;
-        }
-        _showFutureSnackBar(context);
-      },
+      onTap: () => Navigator.pushNamed(context, data.route),
       child: Container(
         height: 57.5 * scale,
         padding: EdgeInsets.symmetric(horizontal: 16 * scale),
@@ -686,21 +676,10 @@ class _ProfileOptionData {
   const _ProfileOptionData({
     required this.label,
     required this.icon,
-    this.route,
+    required this.route,
   });
 
   final String label;
   final IconData icon;
-  final String? route;
-}
-
-void _showFutureSnackBar(BuildContext context) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      const SnackBar(
-        content: Text('Tela visual ser\u00E1 conectada futuramente'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+  final String route;
 }
