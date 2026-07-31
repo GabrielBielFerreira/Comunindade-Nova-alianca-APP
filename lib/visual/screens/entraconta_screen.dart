@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/data/auth_error.dart';
 import '../../features/auth/providers/auth_controller.dart';
@@ -25,11 +26,35 @@ class EntracontaScreen extends ConsumerStatefulWidget {
 }
 
 class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
+  static const _kUltimoEmail = 'ultimo_email_login';
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarUltimoEmail();
+  }
+
+  Future<void> _carregarUltimoEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString(_kUltimoEmail);
+    if (email != null && email.isNotEmpty && mounted) {
+      // Só preenche se o usuário ainda não digitou nada.
+      if (_emailController.text.isEmpty) {
+        _emailController.text = email;
+      }
+    }
+  }
+
+  Future<void> _salvarUltimoEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kUltimoEmail, email);
+  }
 
   @override
   void dispose() {
@@ -66,6 +91,8 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
     setState(() => _loading = true);
     try {
       await ref.read(authActionsProvider).login(email: email, senha: password);
+      // Guarda o e-mail (nunca a senha) para pré-preencher no próximo acesso.
+      await _salvarUltimoEmail(email);
       // Sucesso: o RootGate reage à mudança de sessão e mostra a Home correta.
       // Como o login pode ter sido alcançado via push (Welcome → login),
       // voltamos à raiz para revelar a tela decidida pelo gate.

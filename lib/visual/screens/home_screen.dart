@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
@@ -639,6 +640,13 @@ class _WordCard extends ConsumerWidget {
 
   final double scale;
 
+  void _compartilhar(String verso, String referencia) {
+    // verso já vem entre aspas; monta um texto pronto para redes sociais.
+    Share.share(
+      '$verso\n$referencia\n\nPalavra do Dia — ${IgrejaInfo.nome}',
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final palavra = ref.watch(palavraDoDiaProvider).valueOrNull;
@@ -661,36 +669,45 @@ class _WordCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: 12 * scale,
-              vertical: 4 * scale,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.20),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AuthAssetImage(
-                  HomeAssets.word,
-                  width: 14.7 * scale,
-                  height: 10.7 * scale,
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 12 * scale,
+                  vertical: 4 * scale,
                 ),
-                SizedBox(width: 8 * scale),
-                Text(
-                  HomeMockData.wordLabel,
-                  style: GoogleFonts.montserrat(
-                    fontSize: 12 * scale,
-                    fontWeight: FontWeight.w700,
-                    height: 16.8 / 12,
-                    letterSpacing: 0.6 * scale,
-                    color: Colors.white,
-                  ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.20),
+                  borderRadius: BorderRadius.circular(999),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AuthAssetImage(
+                      HomeAssets.word,
+                      width: 14.7 * scale,
+                      height: 10.7 * scale,
+                    ),
+                    SizedBox(width: 8 * scale),
+                    Text(
+                      HomeMockData.wordLabel,
+                      style: GoogleFonts.montserrat(
+                        fontSize: 12 * scale,
+                        fontWeight: FontWeight.w700,
+                        height: 16.8 / 12,
+                        letterSpacing: 0.6 * scale,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              _WordShareButton(
+                scale: scale,
+                onTap: () => _compartilhar(verso, referencia),
+              ),
+            ],
           ),
           SizedBox(height: 16 * scale),
           Text(
@@ -713,6 +730,40 @@ class _WordCard extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Botão discreto de compartilhar no card da Palavra do Dia.
+class _WordShareButton extends StatelessWidget {
+  const _WordShareButton({required this.scale, required this.onTap});
+
+  final double scale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Compartilhar a Palavra do Dia',
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 32 * scale,
+          height: 32 * scale,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.20),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.share_rounded,
+            size: 16 * scale,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
