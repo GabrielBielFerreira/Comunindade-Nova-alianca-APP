@@ -196,12 +196,7 @@ class HomeMockData {
   static const verse = '"O Senhor é o meu pastor;\nnada me faltará."';
   static const verseReference = 'Salmos 23:1';
   static const nextServiceLabel = 'PRÓXIMO CULTO';
-  static const nextServiceTitle = 'Domingo, 18h';
-  static const nextServiceStatus = 'Presença confirmada';
-  static const schedulesLabel = 'MINHAS ESCALAS';
   static const leaderMinistryLabel = 'MEU MINISTÉRIO';
-  static const schedulesTitle = 'Louvor';
-  static const schedulesStatus = '2 escalas pendentes';
   static const nextStepsTitle = 'ACESSO RÁPIDO';
   static const seeAll = 'Ver tudo';
 

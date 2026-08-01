@@ -10,6 +10,7 @@ import '../../core/constants/igreja_info.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
+import '../../features/ministerios/providers/ministerios_providers.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock_data.dart';
@@ -24,7 +25,7 @@ class HomeScreen extends ConsumerWidget {
     super.key,
     this.greeting = HomeMockData.greeting,
     this.greetingSubtitle = HomeMockData.greetingSubtitle,
-    this.secondaryCardLabel = HomeMockData.schedulesLabel,
+    this.secondaryCardLabel = HomeMockData.leaderMinistryLabel,
     this.showSecondaryCard = true,
     this.showBottomNavigation = true,
     this.muralRoute = VisualRoutes.muralOracao,
@@ -47,7 +48,6 @@ class HomeScreen extends ConsumerWidget {
   static const _line = Color(0xFFE5E7EB);
   static const _iconBackground = Color(0xFFE8E8E8);
   static const _success = Color(0xFF16A34A);
-  static const _danger = Color(0xFFB02D21);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -323,6 +323,10 @@ class _HomeContent extends ConsumerWidget {
     final eventos = ref.watch(eventosStreamProvider).valueOrNull ?? [];
     final proximo = eventos.isNotEmpty ? eventos.first : null;
 
+    // Meu Ministério: só aparece quando o usuário possui vínculo real
+    // (usuarios/{uid}.ministerio_id). Sem vínculo, o card não é exibido.
+    final meuMinisterio = ref.watch(meuMinisterioProvider).valueOrNull;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -354,25 +358,33 @@ class _HomeContent extends ConsumerWidget {
               status: proximo != null
                   ? '${Formatters.data(proximo.data)} • ${proximo.horario}'
                   : 'Confira a programação',
-              statusAsset: HomeAssets.check,
-              statusColor: HomeScreen._success,
+              // Só mostra o "confirmado" (check verde) quando há evento real.
+              statusAsset:
+                  proximo != null ? HomeAssets.check : HomeAssets.calendar,
+              statusColor:
+                  proximo != null ? HomeScreen._success : HomeScreen._muted,
             ),
           ),
         ),
-        if (showSecondaryCard) ...[
+        if (showSecondaryCard && meuMinisterio != null) ...[
           SizedBox(height: 16 * scale),
           FadeSlideIn(
             delay: const Duration(milliseconds: 200),
-            child: _InfoCard(
-              scale: scale,
-              iconAsset: HomeAssets.scaleBell,
-              iconWidth: 16,
-              iconHeight: 20,
-              label: secondaryCardLabel,
-              title: HomeMockData.schedulesTitle,
-              status: HomeMockData.schedulesStatus,
-              statusAsset: HomeAssets.alert,
-              statusColor: HomeScreen._danger,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () =>
+                  Navigator.pushNamed(context, VisualRoutes.meuMinisterio),
+              child: _InfoCard(
+                scale: scale,
+                iconAsset: HomeAssets.scaleBell,
+                iconWidth: 16,
+                iconHeight: 20,
+                label: secondaryCardLabel,
+                title: meuMinisterio.nome,
+                status: 'Ver detalhes do ministério',
+                statusAsset: HomeAssets.calendar,
+                statusColor: HomeScreen._muted,
+              ),
             ),
           ),
         ],
@@ -513,7 +525,7 @@ class _VidaNaComunidadeSection extends StatelessWidget {
             () => Navigator.pushNamed(context, VisualRoutes.meuMinisterio)),
         _Atalho(Icons.favorite_rounded, 'Mural de Oração', 'Ore em comunidade',
             () => Navigator.pushNamed(context, muralRoute)),
-        _Atalho(Icons.live_tv_rounded, 'Ao Vivo', 'Acompanhe o culto',
+        _Atalho(Icons.live_tv_rounded, 'Ao Vivo', 'Transmissões no Instagram',
             () => _abrir(IgrejaInfo.instagramUrl)),
         _Atalho(Icons.camera_alt_rounded, 'Instagram', IgrejaInfo.instagram,
             () => _abrir(IgrejaInfo.instagramUrl)),

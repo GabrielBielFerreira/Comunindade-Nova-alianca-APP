@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/constants/igreja_info.dart';
 import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
@@ -186,22 +187,27 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           SizedBox(height: 20 * scale),
-                          _SectionLabel(
-                            'Visualizar outra igreja',
-                            scale: scale,
-                          ),
-                          SizedBox(height: 12 * scale),
-                          _SurfaceGroup(
-                            scale: scale,
-                            children: [
-                              _ChangeChurchRow(
-                                scale: scale,
-                                label: _churchLabel,
-                                onTap: _openChurchSelection,
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 28 * scale),
+                          // Multi-igreja está fora do escopo da V1 (app exclusivo
+                          // da Comunidade Nova Aliança). Só aparece com a flag
+                          // MULTI_IGREJA ligada — desligada por padrão.
+                          if (AppConfig.multiIgrejaHabilitada) ...[
+                            _SectionLabel(
+                              'Visualizar outra igreja',
+                              scale: scale,
+                            ),
+                            SizedBox(height: 12 * scale),
+                            _SurfaceGroup(
+                              scale: scale,
+                              children: [
+                                _ChangeChurchRow(
+                                  scale: scale,
+                                  label: _churchLabel,
+                                  onTap: _openChurchSelection,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 28 * scale),
+                          ],
                           _SurfaceGroup(
                             scale: scale,
                             children: [

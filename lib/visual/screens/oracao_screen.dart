@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
+import '../../features/oracao/data/pedido_oracao_model.dart';
+import '../../features/oracao/providers/oracao_providers.dart';
 import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock/oracao_mock_data.dart';
 import '../mock_data.dart';
@@ -16,16 +19,24 @@ import '../widgets/oracao_bottom_navigation.dart';
 import 'oracao_novo_pedido_screen.dart';
 import 'oracao_pedido_urgente_screen.dart';
 
-class OracaoScreen extends StatefulWidget {
+/// Converte um pedido do Firestore no formato usado pelos cards visuais.
+OracaoRequestData _paraCard(PedidoOracaoModel p) => OracaoRequestData(
+      author: p.nomeExibicao,
+      time: Formatters.dataRelativa(p.criadoEm),
+      text: p.texto,
+      prayerCount: p.oramCount,
+    );
+
+class OracaoScreen extends ConsumerStatefulWidget {
   const OracaoScreen({super.key, required this.isLeader});
 
   final bool isLeader;
 
   @override
-  State<OracaoScreen> createState() => _OracaoScreenState();
+  ConsumerState<OracaoScreen> createState() => _OracaoScreenState();
 }
 
-class _OracaoScreenState extends State<OracaoScreen> {
+class _OracaoScreenState extends ConsumerState<OracaoScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -36,46 +47,18 @@ class _OracaoScreenState extends State<OracaoScreen> {
   static const _line = Color(0xFFE5E7EB);
   static const _avatar = Color(0xFFEACDD6);
 
+  // 0 = meus pedidos, 1 = comunidade.
   int _selectedTab = 1;
-  final Set<String> _praying = <String>{};
 
-  List<OracaoRequestData> get _requests => _selectedTab == 0
-      ? OracaoMockData.myRequests
-      : OracaoMockData.communityRequests;
-
-  String _requestKey(OracaoRequestData request) =>
-      '${request.author}-${request.time}-${request.text}';
-
-  int _visiblePrayerCount(OracaoRequestData request) {
-    final key = _requestKey(request);
-    return request.prayerCount + (_praying.contains(key) ? 1 : 0);
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-      );
-  }
-
-  void _togglePrayer(OracaoRequestData request) {
-    final key = _requestKey(request);
-    final isPraying = _praying.contains(key);
-
-    setState(() {
-      if (isPraying) {
-        _praying.remove(key);
-      } else {
-        _praying.add(key);
-      }
-    });
-
-    _showMessage(
-      isPraying
-          ? 'Oração removida visualmente'
-          : 'Você marcou que está orando por ${request.author}',
-    );
+  /// Registra a reação "Estou orando" no Firestore (idempotente por usuário).
+  void _orar(PedidoOracaoModel pedido) {
+    final uid = ref.read(authStateProvider).valueOrNull?.uid;
+    if (uid == null) return;
+    ref.read(oracaoRepositoryProvider).estouOrando(
+          pedidoId: pedido.id,
+          uid: uid,
+          jaOrou: pedido.orouUsuario(uid),
+        );
   }
 
   void _openDevotional() {
@@ -139,106 +122,6 @@ class _OracaoScreenState extends State<OracaoScreen> {
         );
       },
     );
-  }
-
-  // ignore: unused_element
-  void _openRequestSheet({required bool urgent}) {
-    final controller = TextEditingController();
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) {
-        final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-            .clamp(0.86, 1.0)
-            .toDouble();
-
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20 * scale,
-            4 * scale,
-            20 * scale,
-            MediaQuery.viewInsetsOf(context).bottom +
-                MediaQuery.paddingOf(context).bottom +
-                20 * scale,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                urgent ? 'Pedido urgente' : 'Novo pedido',
-                style: GoogleFonts.montserrat(
-                  fontSize: 22 * scale,
-                  fontWeight: FontWeight.w700,
-                  color: _title,
-                ),
-              ),
-              SizedBox(height: 12 * scale),
-              TextField(
-                controller: controller,
-                minLines: 3,
-                maxLines: 5,
-                textInputAction: TextInputAction.newline,
-                decoration: InputDecoration(
-                  hintText: 'Digite seu pedido de oração',
-                  hintStyle: GoogleFonts.inter(color: _muted),
-                  filled: true,
-                  fillColor: _background,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12 * scale),
-                    borderSide: const BorderSide(color: _line),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12 * scale),
-                    borderSide: const BorderSide(color: _line),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12 * scale),
-                    borderSide: const BorderSide(color: _primary),
-                  ),
-                ),
-              ),
-              SizedBox(height: 14 * scale),
-              SizedBox(
-                width: double.infinity,
-                height: 52 * scale,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _showMessage(
-                      urgent
-                          ? 'Pedido urgente registrado no protótipo'
-                          : 'Pedido registrado no protótipo',
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10 * scale),
-                    ),
-                  ),
-                  child: Text(
-                    'Enviar pedido',
-                    style: GoogleFonts.inter(
-                      fontSize: 15 * scale,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    ).whenComplete(controller.dispose);
   }
 
   @override
@@ -326,18 +209,11 @@ class _OracaoScreenState extends State<OracaoScreen> {
                                 ),
                               ),
                               SizedBox(height: 16 * scale),
-                              for (var i = 0; i < _requests.length; i++) ...[
-                                _PrayerRequestCard(
-                                  scale: scale,
-                                  request: _requests[i],
-                                  prayerCount: _visiblePrayerCount(
-                                    _requests[i],
-                                  ),
-                                  onPray: () => _togglePrayer(_requests[i]),
-                                ),
-                                if (i < _requests.length - 1)
-                                  SizedBox(height: 8 * scale),
-                              ],
+                              _RecentRequests(
+                                scale: scale,
+                                selectedTab: _selectedTab,
+                                onPray: _orar,
+                              ),
                             ],
                           ),
                         ),
@@ -361,6 +237,93 @@ class _OracaoScreenState extends State<OracaoScreen> {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lista "Recentes" da tela de Oração, alimentada pelo Firestore.
+/// Aba 0 = meus pedidos (inclui privados/não aprovados); aba 1 = mural público.
+class _RecentRequests extends ConsumerWidget {
+  const _RecentRequests({
+    required this.scale,
+    required this.selectedTab,
+    required this.onPray,
+  });
+
+  final double scale;
+  final int selectedTab;
+  final ValueChanged<PedidoOracaoModel> onPray;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = selectedTab == 0
+        ? ref.watch(meusPedidosProvider)
+        : ref.watch(muralPedidosProvider);
+
+    return async.when(
+      loading: () => Padding(
+        padding: EdgeInsets.symmetric(vertical: 32 * scale),
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => _RecentMensagem(
+        scale: scale,
+        texto: selectedTab == 0
+            ? 'Não foi possível carregar seus pedidos. Verifique sua conexão.'
+            : 'Não foi possível carregar os pedidos. Verifique sua conexão.',
+      ),
+      data: (pedidos) {
+        if (pedidos.isEmpty) {
+          return _RecentMensagem(
+            scale: scale,
+            texto: selectedTab == 0
+                ? 'Você ainda não compartilhou pedidos.'
+                : 'Ainda não há pedidos no mural da comunidade.',
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < pedidos.length; i++) ...[
+              _PrayerRequestCard(
+                scale: scale,
+                request: _paraCard(pedidos[i]),
+                prayerCount: pedidos[i].oramCount,
+                onPray: () => onPray(pedidos[i]),
+              ),
+              if (i < pedidos.length - 1) SizedBox(height: 8 * scale),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _RecentMensagem extends StatelessWidget {
+  const _RecentMensagem({required this.scale, required this.texto});
+
+  final double scale;
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20 * scale),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: _OracaoScreenState._line),
+        borderRadius: BorderRadius.circular(12 * scale),
+      ),
+      child: Text(
+        texto,
+        textAlign: TextAlign.center,
+        style: GoogleFonts.inter(
+          fontSize: 15 * scale,
+          height: 1.4,
+          color: _OracaoScreenState._muted,
         ),
       ),
     );
@@ -990,7 +953,7 @@ class _PrayerRequestCard extends StatelessWidget {
           ),
           SizedBox(height: 12 * scale),
           Text(
-            '${request.text}...',
+            request.text,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
