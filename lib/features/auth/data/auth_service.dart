@@ -83,15 +83,27 @@ class AuthService {
     await ref.set(usuario.toMap());
   }
 
+  /// Garante um usuário (uid) para ações abertas a visitantes, como enviar
+  /// pedido de oração. Se já houver sessão, reaproveita; senão entra de forma
+  /// anônima. Requer "Autenticação anônima" habilitada no Firebase.
+  Future<String> garantirUsuario() async {
+    final atual = _auth.currentUser;
+    if (atual != null) return atual.uid;
+    final cred = await _auth.signInAnonymously();
+    return cred.user!.uid;
+  }
+
   Future<void> esqueciSenha(String email) {
     return _auth.sendPasswordResetEmail(email: email);
   }
 
   Future<void> logout() async {
     // Desconecta também do Google para permitir trocar de conta no próximo
-    // acesso. Falha aqui não deve impedir o logout do Firebase.
+    // acesso. Falha/lentidão aqui NUNCA deve impedir o logout do Firebase.
     try {
-      await _googleSignIn.signOut();
+      await _googleSignIn
+          .signOut()
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
     } catch (_) {}
     await _auth.signOut();
   }

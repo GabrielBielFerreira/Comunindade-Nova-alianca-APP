@@ -5,6 +5,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/constants/igreja_info.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_controller.dart';
+import '../../visual/visual_router.dart';
 
 /// Exibida quando o usuário está autenticado mas com status `inativo`.
 class ContaInativaScreen extends ConsumerWidget {
@@ -60,7 +61,10 @@ class ContaInativaScreen extends ConsumerWidget {
                 onPressed: () async {
                   await ref.read(authActionsProvider).sair();
                   if (context.mounted) {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      VisualRoutes.entraconta,
+                      (route) => false,
+                    );
                   }
                 },
                 child: const Text(

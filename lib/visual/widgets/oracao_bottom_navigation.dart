@@ -120,7 +120,7 @@ class _OracaoNavigationItem extends StatelessWidget {
         if (item.asset == HomeAssets.home) {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;
@@ -144,7 +144,7 @@ class _OracaoNavigationItem extends StatelessWidget {
         if (item.label == 'Início') {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;

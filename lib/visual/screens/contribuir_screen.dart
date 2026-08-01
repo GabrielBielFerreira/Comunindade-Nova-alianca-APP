@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/config/app_config.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../../features/campanhas/providers/campanhas_providers.dart';
+import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -13,6 +15,7 @@ import 'campanha_detalhes_screen.dart';
 import 'revisar_contribuicao_screen.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../widgets/mais_menu.dart';
 import '../widgets/motion.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 
@@ -676,14 +679,16 @@ class _PaymentMethodOption extends StatelessWidget {
   }
 }
 
-class _ContribuirTopBar extends StatelessWidget {
+class _ContribuirTopBar extends ConsumerWidget {
   const _ContribuirTopBar({required this.scale, required this.topPadding});
 
   final double scale;
   final double topPadding;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final naoLidas = ref.watch(naoLidasCountProvider);
+    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -725,7 +730,7 @@ class _ContribuirTopBar extends StatelessWidget {
               asset: HomeAssets.notification,
               width: 16,
               height: 20,
-              showDot: true,
+              showDot: naoLidas > 0,
               onTap: () =>
                   Navigator.pushNamed(context, VisualRoutes.notificacoes),
             ),
@@ -735,6 +740,7 @@ class _ContribuirTopBar extends StatelessWidget {
               asset: HomeAssets.menu,
               width: 18,
               height: 12,
+              onTap: () => showMaisMenu(context, isLider: isLider),
             ),
           ],
         ),
@@ -1757,7 +1763,7 @@ class _ContribuirNavigationItem extends StatelessWidget {
         if (item.asset == HomeAssets.home) {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;
@@ -1781,7 +1787,7 @@ class _ContribuirNavigationItem extends StatelessWidget {
         if (item.label == 'Início') {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;

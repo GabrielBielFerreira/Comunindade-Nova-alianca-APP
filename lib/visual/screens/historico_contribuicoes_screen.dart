@@ -1088,7 +1088,7 @@ class _HistoryNavigationItem extends StatelessWidget {
         if (item.label == 'Início') {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;

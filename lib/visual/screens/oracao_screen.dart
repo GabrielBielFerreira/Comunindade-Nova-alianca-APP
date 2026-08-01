@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock/oracao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../widgets/mais_menu.dart';
 import '../widgets/oracao_bottom_navigation.dart';
 import 'oracao_novo_pedido_screen.dart';
 import 'oracao_pedido_urgente_screen.dart';
@@ -364,14 +367,16 @@ class _OracaoScreenState extends State<OracaoScreen> {
   }
 }
 
-class _TopBar extends StatelessWidget {
+class _TopBar extends ConsumerWidget {
   const _TopBar({required this.scale, required this.topPadding});
 
   final double scale;
   final double topPadding;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final naoLidas = ref.watch(naoLidasCountProvider);
+    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -412,7 +417,7 @@ class _TopBar extends StatelessWidget {
               scale: scale,
               width: 16,
               height: 20,
-              showDot: true,
+              showDot: naoLidas > 0,
               onTap: () =>
                   Navigator.pushNamed(context, VisualRoutes.notificacoes),
             ),
@@ -422,6 +427,7 @@ class _TopBar extends StatelessWidget {
               scale: scale,
               width: 18,
               height: 12,
+              onTap: () => showMaisMenu(context, isLider: isLider),
             ),
           ],
         ),

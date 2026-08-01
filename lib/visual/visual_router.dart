@@ -13,6 +13,7 @@ import 'screens/home_leader_screen.dart';
 import 'screens/home_member_screen.dart';
 import 'screens/historico_contribuicoes_screen.dart';
 import 'screens/mural_oracao_screen.dart';
+import 'screens/oracao_novo_pedido_screen.dart';
 import 'screens/oracao_screen.dart';
 import 'screens/pagamento_boleto_screen.dart';
 import 'screens/pagamento_cartao_screen.dart';
@@ -63,6 +64,7 @@ abstract class VisualRoutes {
   static const oracaoLeader = '/oracao-lider';
   static const muralOracao = '/mural-oracao';
   static const muralOracaoLeader = '/mural-oracao-lider';
+  static const oracaoNovoPedido = '/oracao-novo-pedido';
   static const contribuir = '/contribuir';
   static const contribuirLeader = '/contribuir-lider';
   static const escolherMetodoPagamento = '/escolher-metodo-pagamento';
@@ -122,6 +124,8 @@ final Map<String, WidgetBuilder> visualRoutes = {
       const ProgramacaoScreen(isLeader: true),
   VisualRoutes.oracao: (_) => const OracaoScreen(isLeader: false),
   VisualRoutes.oracaoLeader: (_) => const OracaoScreen(isLeader: true),
+  VisualRoutes.oracaoNovoPedido: (_) =>
+      const OracaoNovoPedidoScreen(isLeader: false),
   VisualRoutes.muralOracao: (_) => const MuralOracaoScreen(isLeader: false),
   VisualRoutes.muralOracaoLeader: (_) =>
       const MuralOracaoScreen(isLeader: true),

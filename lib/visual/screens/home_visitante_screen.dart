@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../visual_router.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 import 'home_screen.dart';
 
@@ -24,6 +25,9 @@ class HomeVisitanteScreen extends StatelessWidget {
               greetingSubtitle: 'Um lugar para viver fé, comunhão e propósito.',
               showSecondaryCard: false,
               showBottomNavigation: false,
+              // Visitante pode enviar pedido de oração sem login (vai à
+              // moderação). O atalho "Mural de Oração" abre o formulário.
+              muralRoute: VisualRoutes.oracaoNovoPedido,
             ),
             Align(
               alignment: Alignment.bottomCenter,

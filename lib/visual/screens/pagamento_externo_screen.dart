@@ -515,7 +515,7 @@ class _ExternalPaymentNavigationItem extends StatelessWidget {
         if (item.label == 'In\u00EDcio') {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;

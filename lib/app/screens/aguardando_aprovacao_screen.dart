@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_controller.dart';
+import '../../visual/visual_router.dart';
 
 /// Exibida quando o usuário está autenticado mas com cadastro `pendente`.
 class AguardandoAprovacaoScreen extends ConsumerWidget {
@@ -58,7 +59,10 @@ class AguardandoAprovacaoScreen extends ConsumerWidget {
                 onPressed: () async {
                   await ref.read(authActionsProvider).sair();
                   if (context.mounted) {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      VisualRoutes.entraconta,
+                      (route) => false,
+                    );
                   }
                 },
                 child: const Text(

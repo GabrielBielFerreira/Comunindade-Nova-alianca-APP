@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../features/auth/providers/auth_controller.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/notificacoes/providers/notificacoes_providers.dart';
+import '../widgets/mais_menu.dart';
 import '../mock_data.dart';
 import '../profile_photo_notifier.dart';
 import '../visual_router.dart';
@@ -99,14 +101,16 @@ class PerfilScreen extends StatelessWidget {
   }
 }
 
-class _ProfileTopBar extends StatelessWidget {
+class _ProfileTopBar extends ConsumerWidget {
   const _ProfileTopBar({required this.scale, required this.topPadding});
 
   final double scale;
   final double topPadding;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final naoLidas = ref.watch(naoLidasCountProvider);
+    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -148,7 +152,7 @@ class _ProfileTopBar extends StatelessWidget {
               asset: HomeAssets.notification,
               width: 16,
               height: 20,
-              showDot: true,
+              showDot: naoLidas > 0,
               onTap: () =>
                   Navigator.pushNamed(context, VisualRoutes.notificacoes),
             ),
@@ -158,6 +162,7 @@ class _ProfileTopBar extends StatelessWidget {
               asset: HomeAssets.menu,
               width: 18,
               height: 12,
+              onTap: () => showMaisMenu(context, isLider: isLider),
             ),
           ],
         ),
@@ -474,9 +479,14 @@ class _LogoutButton extends ConsumerWidget {
     if (confirmar != true) return;
 
     await ref.read(authActionsProvider).sair();
-    // O RootGate reage ao logout e mostra a tela pública; voltamos à raiz.
+    // Reconstrói o RootGate como raiz (limpando a pilha). Como as abas usam
+    // pushNamedAndRemoveUntil, sem isto o "voltar" revelaria a Home de membro
+    // em vez da tela de boas-vindas. O RootGate reage à sessão encerrada.
     if (context.mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        VisualRoutes.entraconta,
+        (route) => false,
+      );
     }
   }
 
@@ -626,7 +636,7 @@ class _PerfilNavigationItem extends StatelessWidget {
         if (item.asset == HomeAssets.home) {
           Navigator.pushNamedAndRemoveUntil(
             context,
-            VisualRoutes.homeMember,
+            VisualRoutes.entraconta,
             (route) => false,
           );
           return;

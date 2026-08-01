@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/providers/auth_controller.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/oracao/providers/oracao_providers.dart';
 import '../widgets/leader_bottom_navigation.dart';
@@ -69,17 +70,18 @@ class _OracaoNovoPedidoScreenState
       return;
     }
 
-    final usuario = ref.read(usuarioProvider);
-    if (usuario == null) {
-      _showMessage('Faça login para enviar seu pedido.');
-      return;
-    }
-
     setState(() => _saving = true);
     try {
+      // Aberto a visitantes: se não houver sessão, cria uma sessão anônima
+      // (requer "Autenticação anônima" habilitada no Firebase). O pedido vai
+      // para moderação como qualquer outro.
+      final usuario = ref.read(usuarioProvider);
+      final uid =
+          usuario?.uid ?? await ref.read(authActionsProvider).garantirUsuario();
+
       final texto = '[$_category] ${_descriptionController.text.trim()}';
       await ref.read(oracaoRepositoryProvider).criarPedido(
-            autorId: usuario.uid,
+            autorId: uid,
             autorNome: _nameController.text.trim(),
             texto: texto,
             // "Publicar no mural" => público; caso contrário, privado.

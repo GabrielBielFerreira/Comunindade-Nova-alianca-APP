@@ -47,6 +47,10 @@ class AuthActions {
     return cred != null;
   }
 
+  /// Garante um uid (sessão existente ou anônima) para ações abertas a
+  /// visitantes, como enviar pedido de oração.
+  Future<String> garantirUsuario() => _auth.garantirUsuario();
+
   /// Logout completo: desativa o token FCM do dispositivo antes de encerrar a
   /// sessão para não continuar recebendo notificações após sair.
   Future<void> sair() async {
