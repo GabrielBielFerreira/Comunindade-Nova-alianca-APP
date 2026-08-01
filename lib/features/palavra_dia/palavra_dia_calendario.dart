@@ -5,7 +5,13 @@
 /// mão — é obtido em tempo de execução pela integração bíblica já existente
 /// (Almeida, domínio público), evitando invenção ou atribuição incorreta.
 class PalavraDiaRef {
-  const PalavraDiaRef(this.livro, this.capitulo, this.versiculo, [this.reflexao]);
+  const PalavraDiaRef(
+    this.livro,
+    this.capitulo,
+    this.versiculo, {
+    this.reflexao,
+    this.ativo = true,
+  });
 
   final String livro;
   final int capitulo;
@@ -14,6 +20,11 @@ class PalavraDiaRef {
   /// Pequena mensagem de reflexão (quando aplicável). Texto autoral, não
   /// bíblico — pode ser nulo.
   final String? reflexao;
+
+  /// Status do registro. Um conteúdo `ativo == false` é ignorado na seleção
+  /// diária (a data cai no próximo conteúdo ativo), permitindo desativar uma
+  /// referência sem quebrar o calendário.
+  final bool ativo;
 
   String get referencia => '$livro $capitulo:$versiculo';
 
@@ -47,11 +58,17 @@ class PalavraDiaCalendario {
   static int indiceDoDia(DateTime data) =>
       _inicioMes[data.month - 1] + (data.day - 1);
 
-  /// Referência do dia para a data informada.
+  /// Referência do dia para a data informada. Se o conteúdo do índice estiver
+  /// inativo, avança para o próximo conteúdo ativo (nunca deixa o dia sem
+  /// Palavra do Dia).
   static PalavraDiaRef paraData(DateTime data) {
     final lista = todas();
-    final i = indiceDoDia(data) % lista.length;
-    return lista[i];
+    final inicio = indiceDoDia(data) % lista.length;
+    for (var passo = 0; passo < lista.length; passo++) {
+      final ref = lista[(inicio + passo) % lista.length];
+      if (ref.ativo) return ref;
+    }
+    return lista[inicio]; // fallback (todos inativos — não deve ocorrer)
   }
 
   static List<PalavraDiaRef> _construir() {
@@ -62,7 +79,7 @@ class PalavraDiaCalendario {
       if (refs.length >= 366) return;
       final chave = '$livro $cap:$ver';
       if (vistos.add(chave)) {
-        refs.add(PalavraDiaRef(livro, cap, ver, refl));
+        refs.add(PalavraDiaRef(livro, cap, ver, reflexao: refl));
       }
     }
 
