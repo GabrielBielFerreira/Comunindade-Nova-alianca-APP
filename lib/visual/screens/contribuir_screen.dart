@@ -1808,19 +1808,16 @@ class _ContribuirNavigationItem extends StatelessWidget {
           return;
         }
 
-        if (item.asset == HomeAssets.profile) {
+        if (item.label == 'Perfil' || item.asset == HomeAssets.profile) {
           Navigator.pushNamed(context, VisualRoutes.perfil);
           return;
         }
 
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('Tela visual será conectada futuramente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        if (item.label == 'Contribuir' ||
+            item.asset == HomeAssets.contribute) {
+          Navigator.pushNamed(context, VisualRoutes.contribuir);
+          return;
+        }
       },
       child: Center(
         child: selected

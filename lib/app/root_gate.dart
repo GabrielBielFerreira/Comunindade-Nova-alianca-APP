@@ -53,12 +53,21 @@ class RootGate extends ConsumerWidget {
         final usuarioAsync = ref.watch(usuarioAtualProvider);
         return usuarioAsync.when(
           loading: () => const SplashScreen(),
-          error: (_, _) =>
-              const SplashScreen(mensagem: 'Não foi possível carregar seu perfil.'),
+          // Nunca deixa o usuário preso: oferece tentar de novo ou sair.
+          error: (_, _) => SplashScreen(
+            mensagem: 'Não foi possível carregar seu perfil. '
+                'Verifique sua conexão e tente novamente.',
+            onTentarNovamente: () => ref.invalidate(usuarioAtualProvider),
+            onSair: () => ref.read(authServiceProvider).logout(),
+          ),
           data: (usuario) {
             if (usuario == null) {
               // Documento ainda sendo provisionado (logo após o cadastro).
-              return const SplashScreen(mensagem: 'Preparando sua conta...');
+              // Oferece "Sair" para nunca prender o usuário nesta tela.
+              return SplashScreen(
+                mensagem: 'Preparando sua conta...',
+                onSair: () => ref.read(authServiceProvider).logout(),
+              );
             }
             switch (usuario.status) {
               case StatusUsuario.pendente:

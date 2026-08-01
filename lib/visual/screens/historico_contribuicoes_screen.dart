@@ -1108,14 +1108,16 @@ class _HistoryNavigationItem extends StatelessWidget {
           Navigator.pushNamed(context, VisualRoutes.oracao);
           return;
         }
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text('Tela visual será conectada futuramente'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+
+        if (item.label == 'Contribuir') {
+          Navigator.pushNamed(context, VisualRoutes.contribuir);
+          return;
+        }
+
+        if (item.label == 'Perfil' || item.asset == HomeAssets.profile) {
+          Navigator.pushNamed(context, VisualRoutes.perfil);
+          return;
+        }
       },
       child: Center(
         child: selected
