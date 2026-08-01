@@ -44,6 +44,22 @@ class AppConfig {
   /// Região das Cloud Functions.
   static const String functionsRegion = 'southamerica-east1';
 
+  /// URL oficial do app (página de instalação / loja), usada na legenda e no
+  /// card de compartilhamento da Palavra do Dia.
+  ///
+  /// PONTO DE CONFIGURAÇÃO DO LINK OFICIAL:
+  ///  - Preferencialmente, defina em runtime no Firestore:
+  ///    `configuracoes/app` → campo `url_oficial` (permite trocar sem publicar
+  ///    nova versão). Ver [PalavraDoDia]/serviço de compartilhamento.
+  ///  - Ou em tempo de build: `--dart-define=APP_URL=https://...`.
+  ///
+  /// Vazio por padrão de propósito: enquanto não houver endereço oficial, o
+  /// compartilhamento NÃO inclui link (nunca um link falso/provisório).
+  static const String appOfficialUrl = String.fromEnvironment(
+    'APP_URL',
+    defaultValue: '',
+  );
+
   /// Escola de Louvor: só aparece na Home quando houver conteúdo configurado.
   /// Desligada por padrão (evita atalho morto). Ative com
   /// --dart-define=ESCOLA_LOUVOR=true quando o conteúdo estiver no Firebase.

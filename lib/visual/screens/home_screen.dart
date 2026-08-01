@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
@@ -12,6 +11,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
 import '../../features/ministerios/providers/ministerios_providers.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
+import '../../features/palavra_dia/palavra_dia_share_sheet.dart';
 import '../../features/palavra_dia/palavra_do_dia.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -652,18 +652,31 @@ class _WordCard extends ConsumerWidget {
 
   final double scale;
 
-  void _compartilhar(String verso, String referencia) {
-    // verso já vem entre aspas; monta um texto pronto para redes sociais.
-    Share.share(
-      '$verso\n$referencia\n\nPalavra do Dia — ${IgrejaInfo.nome}',
+  void _continuarLendo(BuildContext context, PalavraDoDia palavra) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _PalavraCompletaSheet(palavra: palavra),
     );
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final palavra = ref.watch(palavraDoDiaProvider).valueOrNull;
-    final verso = palavra != null ? '"${palavra.texto}"' : HomeMockData.verse;
-    final referencia = palavra?.referencia ?? HomeMockData.verseReference;
+    final async = ref.watch(palavraDoDiaProvider);
+    final palavra = async.valueOrNull;
+    final carregando = async.isLoading && palavra == null;
+
+    final temTexto = palavra?.temTexto ?? false;
+    final referencia = palavra?.referencia ?? '';
+    final longo = temTexto &&
+        ((palavra!.texto.length > 140) ||
+            (palavra.reflexao?.trim().isNotEmpty ?? false));
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(24 * scale),
@@ -715,30 +728,219 @@ class _WordCard extends ConsumerWidget {
                 ),
               ),
               const Spacer(),
-              _WordShareButton(
-                scale: scale,
-                onTap: () => _compartilhar(verso, referencia),
-              ),
+              if (palavra != null)
+                _WordShareButton(
+                  scale: scale,
+                  onTap: () =>
+                      PalavraDiaShareSheet.abrir(context, palavra),
+                ),
             ],
           ),
           SizedBox(height: 16 * scale),
+          if (carregando)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 6 * scale),
+              child: Text(
+                'Carregando a Palavra do Dia…',
+                style: GoogleFonts.inter(
+                  fontSize: 15 * scale,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+              ),
+            )
+          else if (temTexto) ...[
+            Text(
+              '"${palavra!.texto}"',
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.montserrat(
+                fontSize: 20 * scale,
+                fontWeight: FontWeight.w500,
+                height: 27 / 20,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 8 * scale),
+            // Referência nunca é cortada (até 2 linhas, sem reticências).
+            Text(
+              referencia,
+              maxLines: 2,
+              style: GoogleFonts.inter(
+                fontSize: 14 * scale,
+                fontWeight: FontWeight.w600,
+                height: 21 / 14,
+                color: Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+            if (longo) ...[
+              SizedBox(height: 12 * scale),
+              _ContinuarLendo(
+                scale: scale,
+                onTap: () => _continuarLendo(context, palavra),
+              ),
+            ],
+          ] else ...[
+            // Offline sem cache do dia: mostra a referência correta do dia,
+            // sem inventar texto nem exibir o versículo de outro dia.
+            Text(
+              referencia.isEmpty ? 'Palavra do Dia' : referencia,
+              maxLines: 2,
+              style: GoogleFonts.montserrat(
+                fontSize: 20 * scale,
+                fontWeight: FontWeight.w600,
+                height: 27 / 20,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 8 * scale),
+            Text(
+              'Conecte-se à internet para carregar o versículo de hoje.',
+              style: GoogleFonts.inter(
+                fontSize: 13 * scale,
+                height: 18 / 13,
+                color: Colors.white.withValues(alpha: 0.80),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Link "Continuar lendo" do card da Palavra do Dia.
+class _ContinuarLendo extends StatelessWidget {
+  const _ContinuarLendo({required this.scale, required this.onTap});
+
+  final double scale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Continuar lendo a Palavra do Dia',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 4 * scale),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Continuar lendo',
+                style: GoogleFonts.inter(
+                  fontSize: 14 * scale,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(width: 4 * scale),
+              Icon(Icons.arrow_forward_rounded,
+                  size: 16 * scale, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Conteúdo completo da Palavra do Dia (texto integral + reflexão), aberto pelo
+/// "Continuar lendo".
+class _PalavraCompletaSheet extends StatelessWidget {
+  const _PalavraCompletaSheet({required this.palavra});
+
+  final PalavraDoDia palavra;
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            verso,
+            'Palavra do Dia',
             style: GoogleFonts.montserrat(
-              fontSize: 20 * scale,
-              fontWeight: FontWeight.w500,
-              height: 25 / 20,
-              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.6,
+              color: HomeScreen._muted,
             ),
           ),
-          SizedBox(height: 8 * scale),
-          Text(
-            referencia,
-            style: GoogleFonts.inter(
-              fontSize: 14 * scale,
-              fontWeight: FontWeight.w400,
-              height: 21 / 14,
-              color: Colors.white.withValues(alpha: 0.80),
+          const SizedBox(height: 12),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (palavra.temTexto)
+                    Text(
+                      '"${palavra.texto}"',
+                      style: GoogleFonts.montserrat(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                        color: HomeScreen._title,
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    palavra.referencia,
+                    style: GoogleFonts.montserrat(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: HomeScreen._hero,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    palavra.traducao,
+                    style: GoogleFonts.inter(
+                        fontSize: 13, color: HomeScreen._muted),
+                  ),
+                  if (palavra.reflexao?.trim().isNotEmpty ?? false) ...[
+                    const SizedBox(height: 18),
+                    Text(
+                      palavra.reflexao!.trim(),
+                      style: GoogleFonts.inter(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: HomeScreen._body,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 50,
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop();
+                PalavraDiaShareSheet.abrir(context, palavra);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: HomeScreen._hero,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.share_rounded, size: 20),
+              label: Text(
+                'Compartilhar',
+                style:
+                    GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
+              ),
             ),
           ),
         ],

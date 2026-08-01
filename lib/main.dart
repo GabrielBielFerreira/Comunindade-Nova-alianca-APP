@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/root_gate.dart';
 import 'core/services/navigation_service.dart';
 import 'core/theme/app_theme.dart';
+import 'features/palavra_dia/palavra_dia_watcher.dart';
 import 'firebase_options.dart';
 import 'visual/visual_router.dart';
 
@@ -93,7 +94,8 @@ class NovaAliancaApp extends StatelessWidget {
               maxScaleFactor: 1.3,
             ),
           ),
-          child: child ?? const SizedBox.shrink(),
+          // Mantém a Palavra do Dia atualizada (abrir/retornar/virada do dia).
+          child: PalavraDiaWatcher(child: child ?? const SizedBox.shrink()),
         );
       },
     );
