@@ -47,6 +47,7 @@ dependencies:
   # Utilidades
   intl: ^0.19.0
   uuid: ^4.5.1
+  package_info_plus: ^8.1.0
   url_launcher: ^6.3.1
   image_picker: ^1.2.3
   mask_text_input_formatter: ^2.9.0

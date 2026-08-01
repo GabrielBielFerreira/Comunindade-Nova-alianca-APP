@@ -807,7 +807,9 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 105.8 * scale,
+      // Altura mínima (não fixa): permite o card crescer com fontes ampliadas
+      // do sistema, evitando "BOTTOM OVERFLOWED" em telas menores/acessíveis.
+      constraints: BoxConstraints(minHeight: 105.8 * scale),
       width: double.infinity,
       padding: EdgeInsets.all(17 * scale),
       decoration: BoxDecoration(
@@ -859,7 +861,7 @@ class _InfoCard extends StatelessWidget {
                 SizedBox(height: 2 * scale),
                 Text(
                   title,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.montserrat(
                     fontSize: 20 * scale,

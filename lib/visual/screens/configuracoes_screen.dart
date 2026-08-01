@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/constants/igreja_info.dart';
+import '../../core/services/app_info.dart';
 import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
 import '../widgets/internal_header.dart';
@@ -34,11 +35,18 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   bool _liveNotifications = true;
   bool _eventNotifications = true;
   bool _communicationNotifications = true;
+  String _appVersao = AppInfo.versao;
 
   @override
   void initState() {
     super.initState();
     _carregarPreferencias();
+    _carregarVersao();
+  }
+
+  Future<void> _carregarVersao() async {
+    await AppInfo.carregar();
+    if (mounted) setState(() => _appVersao = AppInfo.versao);
   }
 
   Future<void> _carregarPreferencias() async {
@@ -79,7 +87,8 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
       case 'Sobre o desenvolvedor':
         _showInfoDialog(
           'Sobre',
-          'App ${IgrejaInfo.nome} (${IgrejaInfo.sigla}).\n\nVersão 1.0.0.\n\n'
+          'App ${IgrejaInfo.nome} (${IgrejaInfo.sigla}).\n\n'
+              '${_appVersao.isEmpty ? 'Versão do aplicativo' : 'Versão $_appVersao'}.\n\n'
               'Desenvolvido para uso da comunidade.',
         );
       case 'Política de privacidade':
@@ -288,7 +297,9 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                           SizedBox(height: 16 * scale),
                           Center(
                             child: Text(
-                              'Versão: 1.0.0',
+                              _appVersao.isEmpty
+                                  ? 'Versão do aplicativo'
+                                  : 'Versão: $_appVersao',
                               style: GoogleFonts.inter(
                                 fontSize: 12 * scale,
                                 fontWeight: FontWeight.w400,
