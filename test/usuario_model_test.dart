@@ -67,5 +67,13 @@ void main() {
       expect(restaurado.status, StatusUsuario.pendente);
       expect(restaurado.email, '');
     });
+
+    test('perfil tolera acento e maiúsculas ("líder"/"Líder" => lider)', () {
+      expect(PerfilUsuarioExt.fromString('líder'), PerfilUsuario.lider);
+      expect(PerfilUsuarioExt.fromString('Líder'), PerfilUsuario.lider);
+      expect(PerfilUsuarioExt.fromString('lider'), PerfilUsuario.lider);
+      expect(PerfilUsuarioExt.fromString('diácono'), PerfilUsuario.diacono);
+      expect(StatusUsuarioExt.fromString('Aprovado'), StatusUsuario.aprovado);
+    });
   });
 }

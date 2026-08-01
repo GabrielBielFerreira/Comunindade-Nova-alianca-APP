@@ -4,20 +4,42 @@ enum PerfilUsuario { pastor, diacono, lider, membro, visitante }
 
 enum StatusUsuario { pendente, aprovado, inativo }
 
+/// Normaliza um texto para comparação: minúsculas, sem acentos e sem espaços.
+/// Assim "líder", "Líder" e "lider" são tratados como o mesmo perfil (evita
+/// que uma edição manual no Firestore com acento quebre o reconhecimento).
+String _normalizarChave(String s) {
+  const com = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
+  const sem = 'aaaaaeeeeiiiiooooouuuucn';
+  final buffer = StringBuffer();
+  for (final ch in s.toLowerCase().trim().split('')) {
+    final i = com.indexOf(ch);
+    buffer.write(i >= 0 ? sem[i] : ch);
+  }
+  return buffer.toString();
+}
+
 extension PerfilUsuarioExt on PerfilUsuario {
   String get valor => name;
 
-  static PerfilUsuario fromString(String v) =>
-      PerfilUsuario.values.firstWhere((e) => e.name == v,
-          orElse: () => PerfilUsuario.membro);
+  static PerfilUsuario fromString(String v) {
+    final chave = _normalizarChave(v);
+    for (final e in PerfilUsuario.values) {
+      if (e.name == chave) return e;
+    }
+    return PerfilUsuario.membro;
+  }
 }
 
 extension StatusUsuarioExt on StatusUsuario {
   String get valor => name;
 
-  static StatusUsuario fromString(String v) =>
-      StatusUsuario.values.firstWhere((e) => e.name == v,
-          orElse: () => StatusUsuario.pendente);
+  static StatusUsuario fromString(String v) {
+    final chave = _normalizarChave(v);
+    for (final e in StatusUsuario.values) {
+      if (e.name == chave) return e;
+    }
+    return StatusUsuario.pendente;
+  }
 }
 
 class QualificacaoUsuario {
