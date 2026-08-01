@@ -17,11 +17,16 @@ service cloud.firestore {
     }
 
     function isAprovado() {
-      return isSignedIn() && meu().status == 'aprovado';
+      return isSignedIn() && meu().status.lower() == 'aprovado';
     }
 
+    // Tolerante a maiúsculas e a acentos (edições manuais no Firestore como
+    // "Líder"/"Diácono" continuam sendo reconhecidas). O app normaliza da mesma
+    // forma — evita o descompasso em que o cliente vê a Gestão mas o servidor
+    // nega as leituras/gravações.
     function isLider() {
-      return isAprovado() && meu().perfil in ['pastor', 'diacono', 'lider'];
+      return isAprovado()
+        && meu().perfil.lower() in ['pastor', 'diacono', 'diácono', 'lider', 'líder'];
     }
 
     function isDono(uid) {
