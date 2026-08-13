@@ -13,6 +13,12 @@ final ministeriosProvider =
   return ref.watch(ministeriosRepositoryProvider).stream();
 });
 
+/// Lista de gestão (liderança): todos os ministérios, inclusive inativos.
+final ministeriosGerenciarProvider =
+    StreamProvider.autoDispose<List<MinisterioModel>>((ref) {
+  return ref.watch(ministeriosRepositoryProvider).streamGerenciar();
+});
+
 /// Ministério do usuário logado (null se não houver vínculo).
 final meuMinisterioProvider =
     FutureProvider.autoDispose<MinisterioModel?>((ref) {

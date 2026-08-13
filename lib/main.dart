@@ -4,7 +4,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/root_gate.dart';
 import 'core/services/navigation_service.dart';
@@ -23,6 +25,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Carrega os dados de localização pt_BR usados por DateFormat/NumberFormat
+  // em todo o app (formatters, Palavra do Dia, agenda...). Sem isto, qualquer
+  // tela que formata data/moeda com o locale 'pt_BR' lança LocaleDataException
+  // e quebra — foi o que travou a Home. Precisa vir ANTES do runApp.
+  await initializeDateFormatting('pt_BR', null);
 
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
@@ -74,6 +82,15 @@ class NovaAliancaApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme,
+      // Localização pt-BR: traduz componentes nativos do Material (date picker,
+      // seletor de hora, tooltips de navegação) para o português.
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       // A rota raiz '/' é o RootGate (decide a tela por sessão/perfil). As
       // demais rotas nomeadas vêm do mapa visual; a tela de login continua
       // acessível em '/login' (VisualRoutes.login).

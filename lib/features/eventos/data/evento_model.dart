@@ -14,6 +14,10 @@ class EventoModel {
   final bool publico;
   final String criadoPor;
   final int confirmadosCount;
+  // Responsável pelo evento (membro escolhido pela liderança). Denormalizado
+  // (id + nome) para exibir sem busca extra. Vazio quando não atribuído.
+  final String responsavelId;
+  final String responsavelNome;
 
   const EventoModel({
     required this.id,
@@ -27,6 +31,8 @@ class EventoModel {
     required this.publico,
     required this.criadoPor,
     required this.confirmadosCount,
+    this.responsavelId = '',
+    this.responsavelNome = '',
   });
 
   factory EventoModel.fromFirestore(DocumentSnapshot doc) {
@@ -46,6 +52,8 @@ class EventoModel {
       publico: data['publico'] as bool? ?? true,
       criadoPor: data['criado_por'] as String? ?? '',
       confirmadosCount: data['confirmados_count'] as int? ?? 0,
+      responsavelId: data['responsavel_id'] as String? ?? '',
+      responsavelNome: data['responsavel_nome'] as String? ?? '',
     );
   }
 
@@ -60,6 +68,8 @@ class EventoModel {
         'publico': publico,
         'criado_por': criadoPor,
         'confirmados_count': confirmadosCount,
+        'responsavel_id': responsavelId,
+        'responsavel_nome': responsavelNome,
       };
 }
 

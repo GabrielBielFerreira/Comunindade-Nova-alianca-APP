@@ -35,6 +35,12 @@ import 'screens/configuracoes_screen.dart';
 import 'screens/visualizar_outra_igreja_screen.dart';
 import 'screens/dados_pessoais_screen.dart';
 import '../features/admin/screens/cadastros_pendentes_screen.dart';
+import '../features/admin/screens/gerenciar_avisos_screen.dart';
+import '../features/admin/screens/gerenciar_campanhas_screen.dart';
+import '../features/admin/screens/gerenciar_devocionais_screen.dart';
+import '../features/admin/screens/gerenciar_eventos_screen.dart';
+import '../features/admin/screens/gerenciar_ministerios_screen.dart';
+import '../features/auth/screens/definir_senha_screen.dart';
 import '../features/biblia/screens/biblia_home_screen.dart';
 import '../features/cantor/screens/cantor_home_screen.dart';
 import '../features/devocionais/screens/devocionais_screen.dart';
@@ -90,11 +96,17 @@ abstract class VisualRoutes {
   static const contribuirVisitante = '/contribuir-visitante';
   static const notificacoes = '/notificacoes';
   static const configuracoes = '/configuracoes';
+  static const definirSenha = '/definir-senha';
   static const visualizarOutraIgreja = '/visualizar-outra-igreja';
   static const dadosPessoais = '/dados-pessoais';
   static const biblia = '/biblia';
   static const cantorCristao = '/cantor-cristao';
   static const cadastrosPendentes = '/cadastros-pendentes';
+  static const gerenciarAvisos = '/gerenciar-avisos';
+  static const gerenciarEventos = '/gerenciar-eventos';
+  static const gerenciarDevocionais = '/gerenciar-devocionais';
+  static const gerenciarCampanhas = '/gerenciar-campanhas';
+  static const gerenciarMinisterios = '/gerenciar-ministerios';
   static const meuMinisterio = '/meu-ministerio';
   static const devocionais = '/devocionais';
   static const escolaLouvor = '/escola-louvor';
@@ -174,12 +186,20 @@ final Map<String, WidgetBuilder> visualRoutes = {
       const ContribuirScreen(isLeader: false, isVisitor: true),
   VisualRoutes.notificacoes: (_) => const NotificacoesScreen(),
   VisualRoutes.configuracoes: (_) => const ConfiguracoesScreen(),
+  VisualRoutes.definirSenha: (_) => const DefinirSenhaScreen(),
   VisualRoutes.visualizarOutraIgreja: (_) =>
       const VisualizarOutraIgrejaScreen(),
   VisualRoutes.dadosPessoais: (_) => const DadosPessoaisScreen(),
   VisualRoutes.biblia: (_) => const BibliaHomeScreen(),
   VisualRoutes.cantorCristao: (_) => const CantorHomeScreen(),
   VisualRoutes.cadastrosPendentes: (_) => const CadastrosPendentesScreen(),
+  VisualRoutes.gerenciarAvisos: (_) => const GerenciarAvisosScreen(),
+  VisualRoutes.gerenciarEventos: (_) => const GerenciarEventosScreen(),
+  VisualRoutes.gerenciarDevocionais: (_) =>
+      const GerenciarDevocionaisScreen(),
+  VisualRoutes.gerenciarCampanhas: (_) => const GerenciarCampanhasScreen(),
+  VisualRoutes.gerenciarMinisterios: (_) =>
+      const GerenciarMinisteriosScreen(),
   VisualRoutes.meuMinisterio: (_) => const MeuMinisterioScreen(),
   VisualRoutes.devocionais: (_) => const DevocionaisScreen(),
   VisualRoutes.escolaLouvor: (_) => const EscolaLouvorScreen(),

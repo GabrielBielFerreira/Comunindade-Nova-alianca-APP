@@ -10,3 +10,9 @@ final eventosStreamProvider =
     StreamProvider.autoDispose<List<EventoModel>>((ref) {
   return ref.watch(eventosRepositoryProvider).streamProximos();
 });
+
+/// Lista de gestão (liderança): todos os eventos, inclusive passados.
+final eventosGerenciarStreamProvider =
+    StreamProvider.autoDispose<List<EventoModel>>((ref) {
+  return ref.watch(eventosRepositoryProvider).streamGerenciar();
+});

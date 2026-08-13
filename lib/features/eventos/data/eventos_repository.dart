@@ -21,4 +21,30 @@ class EventosRepository {
       return lista;
     });
   }
+
+  /// Visão da liderança (Gestão): TODOS os eventos, inclusive os já passados,
+  /// mais recentes/próximos primeiro. Permite revisar e limpar a agenda.
+  Stream<List<EventoModel>> streamGerenciar() {
+    return _col.snapshots().map((snap) {
+      final lista = snap.docs.map(EventoModel.fromFirestore).toList();
+      lista.sort((a, b) => b.data.compareTo(a.data));
+      return lista;
+    });
+  }
+
+  /// Cria um novo evento. Retorna o id gerado.
+  Future<String> criar(EventoModel evento) async {
+    final ref = await _col.add(evento.toMap());
+    return ref.id;
+  }
+
+  /// Atualiza um evento existente.
+  Future<void> atualizar(EventoModel evento) {
+    return _col.doc(evento.id).update(evento.toMap());
+  }
+
+  /// Remove definitivamente um evento.
+  Future<void> excluir(String id) {
+    return _col.doc(id).delete();
+  }
 }

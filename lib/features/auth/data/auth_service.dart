@@ -97,6 +97,38 @@ class AuthService {
     return _auth.sendPasswordResetEmail(email: email);
   }
 
+  /// `true` se a conta atual já possui login por e-mail/senha (provedor
+  /// `password`). Contas criadas só com Google retornam `false` até definirem
+  /// uma senha.
+  bool get possuiSenhaEmail {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    return user.providerData.any((p) => p.providerId == 'password');
+  }
+
+  /// Adiciona (vincula) login por e-mail/senha à conta atual sem remover o
+  /// Google — assim o usuário passa a entrar dos dois jeitos. Usa o e-mail da
+  /// própria conta. Requer sessão recente (pode lançar `requires-recent-login`).
+  Future<void> definirSenha(String senha) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Nenhuma sessão ativa.',
+      );
+    }
+    final email = user.email;
+    if (email == null || email.isEmpty) {
+      throw FirebaseAuthException(
+        code: 'invalid-email',
+        message: 'A conta não tem e-mail para vincular a senha.',
+      );
+    }
+    final credential =
+        EmailAuthProvider.credential(email: email, password: senha);
+    await user.linkWithCredential(credential);
+  }
+
   Future<void> logout() async {
     // Desconecta também do Google para permitir trocar de conta no próximo
     // acesso. Falha/lentidão aqui NUNCA deve impedir o logout do Firebase.

@@ -10,3 +10,9 @@ final avisosStreamProvider =
     StreamProvider.autoDispose<List<AvisoModel>>((ref) {
   return ref.watch(avisosRepositoryProvider).stream();
 });
+
+/// Lista de gestão (liderança): inclui avisos despublicados para edição.
+final avisosGerenciarStreamProvider =
+    StreamProvider.autoDispose<List<AvisoModel>>((ref) {
+  return ref.watch(avisosRepositoryProvider).streamGerenciar();
+});

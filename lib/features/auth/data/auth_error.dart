@@ -14,13 +14,23 @@ String mensagemErroAuth(Object erro) {
       case 'user-not-found':
       case 'wrong-password':
       case 'invalid-credential':
-        return 'E-mail ou senha incorretos.';
+        // Caso frequente: a conta foi criada com "Continuar com Google" e não
+        // tem senha de e-mail. Digitar e-mail/senha sempre cai aqui. Por isso
+        // orientamos explicitamente o botão do Google em vez de só "incorretos".
+        return 'E-mail ou senha incorretos. Se você criou a conta com o '
+            'Google, entre pelo botão "Continuar com Google".';
       case 'email-already-in-use':
         return 'Já existe uma conta com este e-mail.';
       case 'weak-password':
         return 'A senha deve ter pelo menos 6 caracteres.';
       case 'operation-not-allowed':
         return 'Cadastro por e-mail está indisponível no momento.';
+      case 'requires-recent-login':
+        return 'Por segurança, entre novamente com o Google e repita a '
+            'operação.';
+      case 'provider-already-linked':
+      case 'credential-already-in-use':
+        return 'Esta conta já tem uma senha de acesso cadastrada.';
       case 'too-many-requests':
         return 'Muitas tentativas. Aguarde alguns minutos e tente de novo.';
       case 'network-request-failed':

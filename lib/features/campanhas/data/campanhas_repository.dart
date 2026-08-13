@@ -21,4 +21,30 @@ class CampanhasRepository {
       return lista;
     });
   }
+
+  /// Visão da liderança (Gestão): TODAS as campanhas, inclusive encerradas.
+  Stream<List<CampanhaModel>> streamGerenciar() {
+    return _col.snapshots().map((snap) {
+      final lista = snap.docs.map(CampanhaModel.fromFirestore).toList()
+        ..sort((a, b) => b.dataInicio.compareTo(a.dataInicio));
+      return lista;
+    });
+  }
+
+  /// Cria uma nova campanha. Retorna o id gerado.
+  Future<String> criar(CampanhaModel campanha) async {
+    final ref = await _col.add(campanha.toMap());
+    return ref.id;
+  }
+
+  /// Atualiza uma campanha existente. O `valor_arrecadado` é cache do servidor
+  /// e não deve ser sobrescrito por engano — quem chama preserva o valor atual.
+  Future<void> atualizar(CampanhaModel campanha) {
+    return _col.doc(campanha.id).update(campanha.toMap());
+  }
+
+  /// Remove definitivamente uma campanha.
+  Future<void> excluir(String id) {
+    return _col.doc(id).delete();
+  }
 }

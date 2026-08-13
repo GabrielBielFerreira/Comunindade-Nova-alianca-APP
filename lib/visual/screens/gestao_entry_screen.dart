@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/config/app_config.dart';
 import '../../features/admin/providers/aprovacoes_providers.dart';
 import '../../features/oracao/providers/oracao_providers.dart';
 import '../visual_router.dart';
@@ -159,8 +157,50 @@ class _GestaoContent extends StatelessWidget {
           ),
         ),
         SizedBox(height: 22 * scale),
-        _ManagementPanelCard(scale: scale),
+        _SecaoTitulo(scale: scale, texto: 'Publicar conteúdo'),
+        SizedBox(height: 12 * scale),
+        _GestaoNavCard(
+          scale: scale,
+          icone: Icons.campaign_outlined,
+          titulo: 'Gerenciar avisos',
+          subtitulo: 'Publique e edite avisos para os membros',
+          rota: VisualRoutes.gerenciarAvisos,
+        ),
+        SizedBox(height: 12 * scale),
+        _GestaoNavCard(
+          scale: scale,
+          icone: Icons.event_outlined,
+          titulo: 'Gerenciar programação',
+          subtitulo: 'Crie e organize os eventos da agenda',
+          rota: VisualRoutes.gerenciarEventos,
+        ),
+        SizedBox(height: 12 * scale),
+        _GestaoNavCard(
+          scale: scale,
+          icone: Icons.menu_book_outlined,
+          titulo: 'Gerenciar devocionais',
+          subtitulo: 'Publique os devocionais da comunidade',
+          rota: VisualRoutes.gerenciarDevocionais,
+        ),
+        SizedBox(height: 12 * scale),
+        _GestaoNavCard(
+          scale: scale,
+          icone: Icons.volunteer_activism_outlined,
+          titulo: 'Gerenciar campanhas',
+          subtitulo: 'Crie campanhas de arrecadação',
+          rota: VisualRoutes.gerenciarCampanhas,
+        ),
+        SizedBox(height: 12 * scale),
+        _GestaoNavCard(
+          scale: scale,
+          icone: Icons.groups_outlined,
+          titulo: 'Gerenciar ministérios',
+          subtitulo: 'Organize os ministérios da igreja',
+          rota: VisualRoutes.gerenciarMinisterios,
+        ),
         SizedBox(height: 22 * scale),
+        _SecaoTitulo(scale: scale, texto: 'Aprovações'),
+        SizedBox(height: 12 * scale),
         _CadastrosPendentesCard(scale: scale),
         SizedBox(height: 22 * scale),
         _AcaoGestaoCard(
@@ -177,133 +217,95 @@ class _GestaoContent extends StatelessWidget {
   }
 }
 
-class _ManagementPanelCard extends StatelessWidget {
-  const _ManagementPanelCard({required this.scale});
+/// Título de seção da Gestão (agrupa "Publicar conteúdo", "Aprovações"...).
+class _SecaoTitulo extends StatelessWidget {
+  const _SecaoTitulo({required this.scale, required this.texto});
 
   final double scale;
-
-  void _mostrarErro(BuildContext context, String mensagem) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(mensagem),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
-  Future<void> _abrirPainel(BuildContext context) async {
-    final url = AppConfig.gestaoPanelUrl.trim();
-    final uri = Uri.tryParse(url);
-
-    if (url.isEmpty ||
-        uri == null ||
-        !uri.hasScheme ||
-        !(uri.isScheme('http') || uri.isScheme('https'))) {
-      _mostrarErro(
-        context,
-        'Painel de gestão ainda não configurado. Fale com a administração.',
-      );
-      return;
-    }
-
-    try {
-      final abriu = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!abriu && context.mounted) {
-        _mostrarErro(context, 'Não foi possível abrir o painel de gestão.');
-      }
-    } catch (_) {
-      if (context.mounted) {
-        _mostrarErro(context, 'Painel indisponível no momento. Tente novamente.');
-      }
-    }
-  }
+  final String texto;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(22 * scale),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: GestaoEntryScreen._line),
-        borderRadius: BorderRadius.circular(18 * scale),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            offset: Offset(0, 1 * scale),
-            blurRadius: 2 * scale,
-          ),
-        ],
+    return Text(
+      texto,
+      style: GoogleFonts.montserrat(
+        fontSize: 15 * scale,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.2 * scale,
+        color: GestaoEntryScreen._body,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 52 * scale,
-            height: 52 * scale,
-            decoration: const BoxDecoration(
-              color: GestaoEntryScreen._soft,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.admin_panel_settings_outlined,
-              color: GestaoEntryScreen._primary,
-              size: 28 * scale,
-            ),
+    );
+  }
+}
+
+/// Card de navegação da Gestão para uma ferramenta interna (sem badge de
+/// contagem). Usado para "Gerenciar avisos" e "Gerenciar programação".
+class _GestaoNavCard extends StatelessWidget {
+  const _GestaoNavCard({
+    required this.scale,
+    required this.icone,
+    required this.titulo,
+    required this.subtitulo,
+    required this.rota,
+  });
+
+  final double scale;
+  final IconData icone;
+  final String titulo;
+  final String subtitulo;
+  final String rota;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18 * scale),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18 * scale),
+        onTap: () => Navigator.pushNamed(context, rota),
+        child: Container(
+          padding: EdgeInsets.all(18 * scale),
+          decoration: BoxDecoration(
+            border: Border.all(color: GestaoEntryScreen._line),
+            borderRadius: BorderRadius.circular(18 * scale),
           ),
-          SizedBox(height: 16 * scale),
-          Text(
-            'Painel de Gestão',
-            style: GoogleFonts.montserrat(
-              fontSize: 20 * scale,
-              fontWeight: FontWeight.w700,
-              height: 1.3,
-              color: GestaoEntryScreen._title,
-            ),
-          ),
-          SizedBox(height: 8 * scale),
-          Text(
-            'Acesse o painel administrativo externo para organizar escalas, ministérios, membros e pedidos de oração.',
-            style: GoogleFonts.inter(
-              fontSize: 14 * scale,
-              fontWeight: FontWeight.w400,
-              height: 1.5,
-              color: GestaoEntryScreen._muted,
-            ),
-          ),
-          SizedBox(height: 20 * scale),
-          GestureDetector(
-            onTap: () => _abrirPainel(context),
-            child: Container(
-              height: 56 * scale,
-              width: double.infinity,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: GestaoEntryScreen._primary,
-                borderRadius: BorderRadius.circular(12 * scale),
-                boxShadow: [
-                  BoxShadow(
-                    color: GestaoEntryScreen._primary.withValues(alpha: 0.18),
-                    offset: Offset(0, 8 * scale),
-                    blurRadius: 14 * scale,
-                    spreadRadius: -5 * scale,
-                  ),
-                ],
+          child: Row(
+            children: [
+              Container(
+                width: 48 * scale,
+                height: 48 * scale,
+                decoration: const BoxDecoration(
+                  color: GestaoEntryScreen._soft,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icone,
+                    color: GestaoEntryScreen._primary, size: 26 * scale),
               ),
-              child: Text(
-                'Abrir painel de gestão',
-                style: GoogleFonts.inter(
-                  fontSize: 15 * scale,
-                  fontWeight: FontWeight.w700,
-                  height: 20 / 15,
-                  color: Colors.white,
+              SizedBox(width: 14 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(titulo,
+                        style: GoogleFonts.montserrat(
+                            fontSize: 16 * scale,
+                            fontWeight: FontWeight.w700,
+                            color: GestaoEntryScreen._title)),
+                    SizedBox(height: 2 * scale),
+                    Text(subtitulo,
+                        style: GoogleFonts.inter(
+                            fontSize: 13 * scale,
+                            height: 1.35,
+                            color: GestaoEntryScreen._muted)),
+                  ],
                 ),
               ),
-            ),
+              SizedBox(width: 8 * scale),
+              Icon(Icons.chevron_right,
+                  color: GestaoEntryScreen._muted, size: 22 * scale),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

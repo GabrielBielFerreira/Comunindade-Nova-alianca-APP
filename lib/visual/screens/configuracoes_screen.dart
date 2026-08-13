@@ -217,6 +217,22 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                             ),
                             SizedBox(height: 28 * scale),
                           ],
+                          _SectionLabel('Conta', scale: scale),
+                          SizedBox(height: 12 * scale),
+                          _SurfaceGroup(
+                            scale: scale,
+                            children: [
+                              _LinkRow(
+                                scale: scale,
+                                label: 'Senha de acesso',
+                                onTap: () => Navigator.pushNamed(
+                                  context,
+                                  VisualRoutes.definirSenha,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 28 * scale),
                           _SurfaceGroup(
                             scale: scale,
                             children: [

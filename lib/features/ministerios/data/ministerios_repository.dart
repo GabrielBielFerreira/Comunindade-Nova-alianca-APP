@@ -26,6 +26,40 @@ class MinisteriosRepository {
     });
   }
 
+  /// Visão da liderança (Gestão): TODOS os ministérios, inclusive os inativos.
+  Stream<List<MinisterioModel>> streamGerenciar() {
+    return _db.collection('ministerios').snapshots().map((snap) {
+      final lista = snap.docs.map(MinisterioModel.fromFirestore).toList();
+      lista.sort((a, b) => a.nome.compareTo(b.nome));
+      return lista;
+    });
+  }
+
+  /// Cria um novo ministério. Retorna o id gerado.
+  Future<String> criar(MinisterioModel ministerio) async {
+    final ref =
+        await _db.collection('ministerios').add(ministerio.toMap());
+    return ref.id;
+  }
+
+  /// Atualiza um ministério existente.
+  Future<void> atualizar(MinisterioModel ministerio) {
+    return _db
+        .collection('ministerios')
+        .doc(ministerio.id)
+        .update(ministerio.toMap());
+  }
+
+  /// Ativa/desativa um ministério sem apagá-lo (troca `ativo`).
+  Future<void> definirAtivo(String id, bool ativo) {
+    return _db.collection('ministerios').doc(id).update({'ativo': ativo});
+  }
+
+  /// Remove definitivamente um ministério.
+  Future<void> excluir(String id) {
+    return _db.collection('ministerios').doc(id).delete();
+  }
+
   /// Registra interesse do usuário em participar de um ministério.
   Future<void> registrarInteresse({
     required String uid,

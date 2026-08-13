@@ -41,6 +41,12 @@ class AuthActions {
     return _auth.esqueciSenha(email);
   }
 
+  /// Indica se a conta atual já entra por e-mail/senha (senão, só Google).
+  bool get possuiSenha => _auth.possuiSenhaEmail;
+
+  /// Define/adiciona senha de e-mail na conta atual (sem remover o Google).
+  Future<void> definirSenha(String senha) => _auth.definirSenha(senha);
+
   /// Retorna `false` se o usuário cancelar o fluxo do Google (sem erro).
   Future<bool> entrarComGoogle() async {
     final cred = await _auth.entrarComGoogle();

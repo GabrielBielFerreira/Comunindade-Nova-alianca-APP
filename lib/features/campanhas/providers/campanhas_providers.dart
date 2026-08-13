@@ -11,3 +11,9 @@ final campanhasAtivasProvider =
     StreamProvider.autoDispose<List<CampanhaModel>>((ref) {
   return ref.watch(campanhasRepositoryProvider).streamAtivas();
 });
+
+/// Lista de gestão (liderança): todas as campanhas, inclusive encerradas.
+final campanhasGerenciarProvider =
+    StreamProvider.autoDispose<List<CampanhaModel>>((ref) {
+  return ref.watch(campanhasRepositoryProvider).streamGerenciar();
+});

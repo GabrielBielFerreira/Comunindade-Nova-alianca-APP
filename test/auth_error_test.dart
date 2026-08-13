@@ -4,11 +4,14 @@ import 'package:nova_alianca_app/features/auth/data/auth_error.dart';
 
 void main() {
   group('mensagemErroAuth', () {
-    test('credenciais inválidas', () {
+    test('credenciais inválidas orientam login por e-mail ou Google', () {
       final msg = mensagemErroAuth(
         FirebaseAuthException(code: 'invalid-credential'),
       );
-      expect(msg, 'E-mail ou senha incorretos.');
+      // Mantém a mensagem de credencial incorreta e, como contas criadas com
+      // "Continuar com Google" não têm senha, orienta explicitamente o Google.
+      expect(msg, contains('E-mail ou senha incorretos'));
+      expect(msg, contains('Google'));
     });
 
     test('e-mail já em uso', () {

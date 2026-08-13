@@ -16,4 +16,20 @@ class DevocionaisRepository {
       return lista;
     });
   }
+
+  /// Cria um novo devocional. Retorna o id gerado.
+  Future<String> criar(DevocionalModel devocional) async {
+    final ref = await _col.add(devocional.toMap());
+    return ref.id;
+  }
+
+  /// Atualiza um devocional existente.
+  Future<void> atualizar(DevocionalModel devocional) {
+    return _col.doc(devocional.id).update(devocional.toMap());
+  }
+
+  /// Remove definitivamente um devocional.
+  Future<void> excluir(String id) {
+    return _col.doc(id).delete();
+  }
 }
