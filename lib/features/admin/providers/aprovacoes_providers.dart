@@ -1,18 +1,28 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 
-import '../../auth/data/usuario_model.dart';
+import '../../igrejas/providers/igreja_providers.dart';
 import '../data/aprovacoes_repository.dart';
+import '../data/membros_repository.dart';
+import 'membros_providers.dart';
 
 final aprovacoesRepositoryProvider =
     Provider<AprovacoesRepository>((ref) => AprovacoesRepository());
 
-/// Lista de cadastros pendentes (apenas liderança consegue ler, via regras).
+/// Cadastros pendentes da unidade em foco.
 final cadastrosPendentesProvider =
-    StreamProvider.autoDispose<List<UsuarioModel>>((ref) {
-  return ref.watch(aprovacoesRepositoryProvider).streamPendentes();
+    StreamProvider.autoDispose<List<MembroUnidade>>((ref) {
+  final autorizacao = ref.watch(autorizacaoAtualProvider);
+  if (ref.watch(igrejaScopeProvider) == null ||
+      autorizacao == null ||
+      !autorizacao.podeAprovarMembro) {
+    return Stream.value(const <MembroUnidade>[]);
+  }
+  return ref
+      .watch(membrosRepositoryProvider)
+      .streamPorStatus(StatusVinculo.pendente);
 });
 
-/// Contador para o card/badge de "Cadastros pendentes".
 final cadastrosPendentesCountProvider = Provider.autoDispose<int>((ref) {
   return ref.watch(cadastrosPendentesProvider).valueOrNull?.length ?? 0;
 });

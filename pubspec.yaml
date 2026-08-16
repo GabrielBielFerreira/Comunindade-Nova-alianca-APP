@@ -15,6 +15,11 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  # Domínio compartilhado com o painel web (igrejas, perfis, permissões,
+  # contrato financeiro). Fonte única da matriz de autorização.
+  nova_alianca_core:
+    path: packages/nova_alianca_core
+
   # Firebase
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1

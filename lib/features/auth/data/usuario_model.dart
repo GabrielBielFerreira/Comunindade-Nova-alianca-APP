@@ -1,6 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PerfilUsuario { pastor, diacono, lider, membro, visitante }
+/// Perfil histórico, mantido para compatibilidade de leitura dos documentos
+/// globais anteriores à arquitetura multi-igreja.
+///
+/// O perfil que vale para autorização é o do VÍNCULO
+/// (`igrejas/{igrejaId}/membros/{uid}.perfil`), modelado por
+/// `PerfilComunitario` em `nova_alianca_core`. Não use este enum para decidir
+/// permissão.
+enum PerfilUsuario { pastor, diacono, evangelista, lider, membro, visitante }
 
 enum StatusUsuario { pendente, aprovado, inativo }
 
@@ -89,6 +96,12 @@ class UsuarioModel {
   final String? aprovadoPor;
   final DateTime? aprovadoEm;
 
+  /// Unidade à qual a pessoa está vinculada (`igrejas/{id}`).
+  ///
+  /// Só o servidor altera este campo. A igreja *visualizada* é preferência
+  /// local e não muda o vínculo.
+  final String? igrejaPrincipalId;
+
   const UsuarioModel({
     required this.uid,
     required this.nome,
@@ -105,6 +118,7 @@ class UsuarioModel {
     this.qualificacao,
     this.aprovadoPor,
     this.aprovadoEm,
+    this.igrejaPrincipalId,
   });
 
   bool get isAprovado => status == StatusUsuario.aprovado;
@@ -145,6 +159,7 @@ class UsuarioModel {
           : null,
       aprovadoPor: map['aprovado_por'] as String?,
       aprovadoEm: (map['aprovado_em'] as Timestamp?)?.toDate(),
+      igrejaPrincipalId: map['igreja_principal_id'] as String?,
     );
   }
 
@@ -168,6 +183,7 @@ class UsuarioModel {
         'aprovado_por': aprovadoPor,
         'aprovado_em':
             aprovadoEm != null ? Timestamp.fromDate(aprovadoEm!) : null,
+        'igreja_principal_id': igrejaPrincipalId,
       };
 
   UsuarioModel copyWith({
@@ -178,6 +194,7 @@ class UsuarioModel {
     PerfilUsuario? perfil,
     StatusUsuario? status,
     String? ministerioId,
+    String? igrejaPrincipalId,
   }) {
     return UsuarioModel(
       uid: uid,
@@ -195,6 +212,7 @@ class UsuarioModel {
       qualificacao: qualificacao,
       aprovadoPor: aprovadoPor,
       aprovadoEm: aprovadoEm,
+      igrejaPrincipalId: igrejaPrincipalId ?? this.igrejaPrincipalId,
     );
   }
 }

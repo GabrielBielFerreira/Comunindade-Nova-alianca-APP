@@ -364,9 +364,12 @@ class _CommunityMural extends ConsumerWidget {
 
 void _orar(WidgetRef ref, PedidoOracaoModel pedido, String? uid) {
   if (uid == null) return;
+  // As Rules exigem incremento de exatamente 1 sobre o valor atual, por isso
+  // o contador do documento vai junto.
   ref.read(oracaoRepositoryProvider).estouOrando(
         pedidoId: pedido.id,
         uid: uid,
+        oramCountAtual: pedido.oramCount,
         jaOrou: pedido.orouUsuario(uid),
       );
 }

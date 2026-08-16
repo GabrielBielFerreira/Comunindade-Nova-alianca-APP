@@ -1,35 +1,43 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/data/igreja_scope.dart';
 import 'devocional_model.dart';
 
-/// Acesso ao Firestore para devocionais (coleção `devocionais`).
+/// Devocionais de UMA unidade: `igrejas/{igrejaId}/devocionais`.
 class DevocionaisRepository {
-  DevocionaisRepository({FirebaseFirestore? db})
-      : _col = (db ?? FirebaseFirestore.instance).collection('devocionais');
+  DevocionaisRepository(this._scope);
 
-  final CollectionReference<Map<String, dynamic>> _col;
+  final IgrejaScope _scope;
 
+  CollectionReference<Map<String, dynamic>> get _col => _scope.devocionais;
+
+  /// Devocionais ativos, mais recentes primeiro.
   Stream<List<DevocionalModel>> stream() {
-    return _col.snapshots().map((snap) {
-      final lista = snap.docs.map(DevocionalModel.fromFirestore).toList();
-      lista.sort((a, b) => b.data.compareTo(a.data));
-      return lista;
-    });
+    return _col.where('ativo', isEqualTo: true).snapshots().map(_ordenar);
   }
 
-  /// Cria um novo devocional. Retorna o id gerado.
+  /// Visão de gestão: inclui inativos, para reeditar ou reativar.
+  Stream<List<DevocionalModel>> streamGerenciar() {
+    return _col.snapshots().map(_ordenar);
+  }
+
+  List<DevocionalModel> _ordenar(QuerySnapshot<Map<String, dynamic>> snap) {
+    final lista = snap.docs.map(DevocionalModel.fromFirestore).toList();
+    lista.sort((a, b) => b.data.compareTo(a.data));
+    return lista;
+  }
+
   Future<String> criar(DevocionalModel devocional) async {
     final ref = await _col.add(devocional.toMap());
     return ref.id;
   }
 
-  /// Atualiza um devocional existente.
   Future<void> atualizar(DevocionalModel devocional) {
     return _col.doc(devocional.id).update(devocional.toMap());
   }
 
-  /// Remove definitivamente um devocional.
-  Future<void> excluir(String id) {
-    return _col.doc(id).delete();
+  /// Inativa em vez de apagar: o histórico da unidade é preservado.
+  Future<void> definirAtivo(String id, bool ativo) {
+    return _col.doc(id).update({'ativo': ativo});
   }
 }

@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../features/notificacoes/data/notificacao_model.dart';
+import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../widgets/internal_header.dart';
 
@@ -108,10 +109,11 @@ class _NotificacaoTile extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12 * scale),
         onTap: () {
-          if (naoLida) {
+          final uid = ref.read(authStateProvider).valueOrNull?.uid;
+          if (naoLida && uid != null) {
             ref
                 .read(notificacoesRepositoryProvider)
-                .marcarLida(notificacao.id);
+                .marcarLida(uid, notificacao.id);
           }
         },
         child: Container(

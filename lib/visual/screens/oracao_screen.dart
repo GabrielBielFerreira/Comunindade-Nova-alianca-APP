@@ -57,6 +57,7 @@ class _OracaoScreenState extends ConsumerState<OracaoScreen> {
     ref.read(oracaoRepositoryProvider).estouOrando(
           pedidoId: pedido.id,
           uid: uid,
+          oramCountAtual: pedido.oramCount,
           jaOrou: pedido.orouUsuario(uid),
         );
   }

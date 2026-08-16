@@ -4,17 +4,72 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../providers/oracao_providers.dart';
 
-/// Moderação de pedidos de oração públicos — liderança aprova/recusa antes de
-/// aparecerem no Mural da Comunidade.
+/// Moderação de pedidos de oração públicos da unidade em foco.
+///
+/// Recusar NÃO apaga o pedido: marca `recusado` com motivo e autor, tirando-o
+/// da fila e do mural sem destruir o histórico.
 class ModeracaoOracaoScreen extends ConsumerWidget {
   const ModeracaoOracaoScreen({super.key});
+
+  /// Pede o motivo da recusa. Retorna null se o moderador cancelar.
+  Future<String?> _pedirMotivo(BuildContext context) {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (d) => StatefulBuilder(
+        builder: (d, setState) {
+          final valido = controller.text.trim().length >= 5;
+          return AlertDialog(
+            title: const Text('Recusar pedido'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'O pedido sai do mural, mas continua registrado com o '
+                  'motivo e o autor da decisão.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  minLines: 2,
+                  maxLines: 4,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: 'Ex.: conteúdo fora do escopo de oração',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.of(d).pop(),
+                  child: const Text('Cancelar')),
+              FilledButton(
+                onPressed: valido
+                    ? () => Navigator.of(d).pop(controller.text.trim())
+                    : null,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+                child: const Text('Recusar'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(controller.dispose);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(pedidosModeracaoProvider);
     final repo = ref.read(oracaoRepositoryProvider);
+    final moderadorUid = ref.watch(authStateProvider).valueOrNull?.uid ?? '';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -90,7 +145,15 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: OutlinedButton(
-                            onPressed: () => repo.recusarPedido(p.id),
+                            onPressed: () async {
+                              final motivo = await _pedirMotivo(context);
+                              if (motivo == null) return;
+                              await repo.recusarPedido(
+                                p.id,
+                                moderadorUid: moderadorUid,
+                                motivo: motivo,
+                              );
+                            },
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.error,
                               side: const BorderSide(color: AppColors.error),
@@ -101,7 +164,10 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
                         const SizedBox(width: 12),
                         Expanded(
                           child: FilledButton(
-                            onPressed: () => repo.aprovarPedido(p.id),
+                            onPressed: () => repo.aprovarPedido(
+                              p.id,
+                              moderadorUid: moderadorUid,
+                            ),
                             style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.primary),
                             child: const Text('Aprovar'),

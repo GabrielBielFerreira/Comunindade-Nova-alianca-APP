@@ -1,89 +1,43 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 
-import '../../auth/data/usuario_model.dart';
+import '../../../core/config/app_config.dart';
 
-/// Aprovação/recusa de cadastros pendentes (exceção operacional dentro do app).
+/// Aprovação e recusa de cadastros, via Cloud Functions.
 ///
-/// As regras de segurança só permitem estas escritas para liderança
-/// (isLider). Cada ação: atualiza o usuário, envia uma notificação ao membro
-/// e grava um registro de auditoria.
+/// A versão anterior gravava direto no Firestore (usuário + notificação +
+/// auditoria em um batch). Isso não sobrevive à arquitetura multi-igreja:
+/// as Rules negam ao cliente escrever `status` de vínculo e criar auditoria,
+/// justamente para impedir autopromoção e log forjado. Toda a mutação passou
+/// para o servidor, que repete a autorização e grava a auditoria com Admin SDK.
 class AprovacoesRepository {
-  AprovacoesRepository({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  AprovacoesRepository({FirebaseFunctions? functions})
+      : _fn = functions ??
+            FirebaseFunctions.instanceFor(region: AppConfig.functionsRegion);
 
-  final FirebaseFirestore _db;
-
-  Stream<List<UsuarioModel>> streamPendentes() {
-    return _db
-        .collection('usuarios')
-        .where('status', isEqualTo: 'pendente')
-        .snapshots()
-        .map((snap) {
-      final lista = snap.docs.map(UsuarioModel.fromFirestore).toList();
-      lista.sort((a, b) => a.dataCadastro.compareTo(b.dataCadastro));
-      return lista;
-    });
-  }
+  final FirebaseFunctions _fn;
 
   Future<void> aprovar({
+    required IgrejaId igrejaId,
     required String uid,
-    required String aprovadorUid,
-    required String aprovadorNome,
   }) async {
-    final batch = _db.batch();
-    batch.update(_db.collection('usuarios').doc(uid), {
-      'status': 'aprovado',
-      'aprovado_por': aprovadorUid,
-      'aprovado_em': FieldValue.serverTimestamp(),
+    await _fn.httpsCallable('aprovarMembro').call({
+      'igrejaId': igrejaId.valor,
+      'uid': uid,
     });
-    batch.set(_db.collection('notificacoes').doc(), {
-      'destinatario_id': uid,
-      'titulo': 'Cadastro aprovado',
-      'corpo':
-          'Bem-vindo(a)! Seu acesso à Comunidade Nova Aliança foi liberado.',
-      'tipo': 'sistema',
-      'lida': false,
-      'criado_em': FieldValue.serverTimestamp(),
-    });
-    batch.set(_db.collection('auditoria').doc(), {
-      'acao': 'aprovar_cadastro',
-      'alvo_id': uid,
-      'autor_id': aprovadorUid,
-      'autor_nome': aprovadorNome,
-      'em': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
   }
 
+  /// Recusa/inativa o vínculo. O motivo é obrigatório no servidor e entra na
+  /// auditoria; o documento do vínculo é preservado.
   Future<void> recusar({
+    required IgrejaId igrejaId,
     required String uid,
-    required String aprovadorUid,
-    required String aprovadorNome,
-    String? motivo,
+    required String motivo,
   }) async {
-    final batch = _db.batch();
-    batch.update(_db.collection('usuarios').doc(uid), {
-      'status': 'inativo',
-      'aprovado_por': aprovadorUid,
-      'aprovado_em': FieldValue.serverTimestamp(),
-    });
-    batch.set(_db.collection('notificacoes').doc(), {
-      'destinatario_id': uid,
-      'titulo': 'Cadastro não aprovado',
-      'corpo': motivo ??
-          'Seu cadastro não foi aprovado no momento. Fale com a liderança.',
-      'tipo': 'sistema',
-      'lida': false,
-      'criado_em': FieldValue.serverTimestamp(),
-    });
-    batch.set(_db.collection('auditoria').doc(), {
-      'acao': 'recusar_cadastro',
-      'alvo_id': uid,
-      'autor_id': aprovadorUid,
-      'autor_nome': aprovadorNome,
+    await _fn.httpsCallable('recusarMembro').call({
+      'igrejaId': igrejaId.valor,
+      'uid': uid,
       'motivo': motivo,
-      'em': FieldValue.serverTimestamp(),
     });
-    await batch.commit();
   }
 }

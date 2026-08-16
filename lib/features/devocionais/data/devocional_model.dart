@@ -10,6 +10,10 @@ class DevocionalModel {
   final String? referencia; // referência bíblica opcional
   final bool destaque;
 
+  /// Inativar substitui a exclusão física: o devocional some das listas
+  /// públicas mas o histórico da unidade permanece.
+  final bool ativo;
+
   const DevocionalModel({
     required this.id,
     required this.titulo,
@@ -18,6 +22,7 @@ class DevocionalModel {
     required this.data,
     this.referencia,
     this.destaque = false,
+    this.ativo = true,
   });
 
   factory DevocionalModel.fromFirestore(DocumentSnapshot doc) {
@@ -30,6 +35,7 @@ class DevocionalModel {
       data: (d['data'] as Timestamp?)?.toDate() ?? DateTime.now(),
       referencia: d['referencia'] as String?,
       destaque: d['destaque'] as bool? ?? false,
+      ativo: d['ativo'] as bool? ?? true,
     );
   }
 
@@ -40,5 +46,6 @@ class DevocionalModel {
         'data': Timestamp.fromDate(data),
         'referencia': referencia,
         'destaque': destaque,
+        'ativo': ativo,
       };
 }

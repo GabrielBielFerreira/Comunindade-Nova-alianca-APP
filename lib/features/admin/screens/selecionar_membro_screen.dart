@@ -1,16 +1,16 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../auth/data/usuario_model.dart';
+import '../data/membros_repository.dart';
 import '../providers/membros_providers.dart';
 
-/// Seletor de membro (líder de ministério, etc.). Abra com Navigator.push e
-/// aguarde o retorno: devolve o [UsuarioModel] escolhido, ou null se cancelado.
+/// Seletor de membro (líder de ministério, responsável por evento, etc.).
+/// Devolve o [MembroUnidade] escolhido, ou null se cancelado.
 ///
-/// Só a liderança consegue listar todos os membros (regras do Firestore).
+/// Lista apenas membros APROVADOS DA UNIDADE EM FOCO — não existe seleção de
+/// pessoa de outra igreja.
 class SelecionarMembroScreen extends ConsumerStatefulWidget {
   const SelecionarMembroScreen({super.key, this.selecionadoUid});
 
@@ -33,13 +33,13 @@ class _SelecionarMembroScreenState
     super.dispose();
   }
 
-  List<UsuarioModel> _filtrar(List<UsuarioModel> todos) {
+  List<MembroUnidade> _filtrar(List<MembroUnidade> todos) {
     final q = _busca.trim().toLowerCase();
     if (q.isEmpty) return todos;
     return todos
-        .where((u) =>
-            u.nome.toLowerCase().contains(q) ||
-            u.email.toLowerCase().contains(q))
+        .where((m) =>
+            m.exibicao.toLowerCase().contains(q) ||
+            (m.email ?? '').toLowerCase().contains(q))
         .toList();
   }
 
@@ -68,23 +68,12 @@ class _SelecionarMembroScreenState
             child: TextField(
               controller: _buscaController,
               onChanged: (v) => setState(() => _busca = v),
-              decoration: InputDecoration(
-                hintText: 'Buscar por nome ou e-mail…',
-                prefixIcon: const Icon(Icons.search),
+              decoration: const InputDecoration(
+                hintText: 'Buscar por nome ou e-mail',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
                 filled: true,
                 fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.borderFocus),
-                ),
               ),
             ),
           ),
@@ -96,7 +85,7 @@ class _SelecionarMembroScreenState
                   padding: EdgeInsets.all(24),
                   child: Text(
                     'Não foi possível carregar os membros. Verifique sua '
-                    'conexão e seu perfil de liderança.',
+                    'conexão e seu perfil nesta igreja.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.mutedForeground),
                   ),
@@ -108,10 +97,9 @@ class _SelecionarMembroScreenState
                   return Center(
                     child: Text(
                       todos.isEmpty
-                          ? 'Nenhum membro aprovado ainda.'
+                          ? 'Nenhum membro aprovado nesta igreja ainda.'
                           : 'Nenhum membro encontrado.',
-                      style:
-                          const TextStyle(color: AppColors.mutedForeground),
+                      style: const TextStyle(color: AppColors.mutedForeground),
                     ),
                   );
                 }
@@ -121,7 +109,7 @@ class _SelecionarMembroScreenState
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, i) => _MembroTile(
                     membro: lista[i],
-                    selecionado: lista[i].uid == widget.selecionadoUid,
+                    selecionado: lista[i].vinculo.uid == widget.selecionadoUid,
                     onTap: () => Navigator.of(context).pop(lista[i]),
                   ),
                 );
@@ -141,27 +129,14 @@ class _MembroTile extends StatelessWidget {
     required this.onTap,
   });
 
-  final UsuarioModel membro;
+  final MembroUnidade membro;
   final bool selecionado;
   final VoidCallback onTap;
 
-  String _rotuloPerfil(PerfilUsuario p) {
-    switch (p) {
-      case PerfilUsuario.pastor:
-        return 'Pastor';
-      case PerfilUsuario.diacono:
-        return 'Diácono';
-      case PerfilUsuario.lider:
-        return 'Líder';
-      case PerfilUsuario.membro:
-        return 'Membro';
-      case PerfilUsuario.visitante:
-        return 'Visitante';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final perfil = membro.vinculo.perfil;
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(12),
@@ -179,32 +154,34 @@ class _MembroTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _Avatar(membro: membro),
+              _Avatar(nome: membro.exibicao),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      membro.nome.isEmpty ? '(sem nome)' : membro.nome,
+                      membro.exibicao,
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         color: AppColors.foreground,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      membro.email,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          color: AppColors.mutedForeground, fontSize: 13),
-                    ),
+                    if ((membro.email ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        membro.email!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            color: AppColors.mutedForeground, fontSize: 13),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              if (membro.isLider)
+              if (perfil.isLiderancaMinisterial)
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -213,7 +190,7 @@ class _MembroTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    _rotuloPerfil(membro.perfil),
+                    perfil.rotulo,
                     style: const TextStyle(
                         color: AppColors.primary,
                         fontSize: 11,
@@ -234,30 +211,13 @@ class _MembroTile extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.membro});
+  const _Avatar({required this.nome});
 
-  final UsuarioModel membro;
+  final String nome;
 
   @override
   Widget build(BuildContext context) {
-    final url = membro.fotoUrl;
-    if (url != null && url.isNotEmpty) {
-      return ClipOval(
-        child: CachedNetworkImage(
-          imageUrl: url,
-          width: 44,
-          height: 44,
-          fit: BoxFit.cover,
-          placeholder: (_, _) => _iniciais(),
-          errorWidget: (_, _, _) => _iniciais(),
-        ),
-      );
-    }
-    return _iniciais();
-  }
-
-  Widget _iniciais() {
-    final n = membro.nome.trim();
+    final n = nome.trim();
     final letra = n.isEmpty ? '?' : n[0].toUpperCase();
     return Container(
       width: 44,

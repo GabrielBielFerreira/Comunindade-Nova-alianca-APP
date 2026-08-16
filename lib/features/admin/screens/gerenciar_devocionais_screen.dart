@@ -52,8 +52,9 @@ class GerenciarDevocionaisScreen extends ConsumerWidget {
 
     String mensagem;
     try {
-      await ref.read(devocionaisRepositoryProvider).excluir(d.id);
-      mensagem = 'Devocional excluído.';
+      // Inativa em vez de apagar: o histórico da unidade é preservado.
+      await ref.read(devocionaisRepositoryProvider).definirAtivo(d.id, false);
+      mensagem = 'Devocional inativado.';
     } on FirebaseException catch (e) {
       mensagem = e.code == 'permission-denied'
           ? 'Sem permissão para esta ação. Confirme seu perfil de liderança.'
