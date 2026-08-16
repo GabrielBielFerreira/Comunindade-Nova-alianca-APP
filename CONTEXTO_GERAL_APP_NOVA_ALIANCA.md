@@ -33,11 +33,23 @@ O aplicativo móvel é voltado a visitantes e membros. O painel web é voltado a
 
 ## 3. Projetos encontrados
 
-### 3.1 Base funcional oficial
+### 3.1 Repositório oficial e checkout local
+
+Repositório GitHub oficial:
+
+```text
+https://github.com/GabrielBielFerreira/Comunindade-Nova-alianca-APP
+```
+
+Checkout local usado para desenvolvimento:
 
 ```text
 C:\Users\Jean\Downloads\CNA APP atualizado\Comunindade-Nova-alianca-APP
 ```
+
+Esses dois endereços representam a mesma base de código. O primeiro é o remoto
+Git; o segundo é a cópia de trabalho local ligada a ele pelo `origin`. Não há
+um “repositório da pasta” concorrendo com o GitHub oficial.
 
 Características:
 
@@ -634,3 +646,41 @@ Correções verificadas contra o código real. Registro autoritativo em
 - **Riscos de segurança confirmados** (auto-promoção, auditoria forjável,
   exclusão física de histórico, reação de oração explorável): ver `CLAUDE.md`
   §16.1; corrigidos na Fase 1.
+
+## 22. Correção atual e passagem para produção (2026-08-16)
+
+### Estado correto dos ambientes
+
+| Ambiente | Finalidade | Dados permitidos |
+|---|---|---|
+| `demo-nova-alianca` | desenvolvimento e testes locais | fixtures de `seed_emulador/` |
+| `nova-alianca-app` | Firebase real de Olinda, Petrolina e futuras unidades | somente dados reais |
+
+O painel existente foi construído primeiro contra o Emulator Suite para validar
+segurança e isolamento. Isso não significa que seus números sejam hardcoded ou
+que o sistema deva permanecer simulado: a UI deve ler os mesmos contratos por
+repository/provider e alternar a configuração Firebase conforme o ambiente.
+
+### Correção prioritária
+
+O aplicativo móvel ainda possui repositórios que consultam coleções globais,
+enquanto as Rules novas exigem `/igrejas/{igrejaId}/...`. Esse desalinhamento é
+o bloqueio P0 para produção. Antes do deploy das Rules finais é obrigatório:
+
+1. migrar todos os repositórios e providers móveis para o escopo da igreja;
+2. validar troca entre Olinda e Petrolina sem reutilizar cache da unidade
+   anterior;
+3. confirmar que painel e app usam o mesmo contrato de campos;
+4. testar a matriz de permissões no emulador;
+5. configurar builds separados para emulador e Firebase real;
+6. migrar dados reais sem criar conteúdo ou usuários de demonstração.
+
+### Resultado esperado desta correção
+
+- o trabalho continua no checkout ligado ao GitHub oficial;
+- o app móvel volta a ser compatível com as Rules multi-igreja;
+- o painel preserva o visual aprovado sem dados fictícios no código;
+- Olinda e Petrolina usam dados reais e isolados no Firebase de produção;
+- nenhuma fixture do emulador é enviada ao projeto real;
+- Mercado Pago permanece desligado enquanto a integração segura não estiver
+  concluída e autorizada por unidade.

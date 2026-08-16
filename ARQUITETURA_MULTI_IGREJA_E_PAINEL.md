@@ -4,6 +4,10 @@
 **Atualização:** 16 de agosto de 2026  
 **Base:** Nova Aliança App `1.3.0+10`
 
+**Repositório GitHub:** `https://github.com/GabrielBielFerreira/Comunindade-Nova-alianca-APP`
+
+**Checkout local:** `C:\Users\Jean\Downloads\CNA APP atualizado\Comunindade-Nova-alianca-APP`
+
 ## 1. Objetivo
 
 Transformar o aplicativo atual, criado inicialmente para Olinda, em uma plataforma para toda a rede Nova Aliança. O primeiro marco terá Olinda e Petrolina, painel administrativo web separado e finanças isoladas por unidade.
@@ -442,3 +446,42 @@ arquitetura:
 - **Vulnerabilidades D.1, D.2, D.4, D.6** (`CLAUDE.md` §16.1) corrigidas nas
   Rules e nos repositórios da Fase 1.
 
+## 17. Gate arquitetural de produção (2026-08-16)
+
+### Identidade da base
+
+O caminho local documentado acima é o checkout do mesmo repositório GitHub
+oficial. A arquitetura multi-igreja implementada nessa branch deve evoluir nessa
+base; não deve ser reconstruída em uma nova pasta por confusão entre Git remoto
+e diretório de trabalho.
+
+### Bloqueio P0
+
+As Rules multi-igreja e os repositórios móveis não podem divergir. Enquanto
+qualquer fluxo do app consultar coleções operacionais globais, as Rules finais
+não estão autorizadas para produção. A correção P0 é tornar todos os fluxos do
+app dependentes do `igrejaId` visualizado ou principal, conforme o domínio.
+
+### Fluxo para produção
+
+```mermaid
+flowchart LR
+    CODE["Checkout do GitHub oficial"] --> MOBILE["App móvel por igreja"]
+    CODE --> PANEL["Painel funcional por igreja"]
+    MOBILE --> EMU["Aceite no Emulator Suite"]
+    PANEL --> EMU
+    EMU --> PROD_CONFIG["Configuração nova-alianca-app"]
+    PROD_CONFIG --> DATA["Migração idempotente de dados reais"]
+    DATA --> DEPLOY["Deploy controlado"]
+    DEPLOY --> SMOKE["Smoke test Olinda e Petrolina"]
+```
+
+Regras do gate:
+
+- `seed_emulador/` nunca é executado contra `nova-alianca-app`;
+- nenhum card ou tabela do painel recebe valor hardcoded de demonstração;
+- o build de produção nunca conecta no host dos emuladores;
+- a migração preserva IDs e timestamps e não apaga as coleções antigas;
+- Rules são publicadas somente depois que o app móvel estiver compatível;
+- Mercado Pago legado não é incluído no deploy de produção;
+- Petrolina nunca usa credenciais financeiras de Olinda.

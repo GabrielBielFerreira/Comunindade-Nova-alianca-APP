@@ -39,11 +39,23 @@ As prioridades atuais, nesta ordem, são:
 
 ### Base oficial
 
-Este repositório é a única base funcional oficial:
+O repositório Git oficial e único do produto é:
+
+`https://github.com/GabrielBielFerreira/Comunindade-Nova-alianca-APP`
+
+O diretório abaixo é o **checkout local desse mesmo repositório**, e não um
+projeto diferente nem uma simples pasta sem vínculo com o GitHub:
 
 `C:\Users\Jean\Downloads\CNA APP atualizado\Comunindade-Nova-alianca-APP`
 
-Ele contém o aplicativo Flutter, Firebase Rules, Cloud Functions e os testes existentes.
+O `origin` desse checkout deve apontar para a URL oficial acima. Trabalho feito
+em uma branch local pertence ao mesmo repositório, embora só apareça no GitHub
+depois de ser enviado. Não reclonar, copiar o código para outra pasta ou
+reiniciar a implementação apenas por confundir checkout local com repositório
+remoto.
+
+Essa base contém o aplicativo Flutter, o painel `admin_web`, Firebase Rules,
+Cloud Functions e os testes existentes.
 
 ### Referência visual
 
@@ -500,3 +512,62 @@ exportação CSV), obrigatoriamente após a correção do contrato financeiro de
 - Remover e-mails pessoais versionados de `seed/promover_lideres.js`,
   substituindo-os por argumentos/variáveis de ambiente. Não reescrever o
   histórico do Git nesta fase.
+
+## 17. Correção de escopo: produção e fonte oficial (2026-08-16)
+
+### 17.1 Repositório, checkout e Firebase são coisas diferentes
+
+- O GitHub oficial é
+  `GabrielBielFerreira/Comunindade-Nova-alianca-APP`.
+- `C:\Users\Jean\Downloads\CNA APP atualizado\Comunindade-Nova-alianca-APP`
+  é o checkout local desse repositório.
+- `nova-alianca-app` é o projeto Firebase real do produto.
+- `demo-nova-alianca` é somente o projeto lógico do Emulator Suite.
+
+Não tratar o checkout como um repositório alternativo e não confundir dados do
+emulador com dados do Firebase real.
+
+### 17.2 Prioridade funcional imediata
+
+O bloqueio prioritário é migrar os repositórios e providers do aplicativo
+móvel que ainda consultam coleções globais. As Rules multi-igreja negam esses
+caminhos; portanto, publicá-las no Firebase real antes da migração deixaria o
+aplicativo incompatível.
+
+Ordem obrigatória:
+
+1. Migrar o app móvel para `/igrejas/{igrejaId}/...`.
+2. Concluir no painel os módulos administrativos reais e por igreja.
+3. Validar app, painel, Functions e Rules no Emulator Suite.
+4. Criar separação explícita entre ambiente `emulator` e `production`.
+5. Configurar app e painel para o Firebase real `nova-alianca-app`.
+6. Migrar dados reais de modo idempotente e sem exclusão física.
+7. Publicar componentes de produção em ordem controlada e fazer smoke test.
+
+### 17.3 Dados demonstrativos e produção
+
+- Dados de `seed_emulador/` são fixtures de teste e só podem existir no
+  Emulator Suite.
+- Cards, tabelas e indicadores não podem conter valores demonstrativos
+  hardcoded; devem sempre ler repositories/providers reais.
+- Scripts de produção não podem criar contas, senhas, igrejas ou conteúdo de
+  demonstração.
+- Olinda e Petrolina no Firebase real recebem apenas dados reais, migrados ou
+  cadastrados por administradores autorizados.
+- A publicação do painel/app em produção não autoriza ativar o Mercado Pago
+  legado. Pagamentos online continuam desabilitados até existir integração
+  segura, credenciais externas válidas e webhook assinado.
+
+### 17.4 Critério para publicar no Firebase real
+
+O deploy de produção faz parte do objetivo atual, mas só pode ocorrer quando:
+
+- o projeto selecionado for exatamente `nova-alianca-app`;
+- o aplicativo móvel não depender mais das coleções globais negadas;
+- `flutter analyze`, testes Flutter, testes das Functions e testes das Rules
+  estiverem verdes;
+- o build de produção não conectar em `localhost` nem no emulador;
+- a migração real tiver modo `dry-run`, confirmação explícita de projeto,
+  idempotência e relatório de contagem;
+- nenhum segredo ou credencial estiver no app, painel, Git ou logs;
+- não houver exclusão dos documentos legados durante a primeira migração.

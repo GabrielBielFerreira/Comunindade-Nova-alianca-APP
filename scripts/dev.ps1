@@ -85,8 +85,11 @@ $emulador = Start-Process -FilePath $firebase `
 Escrever "Aguardando os emuladores responderem..."
 # A porta ficar em LISTEN nao significa que o emulador esta pronto: o processo
 # do Firestore aceita a conexao antes de servir gRPC, e o seed morre com
-# DEADLINE_EXCEEDED. Por isso exigimos resposta HTTP de verdade.
-$limite = (Get-Date).AddSeconds(180)
+# DEADLINE_EXCEEDED. Por isso exigimos resposta HTTP de verdade. Na primeira
+# execução, o Firebase CLI também pode baixar o runtime local do Storage (cerca
+# de 53 MB), então a margem precisa comportar conexões mais lentas.
+$tempoEsperaSegundos = 600
+$limite = (Get-Date).AddSeconds($tempoEsperaSegundos)
 $fsOk = $false; $authOk = $false; $fnOk = $false
 while ((Get-Date) -lt $limite) {
   if (-not $fsOk) {
@@ -104,7 +107,7 @@ while ((Get-Date) -lt $limite) {
   Start-Sleep -Milliseconds 900
 }
 if (-not ($fsOk -and $authOk -and $fnOk)) {
-  throw "Emuladores nao ficaram prontos em 180s (firestore=$fsOk auth=$authOk functions=$fnOk)."
+  throw "Emuladores nao ficaram prontos em ${tempoEsperaSegundos}s (firestore=$fsOk auth=$authOk functions=$fnOk)."
 }
 Write-Host "  Auth, Firestore e Functions respondendo." -ForegroundColor Green
 

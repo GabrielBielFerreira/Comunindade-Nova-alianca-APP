@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../config/emulador.dart';
 import '../estado/providers.dart';
@@ -157,7 +158,7 @@ class _LoginTelaState extends ConsumerState<LoginTela> {
                       TextButton(
                         onPressed: _carregando
                             ? null
-                            : () => Navigator.of(context).pushNamed('/recuperar-senha'),
+                            : () => context.push('/recuperar-senha'),
                         child: const Text('Esqueci minha senha'),
                       ),
                     ],
@@ -269,7 +270,7 @@ class _RecuperarSenhaTelaState extends ConsumerState<RecuperarSenhaTela> {
                       ],
                       const SizedBox(height: 24),
                       FilledButton.tonal(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: () => context.go('/login'),
                         child: const Text('Voltar ao login'),
                       ),
                     ],
