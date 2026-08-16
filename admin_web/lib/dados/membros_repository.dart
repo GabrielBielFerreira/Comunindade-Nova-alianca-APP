@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
-import '../config/emulador.dart';
+import '../config/ambiente.dart';
 
 /// Um vínculo enriquecido com o nome da pessoa, para exibição em lista.
 class MembroPainel {
@@ -31,7 +31,7 @@ class MembrosRepository {
       : _db = db ?? FirebaseFirestore.instance,
         _functions = functions ??
             FirebaseFunctions.instanceFor(
-              region: ConfiguracaoEmulador.regiaoFunctions,
+              region: ConfiguracaoFirebase.regiaoFunctions,
             );
 
   final FirebaseFirestore _db;
@@ -103,4 +103,29 @@ class MembrosRepository {
   }) =>
       _chamar('desvincularDaIgreja',
           {'igrejaId': igrejaId.valor, 'uid': uid, 'motivo': motivo});
+
+  /// Atribui tesoureiro, editor ou moderador de oração.
+  ///
+  /// A função `pastor` NÃO é atribuída avulsa: ela acompanha a promoção de
+  /// perfil, e o servidor rejeita a tentativa.
+  Future<void> atribuirFuncao({
+    required IgrejaId igrejaId,
+    required String uid,
+    required FuncaoAdmin funcao,
+  }) =>
+      _chamar('atribuirFuncaoAdmin',
+          {'igrejaId': igrejaId.valor, 'uid': uid, 'funcao': funcao.valor});
+
+  Future<void> removerFuncao({
+    required IgrejaId igrejaId,
+    required String uid,
+    required FuncaoAdmin funcao,
+    required String motivo,
+  }) =>
+      _chamar('removerFuncaoAdmin', {
+        'igrejaId': igrejaId.valor,
+        'uid': uid,
+        'funcao': funcao.valor,
+        'motivo': motivo,
+      });
 }

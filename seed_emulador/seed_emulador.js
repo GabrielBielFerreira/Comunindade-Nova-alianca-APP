@@ -205,22 +205,150 @@ async function criarTransacoes(igrejaId, usuarioId, quantia) {
   }
 }
 
+/**
+ * Conteúdo de demonstração da unidade.
+ *
+ * O rótulo `[{IGREJA}]` no título é proposital: se o painel misturasse
+ * unidades, apareceria conteúdo de Petrolina dentro de Olinda e o erro seria
+ * visível na hora.
+ */
 async function criarConteudo(igrejaId) {
+  const marca = igrejaId.toUpperCase();
+  const agora = admin.firestore.FieldValue.serverTimestamp();
+  const base = { origem: "seed_emulador", demonstracao: true };
+
+  // ── Avisos ────────────────────────────────────────────────────────
+  // `conteudo` é o campo canônico (o legado `corpo` só é lido, nunca gravado).
   await db.doc(`igrejas/${igrejaId}/avisos/seed_publico`).set({
-    titulo: "Aviso de demonstração (público)",
-    corpo: "Conteúdo de teste do emulador.",
+    ...base,
+    titulo: `[${marca}] Aviso público de demonstração`,
+    conteudo: "Conteúdo de teste do emulador, visível também a visitantes.",
+    prioridade: "normal",
     publico: true,
     ativo: true,
-    origem: "seed_emulador",
-    publicado_em: admin.firestore.FieldValue.serverTimestamp(),
+    publicado_em: agora,
   });
   await db.doc(`igrejas/${igrejaId}/avisos/seed_interno`).set({
-    titulo: "Aviso de demonstração (interno)",
-    corpo: "Visível apenas para membros aprovados desta unidade.",
+    ...base,
+    titulo: `[${marca}] Aviso interno de demonstração`,
+    conteudo: "Visível apenas para membros aprovados desta unidade.",
+    prioridade: "urgente",
     publico: false,
     ativo: true,
-    origem: "seed_emulador",
-    publicado_em: admin.firestore.FieldValue.serverTimestamp(),
+    publicado_em: agora,
+  });
+
+  // ── Eventos ───────────────────────────────────────────────────────
+  const emDias = (d) =>
+    admin.firestore.Timestamp.fromDate(new Date(Date.now() + d * 86400000));
+
+  await db.doc(`igrejas/${igrejaId}/eventos/seed_culto`).set({
+    ...base,
+    titulo: `[${marca}] Culto de demonstração`,
+    descricao: "Evento de teste criado pelo seed do emulador.",
+    data: emDias(3),
+    local: "Templo",
+    tipo: "culto",
+    publico: true,
+    cancelado: false,
+  });
+  await db.doc(`igrejas/${igrejaId}/eventos/seed_reuniao`).set({
+    ...base,
+    titulo: `[${marca}] Reunião de liderança (interna)`,
+    descricao: "Somente membros aprovados desta unidade.",
+    data: emDias(7),
+    local: "Sala 2",
+    tipo: "reuniao",
+    publico: false,
+    cancelado: false,
+  });
+
+  // ── Campanhas ─────────────────────────────────────────────────────
+  await db.doc(`igrejas/${igrejaId}/campanhas/seed_campanha`).set({
+    ...base,
+    titulo: `[${marca}] Campanha de demonstração`,
+    descricao: "Campanha de teste do emulador.",
+    data_inicio: emDias(-10),
+    data_fim: null,
+    meta_centavos: 500000, // R$ 5.000,00
+    status: "ativa",
+    publico: true,
+  });
+
+  // ── Ministérios ───────────────────────────────────────────────────
+  await db.doc(`igrejas/${igrejaId}/ministerios/seed_louvor`).set({
+    ...base,
+    nome: `[${marca}] Ministério de Louvor`,
+    descricao: "Ministério de teste do emulador.",
+    ativo: true,
+    publico: true,
+    lider_id: null,
+    lider_nome: null,
+  });
+  await db.doc(`igrejas/${igrejaId}/ministerios/seed_infantil`).set({
+    ...base,
+    nome: `[${marca}] Ministério Infantil`,
+    descricao: "Ministério inativo, para testar o filtro.",
+    ativo: false,
+    publico: true,
+    lider_id: null,
+    lider_nome: null,
+  });
+
+  // ── Devocionais ───────────────────────────────────────────────────
+  await db.doc(`igrejas/${igrejaId}/devocionais/seed_devocional`).set({
+    ...base,
+    titulo: `[${marca}] Devocional de demonstração`,
+    corpo: "Texto devocional de teste do emulador.",
+    autor: "Equipe de comunicação",
+    data: emDias(-1),
+    referencia: "Salmos 23",
+    destaque: true,
+    ativo: true,
+  });
+
+  // ── Pedidos de oração ─────────────────────────────────────────────
+  await db.doc(`igrejas/${igrejaId}/pedidos_oracao/seed_aprovado`).set({
+    ...base,
+    autor_id: "seed",
+    autor_nome: "Membro de teste",
+    texto: `[${marca}] Pedido já aprovado, visível no mural.`,
+    privado: false,
+    anonimo: false,
+    urgente: false,
+    aprovado: true,
+    recusado: false,
+    oram_count: 0,
+    oram_por: [],
+    criado_em: emDias(-2),
+  });
+  await db.doc(`igrejas/${igrejaId}/pedidos_oracao/seed_moderacao`).set({
+    ...base,
+    autor_id: "seed",
+    autor_nome: "Visitante de teste",
+    texto: `[${marca}] Pedido comum aguardando moderação.`,
+    privado: false,
+    anonimo: false,
+    urgente: false,
+    aprovado: false,
+    recusado: false,
+    oram_count: 0,
+    oram_por: [],
+    criado_em: emDias(-1),
+  });
+  await db.doc(`igrejas/${igrejaId}/pedidos_oracao/seed_urgente`).set({
+    ...base,
+    autor_id: "seed",
+    autor_nome: "Anônimo",
+    texto: `[${marca}] Pedido URGENTE e anônimo aguardando moderação.`,
+    privado: false,
+    anonimo: true,
+    urgente: true,
+    aprovado: false,
+    recusado: false,
+    oram_count: 0,
+    oram_por: [],
+    criado_em: agora,
   });
 }
 

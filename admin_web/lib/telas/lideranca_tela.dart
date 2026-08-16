@@ -272,6 +272,57 @@ class _CartaoLiderancaState extends ConsumerState<_CartaoLideranca> {
                             },
                       label: const Text('Remover da liderança'),
                     ),
+                  // Funções administrativas: tesoureiro, editor e moderador.
+                  // A função `pastor` não entra aqui — ela acompanha o perfil.
+                  for (final funcao in const [
+                    FuncaoAdmin.tesoureiro,
+                    FuncaoAdmin.editor,
+                    FuncaoAdmin.moderadorOracao,
+                  ])
+                    if (!vinculo.funcoesAdmin.contains(funcao))
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.add_moderator_outlined, size: 16),
+                        onPressed: _ocupado
+                            ? null
+                            : () => _executar(
+                                  () => repo.atribuirFuncao(
+                                    igrejaId: vinculo.igrejaId,
+                                    uid: vinculo.uid,
+                                    funcao: funcao,
+                                  ),
+                                  '${funcao.rotulo} atribuído.',
+                                ),
+                        label: Text('Dar ${funcao.rotulo}'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.remove_moderator_outlined,
+                            size: 16),
+                        onPressed: _ocupado
+                            ? null
+                            : () async {
+                                final motivo = await DialogoMotivo.mostrar(
+                                  context,
+                                  titulo: 'Remover ${funcao.rotulo}',
+                                  descricao:
+                                      '${widget.membro.exibicao} perde a função '
+                                      '${funcao.rotulo} nesta igreja. O vínculo '
+                                      'e o histórico permanecem.',
+                                  rotuloConfirmar: 'Remover função',
+                                );
+                                if (motivo == null) return;
+                                await _executar(
+                                  () => repo.removerFuncao(
+                                    igrejaId: vinculo.igrejaId,
+                                    uid: vinculo.uid,
+                                    funcao: funcao,
+                                    motivo: motivo,
+                                  ),
+                                  '${funcao.rotulo} removido.',
+                                );
+                              },
+                        label: Text('Tirar ${funcao.rotulo}'),
+                      ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.person_off_outlined, size: 16),
                     style: OutlinedButton.styleFrom(

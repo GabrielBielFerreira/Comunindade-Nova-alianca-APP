@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../dados/acessos.dart';
+import '../dados/conteudo_repository.dart';
 import '../dados/financas_repository.dart';
+import '../dados/igrejas_repository.dart';
 import '../dados/membros_repository.dart';
 
 // ── Autenticação ──────────────────────────────────────────────────────
@@ -70,6 +72,63 @@ final transacoesFiltradasProvider = Provider<List<Transacao>>((ref) {
   final todas = ref.watch(transacoesProvider).valueOrNull ?? const <Transacao>[];
   final filtro = ref.watch(filtroFinancasProvider);
   return todas.where(filtro.aceita).toList();
+});
+
+// ── Conteúdo da unidade em foco ───────────────────────────────────────
+
+/// Recriado quando a unidade muda, o que invalida os streams derivados e
+/// descarta o cache da igreja anterior.
+final conteudoRepositoryProvider = Provider<ConteudoRepository?>((ref) {
+  final acesso = ref.watch(acessoAtualProvider);
+  if (acesso == null) return null;
+  return ConteudoRepository(igrejaId: acesso.igrejaId);
+});
+
+/// Emite lista vazia quando não há repositório ou o usuário não tem a
+/// capacidade — evita disparar consulta que as Rules negariam.
+Stream<List<T>> _seAutorizado<T>(
+  Ref ref,
+  bool Function(AcessoIgreja) permite,
+  Stream<List<T>> Function(ConteudoRepository) consulta,
+) {
+  final repo = ref.watch(conteudoRepositoryProvider);
+  final acesso = ref.watch(acessoAtualProvider);
+  if (repo == null || acesso == null || !permite(acesso)) {
+    return Stream.value(const []);
+  }
+  return consulta(repo);
+}
+
+final avisosProvider = StreamProvider<List<Aviso>>((ref) =>
+    _seAutorizado(ref, (a) => a.gerenciarConteudo, (r) => r.avisos()));
+
+final eventosProvider = StreamProvider<List<Evento>>((ref) =>
+    _seAutorizado(ref, (a) => a.gerenciarConteudo, (r) => r.eventos()));
+
+final campanhasProvider = StreamProvider<List<Campanha>>((ref) =>
+    _seAutorizado(ref, (a) => a.gerenciarConteudo, (r) => r.campanhas()));
+
+final ministeriosProvider = StreamProvider<List<Ministerio>>((ref) =>
+    _seAutorizado(ref, (a) => a.gerenciarConteudo, (r) => r.ministerios()));
+
+final devocionaisProvider = StreamProvider<List<Devocional>>((ref) =>
+    _seAutorizado(ref, (a) => a.gerenciarConteudo, (r) => r.devocionais()));
+
+final oracoesPendentesProvider = StreamProvider<List<PedidoOracao>>((ref) =>
+    _seAutorizado(ref, (a) => a.moderarOracao, (r) => r.oracoesPendentes()));
+
+final oracoesAprovadasProvider = StreamProvider<List<PedidoOracao>>((ref) =>
+    _seAutorizado(ref, (a) => a.moderarOracao, (r) => r.oracoesAprovadas()));
+
+// ── Igrejas (super_admin) ─────────────────────────────────────────────
+
+final igrejasRepositoryProvider =
+    Provider<IgrejasRepository>((ref) => IgrejasRepository());
+
+final igrejasProvider = StreamProvider<List<IgrejaModel>>((ref) {
+  final acessos = ref.watch(meusAcessosProvider).valueOrNull;
+  if (acessos == null || !acessos.isSuperAdmin) return Stream.value(const []);
+  return ref.watch(igrejasRepositoryProvider).observar();
 });
 
 // ── Métricas do dashboard (contagens reais) ───────────────────────────

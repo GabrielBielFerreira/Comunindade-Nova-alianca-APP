@@ -1,7 +1,7 @@
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
-import '../config/emulador.dart';
+import '../config/ambiente.dart';
 
 /// Capacidades de um usuário sobre UMA unidade, conforme o servidor.
 ///
@@ -91,7 +91,7 @@ class AcessosRepository {
   AcessosRepository({FirebaseFunctions? functions})
       : _functions = functions ??
             FirebaseFunctions.instanceFor(
-              region: ConfiguracaoEmulador.regiaoFunctions,
+              region: ConfiguracaoFirebase.regiaoFunctions,
             );
 
   final FirebaseFunctions _functions;

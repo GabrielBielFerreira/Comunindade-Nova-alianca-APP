@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'estado/providers.dart';
+import 'telas/conteudo_telas.dart';
 import 'telas/dashboard_tela.dart';
 import 'telas/financas_tela.dart';
+import 'telas/igrejas_tela.dart';
 import 'telas/lideranca_tela.dart';
 import 'telas/login_tela.dart';
 import 'telas/membros_tela.dart';
@@ -51,7 +53,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/dashboard', builder: (_, _) => const DashboardTela()),
           GoRoute(path: '/membros', builder: (_, _) => const MembrosTela()),
           GoRoute(path: '/lideranca', builder: (_, _) => const LiderancaTela()),
+          GoRoute(path: '/avisos', builder: (_, _) => const AvisosTela()),
+          GoRoute(
+              path: '/programacao', builder: (_, _) => const ProgramacaoTela()),
+          GoRoute(path: '/campanhas', builder: (_, _) => const CampanhasTela()),
+          GoRoute(
+              path: '/ministerios', builder: (_, _) => const MinisteriosTela()),
+          GoRoute(
+              path: '/devocionais', builder: (_, _) => const DevocionaisTela()),
+          GoRoute(path: '/oracao', builder: (_, _) => const OracaoTela()),
           GoRoute(path: '/financas', builder: (_, _) => const FinancasTela()),
+          GoRoute(path: '/igrejas', builder: (_, _) => const IgrejasTela()),
         ],
       ),
     ],
