@@ -1,7 +1,33 @@
-# Executar o painel localmente (Emulator Suite)
+# Executar localmente (Emulator Suite)
 
 Tudo roda contra o projeto de demonstração `demo-nova-alianca`. **Nada toca
 produção.** Não é necessário ter credenciais reais do Firebase.
+
+Para publicar em produção, veja [DEPLOY_PRODUCAO.md](DEPLOY_PRODUCAO.md).
+
+## Ambientes
+
+O ambiente é escolhido em tempo de build, por `--dart-define=APP_ENV`:
+
+| Valor | Efeito |
+|---|---|
+| `emulator` | Aponta para o Emulator Suite (`demo-nova-alianca`). |
+| `production` | **Padrão.** Usa a configuração real; nunca toca localhost. |
+
+O padrão ser produção é deliberado: um build feito sem a flag jamais aponta
+para o emulador por acidente, e um build local jamais grava em produção.
+
+```powershell
+# Aplicativo
+flutter run --dart-define=APP_ENV=emulator
+
+# Painel
+cd admin_web; flutter run -d chrome --dart-define=APP_ENV=emulator
+```
+
+> No emulador Android, o host é `10.0.2.2` (atalho do AVD para a máquina
+> hospedeira) — já tratado automaticamente. Em aparelho físico, passe
+> `--dart-define=EMULATOR_HOST=<ip-da-sua-maquina>`.
 
 ## Pré-requisitos
 
@@ -110,7 +136,7 @@ explícitos. A claim só vale no próximo token (logout/login).
 # Domínio compartilhado (62 testes)
 cd packages\nova_alianca_core; dart test
 
-# Rules no emulador (74 testes) — o pretest libera a 8080 se necessário
+# Rules no emulador (115 testes) — o pretest libera a 8080 se necessário
 cd test_rules; npm test
 
 # Build das Functions
