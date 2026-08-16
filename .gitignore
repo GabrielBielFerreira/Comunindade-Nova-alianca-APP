@@ -94,3 +94,6 @@ packages/*/pubspec.lock
 admin_web/.dart_tool/
 admin_web/build/
 admin_web/pubspec.lock
+
+# Seed do emulador
+seed_emulador/node_modules/

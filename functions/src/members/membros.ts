@@ -6,7 +6,7 @@
  * preservando o histórico.
  */
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { FieldValue, REGIAO, db } from "../firebase";
+import { FieldValue, REGIAO, db, type Transaction } from "../firebase";
 import { writeAuditLogTx } from "../audit/audit";
 import {
   assertPodeAlterarVinculo,
@@ -35,7 +35,7 @@ function refVinculo(igrejaId: string, uid: string) {
 
 /** Lê o vínculo do alvo dentro da transação, garantindo que ele existe. */
 async function lerAlvoTx(
-  tx: FirebaseFirestore.Transaction,
+  tx: Transaction,
   igrejaId: string,
   uid: string
 ): Promise<VinculoIgreja> {
