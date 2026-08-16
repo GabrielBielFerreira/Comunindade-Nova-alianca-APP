@@ -6,7 +6,7 @@
  * segurança propriamente ditas ficam nas suítes da Fase 1
  * (isolamento / lideranca / financas / auditoria / oracao).
  */
-const { makeTestEnv, seed, assertFails } = require("./helpers");
+const { makeTestEnv, seed, assertFails, assertSucceeds } = require("./helpers");
 
 let testEnv;
 
@@ -23,13 +23,20 @@ beforeEach(async () => {
 });
 
 describe("harness do Emulator Suite", () => {
-  test("carrega as Rules do repositório e nega leitura anônima", async () => {
+  test("carrega as Rules do repositório e aplica negação por padrão", async () => {
     await seed(testEnv, async (fs) => {
       await fs.collection("igrejas").doc("olinda").set({ nome: "Nova Aliança Olinda" });
+      await fs
+        .doc("igrejas/olinda/membros/uid_alguem")
+        .set({ perfil: "lider", status: "aprovado" });
     });
 
     const anon = testEnv.unauthenticatedContext().firestore();
-    await assertFails(anon.collection("igrejas").doc("olinda").get());
+    // O vínculo é dado de autorização: nunca legível sem sessão.
+    await assertFails(anon.doc("igrejas/olinda/membros/uid_alguem").get());
+    // Já o catálogo de unidades é público de propósito — o app precisa
+    // listar as igrejas antes do login para a seleção de unidade.
+    await assertSucceeds(anon.doc("igrejas/olinda").get());
   });
 
   test("withSecurityRulesDisabled consegue semear dados", async () => {
