@@ -89,3 +89,8 @@ firebase-export-*/
 packages/*/.dart_tool/
 packages/*/.packages
 packages/*/pubspec.lock
+
+# Painel web
+admin_web/.dart_tool/
+admin_web/build/
+admin_web/pubspec.lock
