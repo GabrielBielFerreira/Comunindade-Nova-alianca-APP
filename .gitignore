@@ -97,3 +97,6 @@ admin_web/pubspec.lock
 
 # Seed do emulador
 seed_emulador/node_modules/
+
+# Kotlin build (gerado pelo Gradle)
+android/.kotlin/
