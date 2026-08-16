@@ -100,3 +100,7 @@ seed_emulador/node_modules/
 
 # Kotlin build (gerado pelo Gradle)
 android/.kotlin/
+
+# Artefatos de build (binarios nao entram no Git)
+dist/*
+!dist/LEIA-ME.md
