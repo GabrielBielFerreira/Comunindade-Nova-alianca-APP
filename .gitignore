@@ -70,5 +70,17 @@ android/key.properties
 functions/node_modules/
 functions/.env
 functions/.env.*
+functions/lib/
 seed/node_modules/
 **/serviceAccountKey.json
+
+# Testes de Rules (Node) + artefatos do Emulator Suite
+test_rules/node_modules/
+scripts/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+firebase-export-*/
+.firebase/
