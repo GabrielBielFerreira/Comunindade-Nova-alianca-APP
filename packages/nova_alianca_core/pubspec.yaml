@@ -1,0 +1,11 @@
+name: nova_alianca_core
+description: "Domínio compartilhado da rede Nova Aliança: identidades de igreja, perfis, funções administrativas e matriz de permissões. Dart puro, sem dependência de Flutter nem de Firebase."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.11.4
+
+dev_dependencies:
+  test: ^1.25.0
+  lints: ^5.0.0
