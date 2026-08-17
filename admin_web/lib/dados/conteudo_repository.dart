@@ -304,10 +304,14 @@ class Pagina<T> {
 /// derrubar o painel nem gerar leitura desnecessária no Firestore.
 class ConteudoRepository {
   ConteudoRepository({required this.igrejaId, FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+      : _dbInjetado = db;
 
   final IgrejaId igrejaId;
-  final FirebaseFirestore _db;
+  final FirebaseFirestore? _dbInjetado;
+
+  /// Resolvido sob demanda: construir o repositório não exige Firebase
+  /// inicializado, o que permite montar as telas em teste de widget.
+  late final FirebaseFirestore _db = _dbInjetado ?? FirebaseFirestore.instance;
 
   /// Teto das telas de gestão. Alto o bastante para uso real da unidade e
   /// baixo o bastante para não carregar a coleção inteira.

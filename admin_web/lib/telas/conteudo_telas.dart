@@ -37,33 +37,59 @@ class _PaginaConteudo extends ConsumerWidget {
     final acesso = ref.watch(acessoAtualProvider);
     final pode = acesso?.gerenciarConteudo ?? false;
 
+    final espaco = espacoDaLargura(context);
+
+    final textos = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(titulo, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 4),
+        Text(descricao, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+
+    final botao = pode
+        ? FilledButton.icon(
+            onPressed: onNovo,
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(rotuloNovo),
+          )
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          padding: EdgeInsets.fromLTRB(espaco, espaco, espaco, 12),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (botao == null) return textos;
+
+              // Em telas estreitas o botão desce. Mantê-lo na mesma linha
+              // esmagava sua largura até o rótulo quebrar letra a letra e
+              // esticar o cabeçalho para fora da tela.
+              if (constraints.maxWidth < 520) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(titulo,
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text(descricao,
-                        style: Theme.of(context).textTheme.bodySmall),
+                    textos,
+                    const SizedBox(height: 12),
+                    botao,
                   ],
-                ),
-              ),
-              if (pode)
-                FilledButton.icon(
-                  onPressed: onNovo,
-                  icon: const Icon(Icons.add, size: 18),
-                  label: Text(rotuloNovo),
-                ),
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: textos),
+                  const SizedBox(width: 12),
+                  botao,
+                ],
+              );
+            },
           ),
         ),
         const Divider(height: 1),

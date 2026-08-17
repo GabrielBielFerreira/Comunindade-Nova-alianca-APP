@@ -67,10 +67,12 @@ class ResumoFinanceiroUnidade {
 /// jamais aprova, edita valor ou altera status. As Rules também negam
 /// qualquer escrita de cliente em `transacoes`.
 class FinancasRepository {
-  FinancasRepository({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  FinancasRepository({FirebaseFirestore? db}) : _dbInjetado = db;
 
-  final FirebaseFirestore _db;
+  final FirebaseFirestore? _dbInjetado;
+
+  /// Resolvido sob demanda — ver [MembrosRepository].
+  late final FirebaseFirestore _db = _dbInjetado ?? FirebaseFirestore.instance;
 
   /// Teto da tela de finanças. Os filtros da tela agem dentro desta página; os
   /// TOTAIS do dashboard vêm de [resumo], que agrega no servidor e não depende

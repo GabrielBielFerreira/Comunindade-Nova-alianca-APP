@@ -9,14 +9,18 @@ import 'conteudo_repository.dart' show lerData;
 /// negam escrita direta em `igrejas/{id}` a qualquer cliente.
 class IgrejasRepository {
   IgrejasRepository({FirebaseFirestore? db, FirebaseFunctions? functions})
-      : _db = db ?? FirebaseFirestore.instance,
-        _functions = functions ??
-            FirebaseFunctions.instanceFor(
-              region: ConfiguracaoFirebase.regiaoFunctions,
-            );
+      : _dbInjetado = db,
+        _functionsInjetado = functions;
 
-  final FirebaseFirestore _db;
-  final FirebaseFunctions _functions;
+  final FirebaseFirestore? _dbInjetado;
+  final FirebaseFunctions? _functionsInjetado;
+
+  /// Resolvidos sob demanda — ver [MembrosRepository].
+  late final FirebaseFirestore _db = _dbInjetado ?? FirebaseFirestore.instance;
+  late final FirebaseFunctions _functions = _functionsInjetado ??
+      FirebaseFunctions.instanceFor(
+        region: ConfiguracaoFirebase.regiaoFunctions,
+      );
 
   Stream<List<IgrejaModel>> observar() {
     return _db.collection('igrejas').snapshots().map((snap) {

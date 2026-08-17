@@ -48,14 +48,19 @@ class ContagemMembros {
 /// de escrever perfil, status ou funções.
 class MembrosRepository {
   MembrosRepository({FirebaseFirestore? db, FirebaseFunctions? functions})
-      : _db = db ?? FirebaseFirestore.instance,
-        _functions = functions ??
-            FirebaseFunctions.instanceFor(
-              region: ConfiguracaoFirebase.regiaoFunctions,
-            );
+      : _dbInjetado = db,
+        _functionsInjetado = functions;
 
-  final FirebaseFirestore _db;
-  final FirebaseFunctions _functions;
+  final FirebaseFirestore? _dbInjetado;
+  final FirebaseFunctions? _functionsInjetado;
+
+  // Resolvidos sob demanda: construir o repositório não exige Firebase
+  // inicializado, o que permite montar as telas em teste de widget.
+  late final FirebaseFirestore _db = _dbInjetado ?? FirebaseFirestore.instance;
+  late final FirebaseFunctions _functions = _functionsInjetado ??
+      FirebaseFunctions.instanceFor(
+        region: ConfiguracaoFirebase.regiaoFunctions,
+      );
 
   /// Teto da lista de gestão. A busca da tela filtra dentro desta página.
   static const int limitePadrao = 300;

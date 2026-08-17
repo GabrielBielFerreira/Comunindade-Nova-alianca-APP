@@ -84,14 +84,19 @@ class _MemberAvisosNavigationItem extends StatelessWidget {
           ),
         ),
         SizedBox(height: 2 * scale),
-        Text(
-          item.label,
-          maxLines: 1,
-          style: GoogleFonts.inter(
-            fontSize: item.fontSize * scale,
-            fontWeight: FontWeight.w500,
-            height: item.fontSize == 11 ? 13 / 11 : 16.8 / 12,
-            color: color,
+        // Legenda de ícone em barra de altura fixa — ver
+        // app_bottom_navigation.dart. O conteúdo de leitura do aplicativo
+        // continua respeitando a ampliação de fonte do sistema.
+        MediaQuery.withNoTextScaling(
+          child: Text(
+            item.label,
+            maxLines: 1,
+            style: GoogleFonts.inter(
+              fontSize: item.fontSize * scale,
+              fontWeight: FontWeight.w500,
+              height: item.fontSize == 11 ? 13 / 11 : 16.8 / 12,
+              color: color,
+            ),
           ),
         ),
       ],

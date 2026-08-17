@@ -142,76 +142,119 @@ class _LinhaMembroState extends ConsumerState<_LinhaMembro> {
     final vinculo = widget.membro.vinculo;
     final repo = ref.read(membrosRepositoryProvider);
 
-    return Card(
-      child: ListTile(
-        title: Text(widget.membro.exibicao),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final acoes = <Widget>[
+      if (vinculo.status == StatusVinculo.pendente)
+        FilledButton(
+          onPressed: () => _executar(
+            () => repo.aprovar(igrejaId: vinculo.igrejaId, uid: vinculo.uid),
+            'Cadastro aprovado.',
+          ),
+          child: const Text('Aprovar'),
+        ),
+      if (vinculo.status != StatusVinculo.inativo)
+        OutlinedButton(
+          onPressed: () async {
+            final motivo = await DialogoMotivo.mostrar(
+              context,
+              titulo: vinculo.status == StatusVinculo.pendente
+                  ? 'Recusar cadastro'
+                  : 'Inativar vínculo',
+              descricao:
+                  'O vínculo de ${widget.membro.exibicao} será marcado como '
+                  'inativo. O histórico é preservado.',
+              rotuloConfirmar: 'Confirmar',
+            );
+            if (motivo == null) return;
+            await _executar(
+              () => repo.recusar(
+                igrejaId: vinculo.igrejaId,
+                uid: vinculo.uid,
+                motivo: motivo,
+              ),
+              'Vínculo inativado.',
+            );
+          },
+          child: Text(vinculo.status == StatusVinculo.pendente
+              ? 'Recusar'
+              : 'Inativar'),
+        ),
+    ];
+
+    final identificacao = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          widget.membro.exibicao,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Etiqueta(
-                  texto: vinculo.status.rotulo,
-                  cor: corDoStatus(vinculo.status),
-                ),
-                Etiqueta(texto: vinculo.perfil.rotulo, cor: Colors.blueGrey),
-                for (final funcao in vinculo.funcoesAdmin)
-                  Etiqueta(texto: funcao.rotulo, cor: Colors.indigo),
-              ],
+            Etiqueta(
+              texto: vinculo.status.rotulo,
+              cor: corDoStatus(vinculo.status),
             ),
+            Etiqueta(texto: vinculo.perfil.rotulo, cor: Colors.blueGrey),
+            for (final funcao in vinculo.funcoesAdmin)
+              Etiqueta(texto: funcao.rotulo, cor: Colors.indigo),
           ],
         ),
-        trailing: _ocupado
-            ? const SizedBox(
-                height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-            : !widget.podeAprovar
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (vinculo.status == StatusVinculo.pendente)
-                        FilledButton(
-                          onPressed: () => _executar(
-                            () => repo.aprovar(
-                                igrejaId: vinculo.igrejaId, uid: vinculo.uid),
-                            'Cadastro aprovado.',
-                          ),
-                          child: const Text('Aprovar'),
-                        ),
-                      const SizedBox(width: 8),
-                      if (vinculo.status != StatusVinculo.inativo)
-                        OutlinedButton(
-                          onPressed: () async {
-                            final motivo = await DialogoMotivo.mostrar(
-                              context,
-                              titulo: vinculo.status == StatusVinculo.pendente
-                                  ? 'Recusar cadastro'
-                                  : 'Inativar vínculo',
-                              descricao:
-                                  'O vínculo de ${widget.membro.exibicao} será marcado como '
-                                  'inativo. O histórico é preservado.',
-                              rotuloConfirmar: 'Confirmar',
-                            );
-                            if (motivo == null) return;
-                            await _executar(
-                              () => repo.recusar(
-                                igrejaId: vinculo.igrejaId,
-                                uid: vinculo.uid,
-                                motivo: motivo,
-                              ),
-                              'Vínculo inativado.',
-                            );
-                          },
-                          child: Text(vinculo.status == StatusVinculo.pendente
-                              ? 'Recusar'
-                              : 'Inativar'),
-                        ),
-                    ],
-                  ),
+      ],
+    );
+
+    final Widget controles = _ocupado
+        ? const Padding(
+            padding: EdgeInsets.all(4),
+            child: SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          )
+        : Wrap(spacing: 8, runSpacing: 8, children: acoes);
+
+    final mostrarAcoes = widget.podeAprovar && (acoes.isNotEmpty || _ocupado);
+
+    // Sem ListTile: dois botões no `trailing` não cabem em 320 px e o próprio
+    // ListTile aborta o layout. Aqui as ações descem para baixo do nome
+    // quando o espaço aperta.
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final estreito = constraints.maxWidth < 420;
+
+            if (!mostrarAcoes) return identificacao;
+
+            if (estreito) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  identificacao,
+                  const SizedBox(height: 12),
+                  controles,
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: identificacao),
+                const SizedBox(width: 12),
+                controles,
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -89,12 +89,16 @@ class MeusAcessos {
 /// Cliente da Function `meusAcessos`.
 class AcessosRepository {
   AcessosRepository({FirebaseFunctions? functions})
-      : _functions = functions ??
-            FirebaseFunctions.instanceFor(
-              region: ConfiguracaoFirebase.regiaoFunctions,
-            );
+      : _functionsInjetado = functions;
 
-  final FirebaseFunctions _functions;
+  final FirebaseFunctions? _functionsInjetado;
+
+  /// Resolvido sob demanda: construir o repositório não exige Firebase
+  /// inicializado, o que permite montar as telas em teste de widget.
+  late final FirebaseFunctions _functions = _functionsInjetado ??
+      FirebaseFunctions.instanceFor(
+        region: ConfiguracaoFirebase.regiaoFunctions,
+      );
 
   Future<MeusAcessos> carregar() async {
     final resultado = await _functions.httpsCallable('meusAcessos').call();

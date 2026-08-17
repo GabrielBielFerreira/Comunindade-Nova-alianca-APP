@@ -34,134 +34,125 @@ class FinancasTela extends ConsumerWidget {
     final filtro = ref.watch(filtroFinancasProvider);
     final filtradas = ref.watch(transacoesFiltradasProvider);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('Finanças — ${acesso.nome}',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                  ),
-                  const Etiqueta(texto: 'SOMENTE LEITURA', cor: Colors.teal),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _Filtros(filtro: filtro),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: transacoesAsync.when(
-            loading: () => const CarregandoCentralizado(),
-            error: (erro, _) => EstadoErro(
-              erro: erro,
-              onTentarNovamente: () => ref.invalidate(transacoesProvider),
-            ),
-            data: (todas) {
-              if (todas.isEmpty) {
-                return const EstadoVazio(
-                  titulo: 'Nenhuma transação registrada',
-                  detalhe:
-                      'Esta unidade ainda não possui contribuições lançadas.',
-                  icone: Icons.receipt_long_outlined,
-                );
-              }
-              if (filtradas.isEmpty) {
-                return const EstadoVazio(
-                  titulo: 'Nenhuma transação para os filtros aplicados',
-                  detalhe: 'Ajuste o período, o status ou o tipo.',
-                  icone: Icons.filter_alt_off_outlined,
-                );
-              }
+    final espaco = espacoDaLargura(context);
 
-              final totais = TotaisFinanceiros.de(filtradas);
-              return ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Wrap(
-                    spacing: 16,
-                    runSpacing: 16,
-                    children: [
-                      SizedBox(
-                        width: 220,
-                        child: CartaoMetrica(
-                          rotulo: 'Aprovado',
-                          valor: formatarCentavos(totais.aprovadoCentavos),
-                          icone: Icons.check_circle_outline,
-                          destaque: true,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: CartaoMetrica(
-                          rotulo: 'Pendente',
-                          valor: formatarCentavos(totais.pendenteCentavos),
-                          icone: Icons.schedule,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: CartaoMetrica(
-                          rotulo: 'Recusado/estornado',
-                          valor: formatarCentavos(totais.recusadoCentavos),
-                          icone: Icons.cancel_outlined,
-                        ),
-                      ),
-                      SizedBox(
-                        width: 220,
-                        child: CartaoMetrica(
-                          rotulo: 'Transações',
-                          valor: '${totais.quantidade}',
-                          icone: Icons.receipt_long_outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columns: const [
-                          DataColumn(label: Text('Data')),
-                          DataColumn(label: Text('Tipo')),
-                          DataColumn(label: Text('Método')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Valor'), numeric: true),
-                          DataColumn(label: Text('ID Mercado Pago')),
-                        ],
-                        rows: [
-                          for (final t in filtradas)
-                            DataRow(cells: [
-                              DataCell(Text(t.criadoEm == null
-                                  ? '—'
-                                  : DateFormat('dd/MM/yyyy HH:mm')
-                                      .format(t.criadoEm!))),
-                              DataCell(Text(t.tipo.rotulo)),
-                              DataCell(Text(t.metodo.rotulo)),
-                              DataCell(Etiqueta(
-                                texto: t.status.rotulo,
-                                cor: _corStatus(t.status),
-                              )),
-                              // Sempre derivado de valor_centavos.
-                              DataCell(Text(formatarCentavos(t.valorCentavos))),
-                              DataCell(Text(t.mpPaymentId ?? '—')),
-                            ]),
-                        ],
-                      ),
+    // Página única e rolável: em 320 px os filtros ocupam várias linhas e um
+    // cabeçalho de altura livre dentro de Column estourava a tela.
+    return ListView(
+      padding: EdgeInsets.fromLTRB(espaco, espaco, espaco, espaco),
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('Finanças — ${acesso.nome}',
+                style: Theme.of(context).textTheme.headlineSmall),
+            const Etiqueta(texto: 'SOMENTE LEITURA', cor: Colors.teal),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _Filtros(filtro: filtro),
+        const SizedBox(height: 16),
+        const Divider(height: 1),
+        const SizedBox(height: 16),
+        transacoesAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: CarregandoCentralizado(),
+          ),
+          error: (erro, _) => EstadoErro(
+            erro: erro,
+            onTentarNovamente: () => ref.invalidate(transacoesProvider),
+          ),
+          data: (pagina) {
+            if (pagina.isEmpty) {
+              return const EstadoVazio(
+                titulo: 'Nenhuma transação registrada',
+                detalhe: 'Esta unidade ainda não possui contribuições lançadas.',
+                icone: Icons.receipt_long_outlined,
+              );
+            }
+            if (filtradas.isEmpty) {
+              return const EstadoVazio(
+                titulo: 'Nenhuma transação para os filtros aplicados',
+                detalhe: 'Ajuste o período, o status ou o tipo.',
+                icone: Icons.filter_alt_off_outlined,
+              );
+            }
+
+            // Totais das transações CARREGADAS e filtradas. O total geral da
+            // unidade aparece no dashboard, somado no servidor.
+            final totais = TotaisFinanceiros.de(filtradas);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                GradeCartoes(
+                  children: [
+                    CartaoMetrica(
+                      rotulo: 'Aprovado',
+                      valor: formatarCentavos(totais.aprovadoCentavos),
+                      icone: Icons.check_circle_outline,
+                      destaque: true,
+                    ),
+                    CartaoMetrica(
+                      rotulo: 'Pendente',
+                      valor: formatarCentavos(totais.pendenteCentavos),
+                      icone: Icons.schedule,
+                    ),
+                    CartaoMetrica(
+                      rotulo: 'Recusado/estornado',
+                      valor: formatarCentavos(totais.recusadoCentavos),
+                      icone: Icons.cancel_outlined,
+                    ),
+                    CartaoMetrica(
+                      rotulo: 'Transações',
+                      valor: '${totais.quantidade}',
+                      icone: Icons.receipt_long_outlined,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('Data')),
+                        DataColumn(label: Text('Tipo')),
+                        DataColumn(label: Text('Método')),
+                        DataColumn(label: Text('Status')),
+                        DataColumn(label: Text('Valor'), numeric: true),
+                        DataColumn(label: Text('ID Mercado Pago')),
+                      ],
+                      rows: [
+                        for (final t in filtradas)
+                          DataRow(cells: [
+                            DataCell(Text(t.criadoEm == null
+                                ? '—'
+                                : DateFormat('dd/MM/yyyy HH:mm')
+                                    .format(t.criadoEm!))),
+                            DataCell(Text(t.tipo.rotulo)),
+                            DataCell(Text(t.metodo.rotulo)),
+                            DataCell(Etiqueta(
+                              texto: t.status.rotulo,
+                              cor: _corStatus(t.status),
+                            )),
+                            // Sempre derivado de valor_centavos.
+                            DataCell(Text(formatarCentavos(t.valorCentavos))),
+                            DataCell(Text(t.mpPaymentId ?? '—')),
+                          ]),
+                      ],
                     ),
                   ),
+                ),
+                if (pagina.truncada) ...[
+                  const SizedBox(height: 16),
+                  AvisoListaTruncada(exibidos: pagina.length),
                 ],
-              );
-            },
-          ),
+              ],
+            );
+          },
         ),
       ],
     );
