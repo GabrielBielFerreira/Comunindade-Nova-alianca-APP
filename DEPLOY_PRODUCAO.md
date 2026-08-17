@@ -56,6 +56,29 @@ Verifique:
 cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && flutter analyze && flutter test
 ```
 
+### Trava fail-closed (obrigatória antes de qualquer build de produção)
+
+```bash
+cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && node scripts/verificar_producao.js --app
+```
+
+O comando **reprova** (saída 1) quando `lib/firebase_options.dart` ainda é o
+placeholder, quando `android/app/google-services.json` falta ou aponta para
+outro projeto, ou quando o pacote Android não confere. Enquanto ele reprovar,
+nenhum artefato gerado é de produção — mesmo que o comando de build diga
+`--release`.
+
+Depois de construir, valide o artefato:
+
+```bash
+cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && node scripts/verificar_producao.js --artefato build/app/outputs/flutter-apk/app-release.apk
+```
+
+> Num APK as strings ficam comprimidas dentro do zip, então a *ausência* de
+> `demo-nova-alianca` não prova nada. O que decide é a checagem positiva: o
+> artefato precisa referenciar `nova-alianca-app`. Para o painel
+> (`main.dart.js`, texto puro) as duas direções são confiáveis.
+
 ---
 
 ## Passo 2 — Índices

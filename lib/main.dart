@@ -49,9 +49,13 @@ Future<void> main() async {
   // firebase_options.dart não estiverem configurados, a inicialização falha —
   // o app ainda abre (degradado) e o RootGate exibe a tela pública.
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    final opcoes = DefaultFirebaseOptions.currentPlatform;
+
+    // Fail-closed: um build de produção com configuração de emulador para
+    // aqui, em vez de conversar com o projeto errado em silêncio.
+    exigirConfiguracaoDeProducao(opcoes);
+
+    await Firebase.initializeApp(options: opcoes);
 
     // Só conecta ao Emulator Suite quando o build pediu explicitamente
     // (--dart-define=APP_ENV=emulator). Um build sem a flag é de produção e

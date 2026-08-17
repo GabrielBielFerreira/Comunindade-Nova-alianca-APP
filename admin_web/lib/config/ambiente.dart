@@ -37,6 +37,9 @@ enum AmbientePainel {
 /// Atalho de leitura para a interface.
 final AmbientePainel ambienteAtual = AmbientePainel.atual;
 
+/// Projeto Firebase real do produto.
+const String projetoFirebaseProducao = 'nova-alianca-app';
+
 /// Configuração do Firebase para o painel.
 class ConfiguracaoFirebase {
   const ConfiguracaoFirebase._();
@@ -97,6 +100,18 @@ class ConfiguracaoFirebase {
         'Para desenvolvimento local use --dart-define=APP_ENV=emulator.',
       );
     }
+    // Fail-closed: valores presentes mas apontando para o emulador/projeto
+    // errado são tão perigosos quanto valores ausentes.
+    if (_projectId != projetoFirebaseProducao) {
+      throw StateError(
+        'FB_PROJECT_ID e "$_projectId", esperado "$projetoFirebaseProducao". '
+        'Um painel de producao nao pode subir apontando para outro projeto.',
+      );
+    }
+    if (_apiKey.contains('fake')) {
+      throw StateError('FB_API_KEY e a chave falsa do emulador.');
+    }
+
     return FirebaseOptions(
       apiKey: _apiKey,
       appId: _appId,

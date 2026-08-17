@@ -36,6 +36,39 @@ enum Ambiente {
       };
 }
 
+/// Projeto Firebase real do produto.
+const String projetoFirebaseProducao = 'nova-alianca-app';
+
+/// Recusa iniciar um build de produção com configuração de emulador.
+///
+/// Complementa `scripts/verificar_producao.js`: a trava de build impede gerar
+/// o artefato errado; esta impede que um artefato errado, gerado fora do fluxo
+/// oficial, converse com o projeto errado em silêncio.
+///
+/// Em `APP_ENV=emulator` não faz nada — ali apontar para `demo-` é o correto.
+void exigirConfiguracaoDeProducao(FirebaseOptions opcoes) {
+  if (Ambiente.atual.isEmulador) return;
+
+  final problemas = <String>[
+    if (opcoes.projectId != projetoFirebaseProducao)
+      'projectId e "${opcoes.projectId}", esperado "$projetoFirebaseProducao"',
+    if (opcoes.apiKey.contains('fake')) 'apiKey e a chave falsa do emulador',
+    if (opcoes.projectId.startsWith('demo-'))
+      'projectId aponta para um projeto de demonstracao',
+  ];
+
+  if (problemas.isEmpty) return;
+
+  throw StateError(
+    'Build marcado como PRODUCAO com configuracao invalida:\n'
+    '  - ${problemas.join('\n  - ')}\n'
+    'Gere a configuracao real com:\n'
+    '  flutterfire configure --project=$projetoFirebaseProducao\n'
+    'Ou rode explicitamente contra o emulador:\n'
+    '  --dart-define=APP_ENV=emulator',
+  );
+}
+
 /// Endereço do Emulator Suite. Só é usado quando [Ambiente.atual] é `emulator`.
 class HostsEmulador {
   const HostsEmulador._();
