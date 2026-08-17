@@ -5,21 +5,33 @@ import 'package:go_router/go_router.dart';
 
 import '../config/ambiente.dart';
 import '../estado/providers.dart';
+import '../ui/tema.dart';
 
+/// Mensagem legível para o usuário do painel.
+///
+/// Em produção nenhuma mensagem cita emulador: falar de "emuladores" para o
+/// pastor de uma igreja não ajuda e expõe detalhe de desenvolvimento.
 String mensagemDeErroAuth(Object erro) {
   if (erro is FirebaseAuthException) {
     return switch (erro.code) {
       'invalid-email' => 'E-mail inválido.',
-      'user-disabled' => 'Esta conta está desativada.',
+      'user-disabled' => 'Esta conta está desativada. Fale com o pastor da '
+          'sua igreja.',
       'user-not-found' ||
       'wrong-password' ||
       'invalid-credential' =>
         'E-mail ou senha incorretos.',
+      'missing-password' => 'Informe a senha.',
       'too-many-requests' =>
         'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
-      'network-request-failed' =>
-        'Sem conexão com o servidor. Verifique se os emuladores estão rodando.',
-      _ => 'Não foi possível entrar (${erro.code}).',
+      'operation-not-allowed' =>
+        'Este método de acesso não está habilitado para o painel.',
+      'network-request-failed' => ambienteAtual.isEmulador
+          ? 'Sem conexão com o servidor. Verifique se os emuladores estão '
+              'rodando.'
+          : 'Sem conexão. Verifique sua internet e tente novamente.',
+      _ => 'Não foi possível entrar. Se o problema continuar, informe este '
+          'código ao suporte: ${erro.code}.',
     };
   }
   return 'Não foi possível entrar. Tente novamente.';
@@ -85,16 +97,7 @@ class _LoginTelaState extends ConsumerState<LoginTela> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const _FaixaAmbiente(),
-                      const SizedBox(height: 24),
-                      Text('Painel Nova Aliança',
-                          style: Theme.of(context).textTheme.headlineSmall),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Acesso administrativo',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                      ),
+                      const _Marca(),
                       const SizedBox(height: 24),
                       TextFormField(
                         controller: _email,
@@ -173,7 +176,56 @@ class _LoginTelaState extends ConsumerState<LoginTela> {
   }
 }
 
+/// Logo oficial e identificação do painel.
+class _Marca extends StatelessWidget {
+  const _Marca();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Image.asset(
+          'assets/images/logo_nova_alianca.png',
+          height: 84,
+          fit: BoxFit.contain,
+          semanticLabel: 'Logo da Igreja Nova Aliança',
+          // Se o ativo faltar, o login continua utilizável.
+          errorBuilder: (_, _, _) =>
+              const Icon(Icons.church_outlined, size: 64, color: Cores.primary),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Painel de Gestão',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        Text(
+          'Nova Aliança',
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: Cores.primary,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Acesso exclusivo da liderança e da administração.',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.outline),
+        ),
+      ],
+    );
+  }
+}
+
 /// Deixa explícito que o painel está apontando para o Emulator Suite.
+///
+/// Em produção não aparece: `ambienteAtual.isEmulador` é falso e o widget
+/// devolve um espaço vazio.
 class _FaixaAmbiente extends StatelessWidget {
   const _FaixaAmbiente();
 

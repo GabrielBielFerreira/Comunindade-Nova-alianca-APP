@@ -82,7 +82,7 @@ class _Lista<T> extends StatelessWidget {
     this.onRecarregar,
   });
 
-  final AsyncValue<List<T>> async;
+  final AsyncValue<Pagina<T>> async;
   final Widget vazio;
   final Widget Function(BuildContext, T) item;
   final VoidCallback? onRecarregar;
@@ -92,13 +92,17 @@ class _Lista<T> extends StatelessWidget {
     return async.when(
       loading: () => const CarregandoCentralizado(),
       error: (e, _) => EstadoErro(erro: e, onTentarNovamente: onRecarregar),
-      data: (lista) {
-        if (lista.isEmpty) return vazio;
+      data: (pagina) {
+        if (pagina.isEmpty) return vazio;
+        final lista = pagina.itens;
         return ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: lista.length,
+          padding: EdgeInsets.all(espacoDaLargura(context)),
+          // +1 quando truncada: o aviso vai no fim da lista.
+          itemCount: lista.length + (pagina.truncada ? 1 : 0),
           separatorBuilder: (_, _) => const SizedBox(height: 10),
-          itemBuilder: (context, i) => item(context, lista[i]),
+          itemBuilder: (context, i) => i < lista.length
+              ? item(context, lista[i])
+              : AvisoListaTruncada(exibidos: lista.length),
         );
       },
     );
@@ -521,7 +525,7 @@ class _SeletorResponsavel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final membros = ref.watch(membrosProvider).valueOrNull ?? const [];
+    final membros = ref.watch(membrosProvider).valueOrNull?.itens ?? const [];
     final aprovados = membros
         .where((m) => m.vinculo.status == StatusVinculo.aprovado)
         .toList();
@@ -1188,7 +1192,7 @@ class _ListaOracao extends ConsumerWidget {
     required this.moderavel,
   });
 
-  final AsyncValue<List<PedidoOracao>> async;
+  final AsyncValue<Pagina<PedidoOracao>> async;
   final Widget vazio;
   final bool moderavel;
 
@@ -1199,13 +1203,17 @@ class _ListaOracao extends ConsumerWidget {
     return async.when(
       loading: () => const CarregandoCentralizado(),
       error: (e, _) => EstadoErro(erro: e),
-      data: (lista) {
-        if (lista.isEmpty) return vazio;
+      data: (pagina) {
+        if (pagina.isEmpty) return vazio;
+        final lista = pagina.itens;
         return ListView.separated(
-          padding: const EdgeInsets.all(20),
-          itemCount: lista.length,
+          padding: EdgeInsets.all(espacoDaLargura(context)),
+          itemCount: lista.length + (pagina.truncada ? 1 : 0),
           separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemBuilder: (context, i) {
+            if (i >= lista.length) {
+              return AvisoListaTruncada(exibidos: lista.length);
+            }
             final p = lista[i];
             return Card(
               child: Padding(

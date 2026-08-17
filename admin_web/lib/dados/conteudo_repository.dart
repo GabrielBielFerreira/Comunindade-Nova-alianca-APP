@@ -281,10 +281,27 @@ class PedidoOracao {
 // Repositório
 // ══════════════════════════════════════════════════════════════════════
 
+/// Página de uma listagem: os itens e se a consulta bateu no teto.
+///
+/// O painel nunca finge que a lista é completa. Quando [truncada] é `true`, a
+/// tela avisa que existem mais registros do que os exibidos.
+class Pagina<T> {
+  const Pagina({required this.itens, required this.truncada});
+
+  final List<T> itens;
+  final bool truncada;
+
+  bool get isEmpty => itens.isEmpty;
+  int get length => itens.length;
+}
+
 /// CRUD de conteúdo SEMPRE dentro de `igrejas/{igrejaId}/...`.
 ///
 /// Não existe método que receba caminho livre: o `igrejaId` é fixado na
 /// construção, então nenhuma tela consegue gravar na unidade errada.
+///
+/// Nenhuma consulta é ilimitada: uma unidade com anos de histórico não pode
+/// derrubar o painel nem gerar leitura desnecessária no Firestore.
 class ConteudoRepository {
   ConteudoRepository({required this.igrejaId, FirebaseFirestore? db})
       : _db = db ?? FirebaseFirestore.instance;
@@ -292,16 +309,59 @@ class ConteudoRepository {
   final IgrejaId igrejaId;
   final FirebaseFirestore _db;
 
+  /// Teto das telas de gestão. Alto o bastante para uso real da unidade e
+  /// baixo o bastante para não carregar a coleção inteira.
+  static const int limitePadrao = 200;
+
+  /// Quantos itens os cartões do dashboard mostram.
+  static const int limiteDashboard = 5;
+
   CollectionReference<Map<String, dynamic>> _col(String nome) =>
       _db.collection('igrejas/${igrejaId.valor}/$nome');
 
+  /// Busca `limite + 1` para saber se havia mais — sem uma segunda consulta.
+  Query<Map<String, dynamic>> _limitada(String nome, int limite) =>
+      _col(nome).limit(limite + 1);
+
+  Pagina<T> _paginar<T>(
+    QuerySnapshot<Map<String, dynamic>> s,
+    int limite,
+    T Function(String, Map<String, dynamic>) converter,
+    int Function(T, T) ordenar,
+  ) {
+    final truncada = s.docs.length > limite;
+    final docs = truncada ? s.docs.take(limite) : s.docs;
+    final itens = docs.map((d) => converter(d.id, d.data())).toList()
+      ..sort(ordenar);
+    return Pagina(itens: itens, truncada: truncada);
+  }
+
   // ── Avisos ──────────────────────────────────────────────────────────
-  Stream<List<Aviso>> avisos() => _col('avisos').snapshots().map((s) {
-        final l = s.docs.map((d) => Aviso.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => (b.publicadoEm ?? DateTime(0))
-            .compareTo(a.publicadoEm ?? DateTime(0)));
-        return l;
-      });
+  /// Lista de gestão. Ordena no cliente porque `publicado_em` pode faltar em
+  /// documentos migrados — ordenar no servidor os excluiria da tela.
+  Stream<Pagina<Aviso>> avisos({int limite = limitePadrao}) =>
+      _limitada('avisos', limite).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              Aviso.doMapa,
+              (a, b) => (b.publicadoEm ?? DateTime(0))
+                  .compareTo(a.publicadoEm ?? DateTime(0)),
+            ),
+          );
+
+  /// Cartão do dashboard: os últimos avisos publicados.
+  ///
+  /// Aqui a ordenação é do servidor. Um aviso sem `publicado_em` não é
+  /// "recente" — ficar de fora deste cartão é o comportamento correto; ele
+  /// continua visível na tela de Avisos.
+  Stream<List<Aviso>> avisosRecentes({int limite = limiteDashboard}) => _col(
+        'avisos',
+      )
+          .orderBy('publicado_em', descending: true)
+          .limit(limite)
+          .snapshots()
+          .map((s) => s.docs.map((d) => Aviso.doMapa(d.id, d.data())).toList());
 
   Future<void> salvarAviso(Aviso a) => a.id.isEmpty
       ? _col('avisos').add(a.paraMapa())
@@ -312,11 +372,35 @@ class ConteudoRepository {
       _col('avisos').doc(id).update({'ativo': ativo});
 
   // ── Eventos ─────────────────────────────────────────────────────────
-  Stream<List<Evento>> eventos() => _col('eventos').snapshots().map((s) {
-        final l = s.docs.map((d) => Evento.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => b.data.compareTo(a.data));
-        return l;
-      });
+  Stream<Pagina<Evento>> eventos({int limite = limitePadrao}) =>
+      _limitada('eventos', limite).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              Evento.doMapa,
+              (a, b) => b.data.compareTo(a.data),
+            ),
+          );
+
+  /// Cartão "Próximas programações": só o que ainda vai acontecer.
+  ///
+  /// Filtro e ordenação são do servidor (mesmo campo `data`, então não exige
+  /// índice composto). Eventos cancelados são removidos no cliente para não
+  /// exigir um índice adicional só por isso.
+  Stream<List<Evento>> proximosEventos({int limite = limiteDashboard}) => _col(
+        'eventos',
+      )
+          .where('data', isGreaterThanOrEqualTo: Timestamp.now())
+          .orderBy('data')
+          .limit(limite + 5)
+          .snapshots()
+          .map(
+            (s) => s.docs
+                .map((d) => Evento.doMapa(d.id, d.data()))
+                .where((e) => !e.cancelado)
+                .take(limite)
+                .toList(),
+          );
 
   Future<void> salvarEvento(Evento e) => e.id.isEmpty
       ? _col('eventos').add(e.paraMapa())
@@ -326,11 +410,15 @@ class ConteudoRepository {
       _col('eventos').doc(id).update({'cancelado': cancelado});
 
   // ── Campanhas ───────────────────────────────────────────────────────
-  Stream<List<Campanha>> campanhas() => _col('campanhas').snapshots().map((s) {
-        final l = s.docs.map((d) => Campanha.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => b.dataInicio.compareTo(a.dataInicio));
-        return l;
-      });
+  Stream<Pagina<Campanha>> campanhas({int limite = limitePadrao}) =>
+      _limitada('campanhas', limite).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              Campanha.doMapa,
+              (a, b) => b.dataInicio.compareTo(a.dataInicio),
+            ),
+          );
 
   Future<void> salvarCampanha(Campanha c) => c.id.isEmpty
       ? _col('campanhas').add(c.paraMapa())
@@ -340,12 +428,16 @@ class ConteudoRepository {
       _col('campanhas').doc(id).update({'status': status});
 
   // ── Ministérios ─────────────────────────────────────────────────────
-  Stream<List<Ministerio>> ministerios() =>
-      _col('ministerios').snapshots().map((s) {
-        final l = s.docs.map((d) => Ministerio.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()));
-        return l;
-      });
+  Stream<Pagina<Ministerio>> ministerios({int limite = limitePadrao}) =>
+      _limitada('ministerios', limite).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              Ministerio.doMapa,
+              (a, b) =>
+                  a.nome.toLowerCase().compareTo(b.nome.toLowerCase()),
+            ),
+          );
 
   Future<void> salvarMinisterio(Ministerio m) => m.id.isEmpty
       ? _col('ministerios').add(m.paraMapa())
@@ -355,12 +447,15 @@ class ConteudoRepository {
       _col('ministerios').doc(id).update({'ativo': ativo});
 
   // ── Devocionais ─────────────────────────────────────────────────────
-  Stream<List<Devocional>> devocionais() =>
-      _col('devocionais').snapshots().map((s) {
-        final l = s.docs.map((d) => Devocional.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => b.data.compareTo(a.data));
-        return l;
-      });
+  Stream<Pagina<Devocional>> devocionais({int limite = limitePadrao}) =>
+      _limitada('devocionais', limite).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              Devocional.doMapa,
+              (a, b) => b.data.compareTo(a.data),
+            ),
+          );
 
   Future<void> salvarDevocional(Devocional d) => d.id.isEmpty
       ? _col('devocionais').add(d.paraMapa())
@@ -370,32 +465,39 @@ class ConteudoRepository {
       _col('devocionais').doc(id).update({'ativo': ativo});
 
   // ── Oração ──────────────────────────────────────────────────────────
-  /// Fila de moderação: públicos ainda não decididos.
-  Stream<List<PedidoOracao>> oracoesPendentes() => _col('pedidos_oracao')
+  Query<Map<String, dynamic>> _oracoes({required bool aprovado}) =>
+      _col('pedidos_oracao')
           .where('privado', isEqualTo: false)
-          .where('aprovado', isEqualTo: false)
-          .snapshots()
-          .map((s) {
-        final l = s.docs
+          .where('aprovado', isEqualTo: aprovado);
+
+  /// Fila de moderação: públicos ainda não decididos.
+  ///
+  /// `recusado` é filtrado no cliente de propósito: uma terceira igualdade
+  /// exigiria mais um índice composto para separar pedidos já recusados, que
+  /// são minoria dentro do teto da consulta.
+  Stream<Pagina<PedidoOracao>> oracoesPendentes({int limite = limitePadrao}) =>
+      _oracoes(aprovado: false).limit(limite + 1).snapshots().map((s) {
+        final truncada = s.docs.length > limite;
+        final itens = (truncada ? s.docs.take(limite) : s.docs)
             .map((d) => PedidoOracao.doMapa(d.id, d.data()))
             .where((p) => !p.recusado)
-            .toList();
-        l.sort((a, b) => (a.criadoEm ?? DateTime(0))
-            .compareTo(b.criadoEm ?? DateTime(0)));
-        return l;
+            .toList()
+          ..sort((a, b) =>
+              (a.criadoEm ?? DateTime(0)).compareTo(b.criadoEm ?? DateTime(0)));
+        return Pagina(itens: itens, truncada: truncada);
       });
 
   /// Mural: públicos aprovados.
-  Stream<List<PedidoOracao>> oracoesAprovadas() => _col('pedidos_oracao')
-          .where('privado', isEqualTo: false)
-          .where('aprovado', isEqualTo: true)
-          .snapshots()
-          .map((s) {
-        final l = s.docs.map((d) => PedidoOracao.doMapa(d.id, d.data())).toList();
-        l.sort((a, b) => (b.criadoEm ?? DateTime(0))
-            .compareTo(a.criadoEm ?? DateTime(0)));
-        return l;
-      });
+  Stream<Pagina<PedidoOracao>> oracoesAprovadas({int limite = limitePadrao}) =>
+      _oracoes(aprovado: true).limit(limite + 1).snapshots().map(
+            (s) => _paginar(
+              s,
+              limite,
+              PedidoOracao.doMapa,
+              (a, b) => (b.criadoEm ?? DateTime(0))
+                  .compareTo(a.criadoEm ?? DateTime(0)),
+            ),
+          );
 
   Future<void> aprovarOracao(String id, String moderadorUid) =>
       _col('pedidos_oracao').doc(id).update({

@@ -17,6 +17,22 @@
       ]
     },
     {
+      "collectionGroup": "pedidos_oracao",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "privado", "order": "ASCENDING" },
+        { "fieldPath": "aprovado", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "membros",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "perfil", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "transacoes",
       "queryScope": "COLLECTION",
       "fields": [

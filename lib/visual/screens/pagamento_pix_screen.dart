@@ -10,6 +10,7 @@ import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 /// PIX **manual e honesto**: mostra o QR Code e o "copia e cola" gerados a
 /// partir da chave pública da igreja. Não há confirmação automática — o
@@ -70,7 +71,7 @@ class PagamentoPixScreen extends StatelessWidget {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../visual_router.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 import 'home_screen.dart';
+import '../escala_tela.dart';
 
 /// Home do Visitante (usuário NÃO logado). Reaproveita a [HomeScreen] com
 /// saudação de visitante e a bottom navigation do visitante. Os atalhos que
@@ -15,7 +16,7 @@ class HomeVisitanteScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final scale = (constraints.maxWidth / 394).clamp(0.86, 1.0).toDouble();
+        final scale = (constraints.maxWidth / 394).clamp(escalaMinima, 1.0).toDouble();
         final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
         return Stack(

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/config/app_config.dart';
 import '../visual_router.dart';
+import '../escala_tela.dart';
 
 /// Menu "Mais" (☰) da Home — folha inferior on-brand com atalhos reais.
 ///
@@ -67,7 +68,7 @@ class _MaisMenuSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = (MediaQuery.sizeOf(context).width / 394)
-        .clamp(0.86, 1.0)
+        .clamp(escalaMinima, 1.0)
         .toDouble();
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 

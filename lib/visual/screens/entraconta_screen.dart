@@ -8,6 +8,7 @@ import '../../features/auth/providers/auth_controller.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class EntracontaScreen extends ConsumerStatefulWidget {
   const EntracontaScreen({super.key});
@@ -138,7 +139,7 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
         child: Builder(
           builder: (context) {
             final screen = MediaQuery.sizeOf(context);
-            final scale = (screen.width / 391).clamp(0.86, 1.0);
+            final scale = (screen.width / 391).clamp(escalaMinima, 1.0);
             final headerHeight = 287.0 * scale;
             final figmaCardHeight = 534.0 * scale;
             final remainingHeight = screen.height - headerHeight;
@@ -450,7 +451,7 @@ class _FormFieldBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final scale = (width / 391).clamp(0.86, 1.16);
+    final scale = (width / 391).clamp(escalaMinima, 1.16);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

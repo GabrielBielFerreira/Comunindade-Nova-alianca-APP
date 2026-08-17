@@ -7,6 +7,7 @@ import '../models/contribuicao_visual_model.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 enum _ContributionFilter { todos, aprovadas, pendentes, recusadas, canceladas }
 
@@ -108,7 +109,7 @@ class _HistoricoContribuicoesScreenState
               final scale =
                   (constraints.maxWidth /
                           HistoricoContribuicoesScreen._designWidth)
-                      .clamp(0.86, 1.0)
+                      .clamp(escalaMinima, 1.0)
                       .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

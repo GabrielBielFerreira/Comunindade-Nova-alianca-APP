@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../mock_data.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// Tela "Visualizar outra igreja" (membro e liderança — idêntica para ambos).
 ///
@@ -100,7 +101,7 @@ class _VisualizarOutraIgrejaScreenState
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -361,7 +362,7 @@ class _ChurchDetailsSheet extends StatelessWidget {
     final scale =
         (MediaQuery.sizeOf(context).width /
                 _VisualizarOutraIgrejaScreenState._designWidth)
-            .clamp(0.86, 1.0)
+            .clamp(escalaMinima, 1.0)
             .toDouble();
     final screenHeight = MediaQuery.sizeOf(context).height;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;

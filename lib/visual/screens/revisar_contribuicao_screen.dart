@@ -10,6 +10,7 @@ import '../widgets/leader_bottom_navigation.dart';
 import 'pagamento_boleto_screen.dart';
 import 'pagamento_cartao_screen.dart';
 import 'pagamento_pix_screen.dart';
+import '../escala_tela.dart';
 
 class RevisarContribuicaoScreen extends StatelessWidget {
   const RevisarContribuicaoScreen({
@@ -56,7 +57,7 @@ class RevisarContribuicaoScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

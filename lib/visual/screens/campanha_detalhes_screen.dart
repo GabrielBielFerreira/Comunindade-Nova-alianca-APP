@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../widgets/internal_header.dart';
 import '../widgets/motion.dart';
+import '../escala_tela.dart';
 
 /// Detalhes de uma campanha. O botão "Contribuir para esta campanha" retorna a
 /// campanha selecionada ([ContribuicaoCampaignData]) para a tela Contribuir,
@@ -44,7 +45,7 @@ class CampanhaDetalhesScreen extends StatelessWidget {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/igreja_info.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// "Ajuda" — tela interna (push) acessível pelo menu "Mais".
 ///
@@ -76,7 +77,7 @@ class AjudaScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

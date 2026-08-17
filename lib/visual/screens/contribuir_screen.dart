@@ -18,6 +18,7 @@ import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
 import '../widgets/motion.dart';
 import '../widgets/visitor_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class ContribuirScreen extends ConsumerStatefulWidget {
   const ContribuirScreen({
@@ -179,7 +180,7 @@ class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -343,7 +344,7 @@ class _EscolherMetodoPagamentoScreenState
             builder: (context, constraints) {
               final scale =
                   (constraints.maxWidth / _ContribuirScreenState._designWidth)
-                      .clamp(0.86, 1.0)
+                      .clamp(escalaMinima, 1.0)
                       .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

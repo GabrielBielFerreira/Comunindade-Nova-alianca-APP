@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../config/ambiente.dart';
+import 'conteudo_repository.dart' show Pagina;
 
 /// Um vínculo enriquecido com o nome da pessoa, para exibição em lista.
 class MembroPainel {
@@ -21,6 +22,25 @@ class MembroPainel {
   }
 }
 
+/// Contagens da unidade, obtidas por consulta agregada.
+///
+/// O dashboard NÃO baixa a coleção de membros para contar: `count()` roda no
+/// servidor e cobra uma fração da leitura, o que importa numa unidade com
+/// milhares de vínculos.
+class ContagemMembros {
+  const ContagemMembros({
+    required this.pendentes,
+    required this.aprovados,
+    required this.inativos,
+    required this.lideranca,
+  });
+
+  final int pendentes;
+  final int aprovados;
+  final int inativos;
+  final int lideranca;
+}
+
 /// Leitura de membros e mutações via Cloud Functions.
 ///
 /// Leituras vão direto ao Firestore (as Rules já restringem ao escopo da
@@ -37,6 +57,9 @@ class MembrosRepository {
   final FirebaseFirestore _db;
   final FirebaseFunctions _functions;
 
+  /// Teto da lista de gestão. A busca da tela filtra dentro desta página.
+  static const int limitePadrao = 300;
+
   CollectionReference<Map<String, dynamic>> _colecao(IgrejaId igrejaId) =>
       _db.collection('igrejas/${igrejaId.valor}/membros');
 
@@ -44,9 +67,18 @@ class MembrosRepository {
       valor is Timestamp ? valor.toDate() : (valor is DateTime ? valor : null);
 
   /// Membros da unidade. Ordenação no cliente para dispensar índice composto.
-  Stream<List<MembroPainel>> observar(IgrejaId igrejaId) {
-    return _colecao(igrejaId).snapshots().asyncMap((snap) async {
-      final membros = snap.docs.map((doc) {
+  ///
+  /// Limitada: uma unidade grande não pode fazer o painel baixar todos os
+  /// vínculos de uma vez. A tela informa quando a lista foi truncada.
+  Stream<Pagina<MembroPainel>> observar(
+    IgrejaId igrejaId, {
+    int limite = limitePadrao,
+  }) {
+    return _colecao(igrejaId).limit(limite + 1).snapshots().map((snap) {
+      final truncada = snap.docs.length > limite;
+      final docs = truncada ? snap.docs.take(limite) : snap.docs;
+
+      final membros = docs.map((doc) {
         return MembroPainel(
           vinculo: VinculoIgreja.doMapa(
             uid: doc.id,
@@ -57,12 +89,45 @@ class MembrosRepository {
           nome: doc.data()['nome'] as String?,
           email: doc.data()['email'] as String?,
         );
-      }).toList();
+      }).toList()
+        ..sort((a, b) =>
+            a.exibicao.toLowerCase().compareTo(b.exibicao.toLowerCase()));
 
-      membros.sort((a, b) =>
-          a.exibicao.toLowerCase().compareTo(b.exibicao.toLowerCase()));
-      return membros;
+      return Pagina(itens: membros, truncada: truncada);
     });
+  }
+
+  /// Contagens por consulta agregada — nenhum documento trafega.
+  Future<ContagemMembros> contar(IgrejaId igrejaId) async {
+    final col = _colecao(igrejaId);
+
+    Future<int> quantos(Query<Map<String, dynamic>> q) async =>
+        (await q.count().get()).count ?? 0;
+
+    // Disparadas em paralelo: são quatro idas independentes ao servidor.
+    final resultados = await Future.wait([
+      quantos(col.where('status', isEqualTo: StatusVinculo.pendente.valor)),
+      quantos(col.where('status', isEqualTo: StatusVinculo.aprovado.valor)),
+      quantos(col.where('status', isEqualTo: StatusVinculo.inativo.valor)),
+      quantos(
+        col
+            .where('status', isEqualTo: StatusVinculo.aprovado.valor)
+            .where(
+              'perfil',
+              whereIn: PerfilComunitario.values
+                  .where((p) => p.isLiderancaMinisterial)
+                  .map((p) => p.valor)
+                  .toList(),
+            ),
+      ),
+    ]);
+
+    return ContagemMembros(
+      pendentes: resultados[0],
+      aprovados: resultados[1],
+      inativos: resultados[2],
+      lideranca: resultados[3],
+    );
   }
 
   Future<void> _chamar(String nome, Map<String, dynamic> dados) async {

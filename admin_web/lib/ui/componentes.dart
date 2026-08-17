@@ -1,5 +1,100 @@
 import 'package:flutter/material.dart';
 
+/// Padding lateral proporcional à tela.
+///
+/// Em 320 px, 24 de cada lado consomem 15% da largura útil e apertam tabelas
+/// e cartões; em desktop, 24 é o respiro certo.
+double espacoDaLargura(BuildContext context) {
+  final largura = MediaQuery.sizeOf(context).width;
+  if (largura < 400) return 12;
+  if (largura < 700) return 16;
+  return 24;
+}
+
+/// Grade de cartões que se adapta à largura disponível.
+///
+/// Substitui `SizedBox(width: 240)` dentro de `Wrap`: uma largura fixa estoura
+/// (ou deixa buraco) conforme a tela. Aqui a largura da coluna é calculada a
+/// partir do espaço real.
+class GradeCartoes extends StatelessWidget {
+  const GradeCartoes({
+    super.key,
+    required this.children,
+    this.larguraMinima = 220,
+    this.espaco = 16,
+  });
+
+  final List<Widget> children;
+
+  /// Largura desejada por cartão. Com menos espaço que isto, vira uma coluna.
+  final double larguraMinima;
+  final double espaco;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final disponivel = constraints.maxWidth;
+
+        // Quantas colunas cabem sem espremer abaixo da largura mínima.
+        var colunas = ((disponivel + espaco) / (larguraMinima + espaco))
+            .floor()
+            .clamp(1, children.isEmpty ? 1 : children.length);
+
+        // Numa tela estreita, uma coluna inteira é melhor que duas apertadas.
+        if (disponivel < larguraMinima) colunas = 1;
+
+        final largura =
+            (disponivel - espaco * (colunas - 1)) / colunas;
+
+        return Wrap(
+          spacing: espaco,
+          runSpacing: espaco,
+          children: [
+            for (final filho in children)
+              // `max(0, ...)` protege contra largura negativa quando o pai
+              // ainda não tem restrição resolvida.
+              SizedBox(width: largura < 0 ? 0 : largura, child: filho),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Avisa que a consulta bateu no teto.
+///
+/// O painel nunca deixa o usuário achar que está vendo tudo: se existem mais
+/// registros que o limite, a tela diz.
+class AvisoListaTruncada extends StatelessWidget {
+  const AvisoListaTruncada({super.key, required this.exibidos});
+
+  final int exibidos;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.filter_list, size: 18),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Exibindo os primeiros $exibidos registros. Existem mais '
+                'nesta unidade — use a busca para encontrar um item '
+                'específico.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Estado vazio honesto: diz o que não existe, sem inventar conteúdo.
 class EstadoVazio extends StatelessWidget {
   const EstadoVazio({super.key, required this.titulo, this.detalhe, this.icone});
@@ -111,6 +206,7 @@ class CartaoMetrica extends StatelessWidget {
     this.detalhe,
     this.icone,
     this.destaque = false,
+    this.onTap,
   });
 
   final String rotulo;
@@ -119,42 +215,65 @@ class CartaoMetrica extends StatelessWidget {
   final IconData? icone;
   final bool destaque;
 
+  /// Quando informado, o cartão vira atalho para a tela correspondente.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
+
+    final conteudo = Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              if (icone != null) ...[
+                Icon(icone, size: 18, color: cores.outline),
+                const SizedBox(width: 6),
+              ],
+              Expanded(
+                // Com fonte ampliada (textScale 1.3) um rótulo longo passa de
+                // uma linha; sem isto, estoura a largura do cartão.
+                child: Text(
+                  rotulo,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(valor, style: Theme.of(context).textTheme.headlineSmall),
+          ),
+          if (detalhe != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              detalhe!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cores.outline),
+            ),
+          ],
+        ],
+      ),
+    );
+
     return Card(
       color: destaque ? cores.primaryContainer : null,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                if (icone != null) ...[
-                  Icon(icone, size: 18, color: cores.outline),
-                  const SizedBox(width: 6),
-                ],
-                Expanded(
-                  child: Text(rotulo,
-                      style: Theme.of(context).textTheme.labelLarge),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(valor, style: Theme.of(context).textTheme.headlineSmall),
-            if (detalhe != null) ...[
-              const SizedBox(height: 4),
-              Text(detalhe!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: cores.outline)),
-            ],
-          ],
-        ),
-      ),
+      clipBehavior: Clip.antiAlias,
+      child: onTap == null
+          ? conteudo
+          : InkWell(onTap: onTap, child: conteudo),
     );
   }
 }

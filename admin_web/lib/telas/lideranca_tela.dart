@@ -40,7 +40,8 @@ class LiderancaTela extends ConsumerWidget {
         erro: erro,
         onTentarNovamente: () => ref.invalidate(membrosProvider),
       ),
-      data: (todos) {
+      data: (pagina) {
+        final todos = pagina.itens;
         final aprovados =
             todos.where((m) => m.vinculo.status == StatusVinculo.aprovado).toList();
         final lideranca =

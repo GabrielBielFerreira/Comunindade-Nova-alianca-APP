@@ -19,6 +19,7 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
 import '../widgets/motion.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({
@@ -73,7 +74,7 @@ class HomeScreen extends ConsumerWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -316,7 +317,7 @@ class _HomeContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scale = (MediaQuery.sizeOf(context).width / HomeScreen._designWidth)
-        .clamp(0.86, 1.0)
+        .clamp(escalaMinima, 1.0)
         .toDouble();
 
     // Próximo culto: primeiro evento futuro do Firestore (sem horário fixo).

@@ -7,6 +7,7 @@ import '../../features/admin/providers/aprovacoes_providers.dart';
 import '../../features/oracao/providers/oracao_providers.dart';
 import '../visual_router.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class GestaoEntryScreen extends StatelessWidget {
   const GestaoEntryScreen({super.key});
@@ -38,7 +39,7 @@ class GestaoEntryScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

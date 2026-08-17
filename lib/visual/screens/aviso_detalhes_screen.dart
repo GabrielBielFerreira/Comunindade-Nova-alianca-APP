@@ -10,6 +10,7 @@ import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 /// Abre o mapa (Google Maps) no endereço da igreja.
 Future<void> _abrirMapaIgreja() async {
@@ -63,7 +64,7 @@ class AvisoDetalhesScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class SelectChurchScreen extends StatefulWidget {
   const SelectChurchScreen({super.key});
@@ -16,7 +17,7 @@ class SelectChurchScreen extends StatefulWidget {
   static double _scaleFor(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final effectiveWidth = math.min(width, _referenceWidth);
-    return (effectiveWidth / _referenceWidth).clamp(0.86, 1.0).toDouble();
+    return (effectiveWidth / _referenceWidth).clamp(escalaMinima, 1.0).toDouble();
   }
 
   @override

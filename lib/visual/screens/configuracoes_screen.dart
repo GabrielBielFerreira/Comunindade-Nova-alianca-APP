@@ -10,6 +10,7 @@ import '../../core/services/app_info.dart';
 import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// Tela de Configurações (membro e liderança — idêntica para ambos).
 ///
@@ -176,7 +177,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

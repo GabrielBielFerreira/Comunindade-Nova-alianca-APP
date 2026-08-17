@@ -29,6 +29,17 @@ class IgrejasRepository {
     });
   }
 
+  /// Uma unidade. `/igrejas/{id}` tem leitura pública nas Rules (o aplicativo
+  /// precisa listar unidades antes do login), então qualquer usuário do painel
+  /// consegue ler a configuração da unidade que administra.
+  Stream<IgrejaModel?> observarUma(IgrejaId igrejaId) {
+    return _db.doc('igrejas/${igrejaId.valor}').snapshots().map((d) {
+      final dados = d.data();
+      if (!d.exists || dados == null) return null;
+      return IgrejaModel.doMapa(id: d.id, dados: dados, lerData: lerData);
+    });
+  }
+
   Future<void> criar({required String igrejaId, required String nome}) async {
     await _functions.httpsCallable('criarIgreja').call({
       'igrejaId': igrejaId,

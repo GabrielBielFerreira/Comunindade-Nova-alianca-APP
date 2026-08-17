@@ -18,6 +18,7 @@ import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
 import '../widgets/motion.dart';
 import 'aviso_detalhes_screen.dart';
+import '../escala_tela.dart';
 
 /// Converte o aviso do Firestore no formato usado pelo card visual.
 AvisoData _avisoParaCard(AvisoModel m) {
@@ -150,7 +151,7 @@ class _AvisosScreenState extends ConsumerState<AvisosScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

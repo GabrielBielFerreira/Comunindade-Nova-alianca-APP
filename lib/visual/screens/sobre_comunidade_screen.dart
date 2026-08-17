@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/igreja_info.dart';
 import '../mock_data.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// "Sobre a Comunidade" — tela interna (push) acessível a membros e liderança
 /// pelo menu "Mais". Apresenta dados públicos reais da igreja ([IgrejaInfo]):
@@ -47,7 +48,7 @@ class SobreComunidadeScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

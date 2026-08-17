@@ -18,6 +18,7 @@ import '../widgets/mais_menu.dart';
 import '../widgets/oracao_bottom_navigation.dart';
 import 'oracao_novo_pedido_screen.dart';
 import 'oracao_pedido_urgente_screen.dart';
+import '../escala_tela.dart';
 
 /// Converte um pedido do Firestore no formato usado pelos cards visuais.
 OracaoRequestData _paraCard(PedidoOracaoModel p) => OracaoRequestData(
@@ -72,7 +73,7 @@ class _OracaoScreenState extends ConsumerState<OracaoScreen> {
       ),
       builder: (context) {
         final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-            .clamp(0.86, 1.0)
+            .clamp(escalaMinima, 1.0)
             .toDouble();
 
         return Padding(
@@ -143,7 +144,7 @@ class _OracaoScreenState extends ConsumerState<OracaoScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

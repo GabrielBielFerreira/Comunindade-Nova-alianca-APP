@@ -65,7 +65,8 @@ class MembrosTela extends ConsumerWidget {
               erro: erro,
               onTentarNovamente: () => ref.invalidate(membrosProvider),
             ),
-            data: (todos) {
+            data: (pagina) {
+              final todos = pagina.itens;
               final lista = filtro == null
                   ? todos
                   : todos.where((m) => m.vinculo.status == filtro).toList();
@@ -83,11 +84,15 @@ class MembrosTela extends ConsumerWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: lista.length,
+                padding: EdgeInsets.all(espacoDaLargura(context)),
+                itemCount: lista.length + (pagina.truncada ? 1 : 0),
                 separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, i) =>
-                    _LinhaMembro(membro: lista[i], podeAprovar: acesso.aprovarMembro),
+                itemBuilder: (context, i) => i >= lista.length
+                    ? AvisoListaTruncada(exibidos: lista.length)
+                    : _LinhaMembro(
+                        membro: lista[i],
+                        podeAprovar: acesso.aprovarMembro,
+                      ),
               );
             },
           ),

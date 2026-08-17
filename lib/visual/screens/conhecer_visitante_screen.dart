@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/igreja_info.dart';
 import '../mock_data.dart';
 import '../widgets/visitor_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 /// Tela "Conhecer" do visitante (Sobre nós).
 ///
@@ -42,7 +43,7 @@ class ConhecerVisitanteScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
