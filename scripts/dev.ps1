@@ -100,7 +100,11 @@ while ((Get-Date) -lt $limite) {
     try { $null = Invoke-WebRequest "http://127.0.0.1:9099/" -UseBasicParsing -TimeoutSec 3; $authOk = $true } catch {}
   }
   if (-not $fnOk) {
-    $fnOk = [bool](Get-NetTCPConnection -LocalPort 5001 -State Listen -ErrorAction SilentlyContinue)
+    # Em alguns ambientes isolados do Windows, Get-NetTCPConnection nao enxerga
+    # listeners iniciados pelo processo filho, mesmo com o endpoint acessivel.
+    # Uma resposta HTTP (inclusive 404 na raiz) comprova que o emulador iniciou.
+    try { $null = Invoke-WebRequest "http://127.0.0.1:5001/" -UseBasicParsing -TimeoutSec 3; $fnOk = $true }
+    catch { if ($_.Exception.Response) { $fnOk = $true } }
   }
   if ($fsOk -and $authOk -and $fnOk) { break }
   if ($emulador.HasExited) { throw "Os emuladores encerraram inesperadamente." }
