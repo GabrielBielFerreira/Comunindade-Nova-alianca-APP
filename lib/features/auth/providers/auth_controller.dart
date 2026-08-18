@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/fcm_service.dart';
 import '../data/auth_service.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
 import '../data/usuario_model.dart';
 import 'auth_provider.dart';
 
@@ -21,11 +23,14 @@ class AuthActions {
     return _auth.login(email, senha);
   }
 
+  /// Cadastro vinculado a uma unidade. Sem igreja nao ha vinculo, e sem
+  /// vinculo o cadastro nao aparece para nenhuma lideranca aprovar.
   Future<void> cadastrar({
     required String nome,
     required String email,
     required String telefone,
     required String senha,
+    required IgrejaId igrejaId,
     QualificacaoUsuario? qualificacao,
   }) {
     return _auth.cadastrar(
@@ -33,6 +38,7 @@ class AuthActions {
       senha: senha,
       nome: nome,
       telefone: telefone,
+      igrejaId: igrejaId,
       qualificacao: qualificacao,
     );
   }
@@ -48,8 +54,11 @@ class AuthActions {
   Future<void> definirSenha(String senha) => _auth.definirSenha(senha);
 
   /// Retorna `false` se o usuário cancelar o fluxo do Google (sem erro).
-  Future<bool> entrarComGoogle() async {
-    final cred = await _auth.entrarComGoogle();
+  /// [igrejaId] so e usado no PRIMEIRO acesso; nos seguintes e ignorado.
+  /// Sem ele, um primeiro acesso lanca [IgrejaObrigatoriaNoCadastro] e a tela
+  /// leva o usuario a escolher a unidade antes de concluir.
+  Future<bool> entrarComGoogle({IgrejaId? igrejaId}) async {
+    final cred = await _auth.entrarComGoogle(igrejaId: igrejaId);
     return cred != null;
   }
 

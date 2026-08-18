@@ -216,3 +216,52 @@ class UsuarioModel {
     );
   }
 }
+
+/// Mapa de CRIAÇÃO de `usuarios/{uid}`.
+///
+/// As Rules restringem o create a um conjunto fechado de chaves
+/// (`hasOnly([...])` em `match /usuarios/{uid}`). O [UsuarioModel.toMap]
+/// escreve `uid`, `perfil`, `status`, `data_cadastro` e outros campos que NÃO
+/// estão nessa lista — usá-lo no cadastro faz o Firestore recusar a escrita em
+/// produção.
+///
+/// Autorização não mora mais aqui: `perfil` e `status` pertencem ao vínculo
+/// `igrejas/{igrejaId}/membros/{uid}`. Este documento guarda só identidade.
+Map<String, dynamic> mapaDeCriacaoUsuario({
+  required String nome,
+  required String email,
+  required String telefone,
+  required String igrejaPrincipalId,
+  String? fotoUrl,
+  DateTime? dataNascimento,
+  Map<String, dynamic>? dadosPessoais,
+}) {
+  return <String, dynamic>{
+    'nome': nome,
+    'email': email,
+    'telefone': telefone,
+    'foto_url': ?fotoUrl,
+    if (dataNascimento != null)
+      'data_nascimento': Timestamp.fromDate(dataNascimento),
+    'igreja_principal_id': igrejaPrincipalId,
+    'criado_em': FieldValue.serverTimestamp(),
+    'atualizado_em': FieldValue.serverTimestamp(),
+    'dados_pessoais': ?dadosPessoais,
+  };
+}
+
+/// Chaves aceitas pelas Rules no create de `usuarios/{uid}`.
+///
+/// Espelha `firestore.rules`. Existe para que um teste detecte a divergência
+/// antes de ela virar "cadastro recusado em producao".
+const chavesPermitidasCriacaoUsuario = <String>{
+  'nome',
+  'email',
+  'telefone',
+  'foto_url',
+  'data_nascimento',
+  'igreja_principal_id',
+  'criado_em',
+  'atualizado_em',
+  'dados_pessoais',
+};

@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../features/igrejas/data/igreja_opcao.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/internal_header.dart';
@@ -11,29 +15,27 @@ import '../escala_tela.dart';
 
 /// Tela "Visualizar outra igreja" (membro e liderança — idêntica para ambos).
 ///
-/// Tela interna (push), sem bottom navigation. Dados simulados.
-class VisualizarOutraIgrejaScreen extends StatefulWidget {
+/// Tela interna (push), sem bottom navigation.
+///
+/// A lista vem de `igrejasAtivasProvider` — não de constante. Confirmar grava
+/// um [IgrejaId] em `igrejaVisualizadaProvider`, o que recria
+/// `igrejaScopeProvider` e faz TODO o conteúdo do aplicativo (home, avisos,
+/// programação, campanhas, ministérios, devocionais, oração, contribuição)
+/// passar a ler da unidade escolhida.
+///
+/// Visualizar NÃO transfere vínculo nem permissão: na unidade visitada
+/// `vinculoAtualProvider` fica nulo, e é isso que mantém o conteúdo restrito
+/// fechado e as ações de liderança indisponíveis.
+class VisualizarOutraIgrejaScreen extends ConsumerStatefulWidget {
   const VisualizarOutraIgrejaScreen({super.key});
 
-  static const churches = <ChurchOptionData>[
-    ChurchOptionData(
-      name: 'Nova Aliança Olinda',
-      address:
-          'Av. Leopoldino Canuto de Melo, 846 - Caixa D\'Água, Olinda - PE, 53210-250',
-    ),
-    ChurchOptionData(
-      name: 'Nova Aliança Petrolina',
-      address: 'Rua 47, número 180 - São Gonçalo',
-    ),
-  ];
-
   @override
-  State<VisualizarOutraIgrejaScreen> createState() =>
+  ConsumerState<VisualizarOutraIgrejaScreen> createState() =>
       _VisualizarOutraIgrejaScreenState();
 }
 
 class _VisualizarOutraIgrejaScreenState
-    extends State<VisualizarOutraIgrejaScreen> {
+    extends ConsumerState<VisualizarOutraIgrejaScreen> {
   static const _designWidth = 394.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -51,39 +53,39 @@ class _VisualizarOutraIgrejaScreenState
     super.dispose();
   }
 
-  List<ChurchOptionData> get _filteredChurches {
+  List<IgrejaOpcao> _filtrar(List<IgrejaOpcao> todas) {
     final query = _query.trim().toLowerCase();
-    if (query.isEmpty) {
-      return VisualizarOutraIgrejaScreen.churches;
-    }
-    return VisualizarOutraIgrejaScreen.churches
-        .where(
-          (church) =>
-              church.name.toLowerCase().contains(query) ||
-              church.address.toLowerCase().contains(query),
-        )
+    if (query.isEmpty) return todas;
+    return todas
+        .where((church) => church.buscavel.toLowerCase().contains(query))
         .toList();
   }
 
-  /// Abre o bottom sheet de confirmação. Ao confirmar, fecha o sheet com o
-  /// nome da igreja e devolve esse nome para a tela de Configurações.
-  Future<void> _showChurchDetails(ChurchOptionData church) async {
-    final selectedName = await showModalBottomSheet<String>(
+  /// Abre o bottom sheet de confirmação. Ao confirmar, define a unidade
+  /// VISUALIZADA e devolve o nome apenas para a mensagem da tela anterior.
+  ///
+  /// O que muda o aplicativo é a gravação do [IgrejaId] no provider — o nome
+  /// devolvido é texto de interface, não contexto de dados.
+  Future<void> _showChurchDetails(IgrejaOpcao church) async {
+    final confirmou = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black.withValues(alpha: 0.48),
       isScrollControlled: true,
       builder: (sheetContext) => _ChurchDetailsSheet(
         church: church,
-        onConfirm: () => Navigator.of(sheetContext).pop(church.name),
+        onConfirm: () => Navigator.of(sheetContext).pop(true),
       ),
     );
 
-    if (selectedName != null && mounted) {
-      Navigator.of(context).pop(selectedName);
-    }
-  }
+    if (confirmou != true || !mounted) return;
 
+    await ref
+        .read(igrejaVisualizadaProvider.notifier)
+        .definir(church.id);
+
+    if (mounted) Navigator.of(context).pop(church.nome);
+  }
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -105,7 +107,18 @@ class _VisualizarOutraIgrejaScreenState
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
-              final churches = _filteredChurches;
+              // Só unidades ativas, e sem a própria: "visualizar outra" não
+              // faz sentido oferecendo a igreja em que a pessoa já está.
+              final atual = ref.watch(igrejaAtualProvider);
+              final igrejasAsync = ref.watch(igrejasAtivasProvider);
+              final churches = _filtrar(
+                (igrejasAsync.valueOrNull ?? const [])
+                    .where((i) => i.id != atual)
+                    .map(IgrejaOpcao.de)
+                    .toList(growable: false),
+              );
+              final carregando = igrejasAsync.isLoading;
+              final falhou = igrejasAsync.hasError;
 
               return Column(
                 children: [
@@ -137,14 +150,24 @@ class _VisualizarOutraIgrejaScreenState
                           SizedBox(height: 12 * scale),
                           _InfoCard(scale: scale),
                           SizedBox(height: 20 * scale),
-                          if (churches.isEmpty)
+                          if (carregando)
+                            Padding(
+                              padding:
+                                  EdgeInsets.symmetric(vertical: 32 * scale),
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            )
+                          else if (churches.isEmpty)
                             Padding(
                               padding: EdgeInsets.symmetric(
                                 vertical: 32 * scale,
                               ),
                               child: Center(
                                 child: Text(
-                                  'Nenhuma igreja encontrada',
+                                  falhou
+                                      ? 'Não foi possível carregar as igrejas'
+                                      : 'Nenhuma outra igreja disponível',
                                   style: GoogleFonts.inter(
                                     fontSize: 14 * scale,
                                     fontWeight: FontWeight.w400,
@@ -290,7 +313,7 @@ class _ChurchCard extends StatelessWidget {
   });
 
   final double scale;
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final VoidCallback onTap;
 
   @override
@@ -314,7 +337,7 @@ class _ChurchCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      church.name,
+                      church.nome,
                       style: GoogleFonts.montserrat(
                         fontSize: 16 * scale,
                         fontWeight: FontWeight.w600,
@@ -324,7 +347,7 @@ class _ChurchCard extends StatelessWidget {
                     ),
                     SizedBox(height: 4 * scale),
                     Text(
-                      church.address,
+                      church.endereco,
                       style: GoogleFonts.inter(
                         fontSize: 13 * scale,
                         fontWeight: FontWeight.w400,
@@ -354,7 +377,7 @@ class _ChurchCard extends StatelessWidget {
 class _ChurchDetailsSheet extends StatelessWidget {
   const _ChurchDetailsSheet({required this.church, required this.onConfirm});
 
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final VoidCallback onConfirm;
 
   @override
@@ -472,7 +495,7 @@ class _SheetHeader extends StatelessWidget {
 class _ChurchInfoRow extends StatelessWidget {
   const _ChurchInfoRow({required this.church, required this.scale});
 
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final double scale;
 
   @override
@@ -501,7 +524,7 @@ class _ChurchInfoRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                church.name,
+                church.nome,
                 style: GoogleFonts.montserrat(
                   fontSize: 20 * scale,
                   fontWeight: FontWeight.w600,
@@ -511,7 +534,7 @@ class _ChurchInfoRow extends StatelessWidget {
               ),
               SizedBox(height: 8 * scale),
               Text(
-                church.address,
+                church.endereco,
                 style: GoogleFonts.inter(
                   fontSize: 16 * scale,
                   fontWeight: FontWeight.w400,

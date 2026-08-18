@@ -104,17 +104,36 @@ const IGREJAS = [
   },
   {
     id: "petrolina",
-    nome: "Nova Aliança Petrolina",
-    // Entra INATIVA e NÃO CONFIGURADA: os dados oficiais ainda não foram
-    // confirmados pelo responsável e não serão inventados aqui.
-    ativa: false,
+    nome: "Comunidade Nova Aliança Petrolina",
+    slug: "petrolina",
+    // Ativa para permitir o teste de cadastro e de troca de igreja no
+    // emulador. Segue `configurada: false`: os dados abaixo sao PUBLICOS
+    // (perfil oficial no Instagram/YouTube), nao dados administrativos
+    // confirmados pelo responsavel da unidade.
+    ativa: true,
     configurada: false,
     dados_institucionais: {
+      // DIVERGENCIA NAO RESOLVIDA: a bio atual do perfil oficial cita Jose
+      // Assis e Glayce Carvalho; o post institucional da rede identifica a
+      // "Sede Petrolina" com Pr. Antonio e Missionaria Zelia. Pode ser outra
+      // congregacao, mudanca de lideranca ou distincao entre pastor local e
+      // responsavel da sede.
+      //
+      // Por isso pastor_responsavel fica NULO e nenhum nome e eleito. A lista
+      // publica abaixo NAO concede acesso administrativo: quem administra e
+      // definido por vinculo/UID.
       pastor_responsavel: null,
-      endereco: null,
-      cidade_estado: null,
+      pastores_publicos: [],
+      responsavel_administrativo_uid: null,
+      slogan: "Uma família para pertencer",
+      endereco: "Rua 47, número 180 — São Gonçalo",
+      endereco_secundario: "Rua Tomaz Maia, número 255",
+      cidade_estado: "Petrolina — PE",
+      instagram: "@cna.petrolina_",
+      youtube_url: "https://www.youtube.com/@comunidadenovaalianca547",
+      cultos_recorrentes: ["Quinta-feira às 19h30", "Domingo às 18h"],
+      // Nao encontrados publicamente — continuam vazios ate o pastor informar.
       cep: null,
-      instagram: null,
       pix_chave: null,
       pix_tipo: null,
       telefone: null,

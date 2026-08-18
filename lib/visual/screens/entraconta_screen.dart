@@ -4,7 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/data/auth_error.dart';
+import '../../features/auth/data/auth_service.dart';
 import '../../features/auth/providers/auth_controller.dart';
+import '../../features/igrejas/providers/escolha_igreja_provider.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
@@ -112,11 +114,22 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
-      final ok = await ref.read(authActionsProvider).entrarComGoogle();
+      // No PRIMEIRO acesso o cadastro precisa de uma unidade; nos seguintes o
+      // valor e ignorado pelo servico.
+      final ok = await ref.read(authActionsProvider).entrarComGoogle(
+            igrejaId: ref.read(igrejaEscolhidaCadastroProvider),
+          );
       // Sucesso: o RootGate reage à sessão; voltamos à raiz. Cancelamento
       // (ok == false) não faz nada.
       if (ok && mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on IgrejaObrigatoriaNoCadastro {
+      // Primeiro acesso sem igreja: leva a pessoa para escolher em vez de
+      // deixar a conta autenticada sem vinculo nenhum.
+      if (mounted) {
+        _showMessage('Escolha sua igreja para concluir o cadastro.');
+        Navigator.of(context).pushNamed(VisualRoutes.selectChurch);
       }
     } catch (e) {
       if (mounted) _showMessage(mensagemErroAuth(e));
