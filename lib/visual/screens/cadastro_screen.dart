@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../../features/auth/data/auth_error.dart';
 import '../../features/auth/providers/auth_controller.dart';
@@ -10,6 +11,7 @@ import '../../features/igrejas/providers/escolha_igreja_provider.dart';
 import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/auth_widgets.dart';
 
 class CadastroScreen extends ConsumerStatefulWidget {
@@ -41,6 +43,21 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
   bool _isValidEmail(String value) {
     final email = value.trim();
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+  }
+
+  /// Abre a seleção no modo cadastro.
+  ///
+  /// Esta tela permanece VIVA na pilha, então os campos já digitados são
+  /// preservados — a seleção volta por `pop`, sem reconstruir o formulário.
+  Future<void> _abrirSelecaoDeIgreja() async {
+    await Navigator.of(context).push<IgrejaId>(
+      MaterialPageRoute(
+        builder: (_) =>
+            const SelectChurchScreen(modo: ModoSelecaoIgreja.cadastro),
+      ),
+    );
+    // O valor escolhido já foi gravado no provider pela própria seleção; não
+    // é preciso nada aqui além de deixar a tela reconstruir.
   }
 
   void _showMessage(String message) {
@@ -80,7 +97,7 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
     final igrejaId = ref.read(igrejaEscolhidaCadastroProvider);
     if (igrejaId == null) {
       _showMessage('Escolha sua igreja para concluir o cadastro.');
-      Navigator.of(context).pushNamed(VisualRoutes.selectChurch);
+      _abrirSelecaoDeIgreja();
       return;
     }
 
@@ -421,7 +438,13 @@ class _IgrejaEscolhida extends ConsumerWidget {
             ),
             TextButton(
               onPressed: () => Navigator.of(context)
-                  .pushNamed(VisualRoutes.selectChurch),
+                  .push<IgrejaId>(
+                        MaterialPageRoute(
+                          builder: (_) => const SelectChurchScreen(
+                            modo: ModoSelecaoIgreja.cadastro,
+                          ),
+                        ),
+                      ),
               child: Text(semIgreja ? 'Escolher' : 'Trocar'),
             ),
           ],

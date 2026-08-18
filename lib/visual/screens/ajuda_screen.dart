@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants/igreja_info.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../widgets/internal_header.dart';
 import '../escala_tela.dart';
 
@@ -11,7 +14,7 @@ import '../escala_tela.dart';
 ///
 /// Perguntas frequentes honestas sobre os recursos reais do app e formas de
 /// contato reais (Instagram e e-mail da igreja). Nada aqui é simulado.
-class AjudaScreen extends StatelessWidget {
+class AjudaScreen extends ConsumerWidget {
   const AjudaScreen({super.key});
 
   static const _designWidth = 394.0;
@@ -61,7 +64,9 @@ class AjudaScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final igreja = ref.watch(igrejaAtualDadosProvider).valueOrNull;
+    final mapaUrl = igreja?.mapaUrl;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -132,35 +137,53 @@ class AjudaScreen extends StatelessWidget {
                           SizedBox(height: 28 * scale),
                           _SectionTitle('Fale com a gente', scale: scale),
                           SizedBox(height: 12 * scale),
-                          _ContatoTile(
-                            scale: scale,
-                            icon: Icons.camera_alt_outlined,
-                            title: 'Instagram',
-                            subtitle: IgrejaInfo.instagram,
-                            onTap: () => _abrir(IgrejaInfo.instagramUrl),
-                          ),
-                          SizedBox(height: 10 * scale),
-                          _ContatoTile(
-                            scale: scale,
-                            icon: Icons.email_outlined,
-                            title: 'E-mail',
-                            subtitle: IgrejaInfo.pixChave,
-                            onTap: () => _abrir(
-                              'mailto:${IgrejaInfo.pixChave}'
-                              '?subject=${Uri.encodeComponent('Ajuda — App ${IgrejaInfo.sigla}')}',
+                          // Contatos da UNIDADE EM FOCO. Cada item só aparece
+                          // quando a igreja tem aquele dado cadastrado — nunca
+                          // cai no contato de Olinda como padrão.
+                          if (igreja?.instagram != null) ...[
+                            _ContatoTile(
+                              scale: scale,
+                              icon: Icons.camera_alt_outlined,
+                              title: 'Instagram',
+                              subtitle: igreja!.instagram!,
+                              onTap: () => _abrir(
+                                'https://instagram.com/'
+                                '${igreja.instagram!.replaceAll('@', '')}',
+                              ),
                             ),
-                          ),
-                          SizedBox(height: 10 * scale),
-                          _ContatoTile(
-                            scale: scale,
-                            icon: Icons.location_on_outlined,
-                            title: 'Endereço',
-                            subtitle: IgrejaInfo.endereco,
-                            onTap: () => _abrir(
-                              'https://www.google.com/maps/search/?api=1&query='
-                              '${Uri.encodeComponent(IgrejaInfo.endereco)}',
+                            SizedBox(height: 10 * scale),
+                          ],
+                          if (igreja?.telefone != null) ...[
+                            _ContatoTile(
+                              scale: scale,
+                              icon: Icons.phone_outlined,
+                              title: 'Telefone',
+                              subtitle: igreja!.telefone!,
+                              onTap: () => _abrir('tel:${igreja.telefone}'),
                             ),
-                          ),
+                            SizedBox(height: 10 * scale),
+                          ],
+                          if (mapaUrl != null) ...[
+                            _ContatoTile(
+                              scale: scale,
+                              icon: Icons.location_on_outlined,
+                              title: 'Endereço',
+                              subtitle: igreja!.endereco!,
+                              onTap: () => _abrir(mapaUrl),
+                            ),
+                            SizedBox(height: 10 * scale),
+                          ],
+                          if (igreja?.instagram == null &&
+                              igreja?.telefone == null &&
+                              mapaUrl == null)
+                            Text(
+                              'Esta igreja ainda não cadastrou canais de '
+                              'contato no aplicativo.',
+                              style: GoogleFonts.inter(
+                                fontSize: 13 * scale,
+                                color: const Color(0xFF6B7280),
+                              ),
+                            ),
                         ],
                       ),
                     ),

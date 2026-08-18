@@ -11,6 +11,7 @@ import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../core/services/app_info.dart';
 import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/internal_header.dart';
 import '../escala_tela.dart';
 
@@ -71,9 +72,12 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
   Future<void> _openChurchSelection() async {
     // A tela de seleção grava o IgrejaId em igrejaVisualizadaProvider; aqui
     // só confirmamos para a pessoa o que passou a ser exibido.
-    final result = await Navigator.pushNamed(
+    final result = await Navigator.push<String>(
       context,
-      VisualRoutes.visualizarOutraIgreja,
+      MaterialPageRoute(
+        builder: (_) =>
+            const SelectChurchScreen(modo: ModoSelecaoIgreja.troca),
+      ),
     );
 
     if (result is String && mounted) {
@@ -106,13 +110,16 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
     switch (label) {
       case 'Compartilhar este aplicativo':
         Share.share(
-          'Conheça o app da ${IgrejaInfo.nome}. Baixe e participe: '
-          '${IgrejaInfo.instagramUrl}',
+          // Convite para a UNIDADE em foco, com o Instagram dela quando houver.
+          [
+            'Conheça o app da ${ref.read(nomeIgrejaEmFocoProvider)}.',
+            ?ref.read(igrejaAtualDadosProvider).valueOrNull?.instagram,
+          ].join(' '),
         );
       case 'Sobre o desenvolvedor':
         _showInfoDialog(
           'Sobre',
-          'App ${IgrejaInfo.nome} (${IgrejaInfo.sigla}).\n\n'
+          'App ${RedeNovaAlianca.nome} (${RedeNovaAlianca.sigla}).\n\n'
               '${_appVersao.isEmpty ? 'Versão do aplicativo' : 'Versão $_appVersao'}.\n\n'
               'Desenvolvido para uso da comunidade.',
         );
@@ -123,15 +130,15 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
               'organização da comunidade, e não são compartilhados com '
               'terceiros para fins comerciais. Para detalhes ou solicitações '
               'sobre seus dados, fale com a liderança pelo e-mail '
-              '${IgrejaInfo.pixChave}.',
+              '${RedeNovaAlianca.suporteEmail}.',
         );
       case 'Termos de serviço':
         _showInfoDialog(
           'Termos de serviço',
           'Ao usar este aplicativo, você concorda em utilizá-lo para os fins '
               'da comunidade, respeitando os demais membros. O conteúdo é de '
-              'uso interno da ${IgrejaInfo.nome}. Dúvidas: '
-              '${IgrejaInfo.pixChave}.',
+              'uso interno da ${RedeNovaAlianca.nome}. Dúvidas: '
+              '${RedeNovaAlianca.suporteEmail}.',
         );
     }
   }
@@ -160,7 +167,7 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
         content: Text(
           'A exclusão da conta é feita pela liderança, mediante solicitação, '
           'para preservar os registros da comunidade. Deseja enviar um pedido '
-          'de exclusão por e-mail para ${IgrejaInfo.pixChave}?',
+          'de exclusão por e-mail para ${RedeNovaAlianca.suporteEmail}?',
         ),
         actions: [
           TextButton(
@@ -177,7 +184,7 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
 
     if (confirmar != true) return;
     final uri = Uri.parse(
-      'mailto:${IgrejaInfo.pixChave}'
+      'mailto:${RedeNovaAlianca.suporteEmail}'
       '?subject=${Uri.encodeComponent('Pedido de exclusão de conta')}'
       '&body=${Uri.encodeComponent('Olá, gostaria de solicitar a exclusão da minha conta no app.')}',
     );

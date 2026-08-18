@@ -19,10 +19,38 @@ import '../escala_tela.dart';
 /// unidades cadastradas pelo superadministrador aparecem aqui sem publicar
 /// versão nova do aplicativo. Só unidades ATIVAS entram.
 ///
-/// Confirmar grava um [IgrejaId] em `igrejaEscolhidaCadastroProvider`; é esse
-/// id — nunca o nome — que o cadastro usa para criar o vínculo.
+/// A mesma tela serve a quatro contextos — ver [ModoSelecaoIgreja].
+
+/// Contexto em que a seleção de igreja foi aberta.
+///
+/// O que muda entre os modos é O QUE SE FAZ com a escolha e PARA ONDE se vai
+/// depois. A lista e o visual são idênticos.
+enum ModoSelecaoIgreja {
+  /// Primeira abertura do aplicativo, sem sessão.
+  ///
+  /// Define a unidade pública em foco (o visitante passa a ver o conteúdo
+  /// dela) e também a pré-seleção do cadastro. Segue para "Bem-vindo"
+  /// SUBSTITUINDO a rota, para não empilhar a seleção atrás do Welcome.
+  onboarding,
+
+  /// Aberta a partir do formulário de cadastro.
+  ///
+  /// Só define a igreja do cadastro e VOLTA para o formulário, preservando o
+  /// que a pessoa já digitou. Mandar para o Welcome aqui perderia o
+  /// preenchimento.
+  cadastro,
+
+  /// Troca de unidade dentro do aplicativo, com sessão ativa.
+  ///
+  /// Define apenas a unidade visualizada. Não altera `igreja_principal_id`,
+  /// vínculo, perfil ou funções.
+  troca,
+}
+
 class SelectChurchScreen extends ConsumerStatefulWidget {
-  const SelectChurchScreen({super.key});
+  const SelectChurchScreen({super.key, this.modo = ModoSelecaoIgreja.onboarding});
+
+  final ModoSelecaoIgreja modo;
 
   static const _referenceWidth = 390.0;
 
@@ -171,15 +199,51 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
     );
   }
 
-  /// Confirma a escolha guardando o [IgrejaId] — não o nome — e segue para o
-  /// acesso. O cadastro adiante usa exatamente esse id para criar o vínculo.
+  /// Aplica a escolha conforme o modo.
+  ///
+  /// Em todos os casos o que é gravado é o [IgrejaId]; o nome nunca vira
+  /// chave de escopo.
   Future<void> _confirmar(IgrejaOpcao church) async {
-    await ref
-        .read(igrejaEscolhidaCadastroProvider.notifier)
-        .definir(church.id);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    Navigator.of(context).pushNamed(VisualRoutes.welcomeAccess);
+    switch (widget.modo) {
+      case ModoSelecaoIgreja.onboarding:
+        // A unidade pública passa a ser o contexto do visitante...
+        await ref.read(igrejaVisualizadaProvider.notifier).definir(church.id);
+        // ...e já fica pré-selecionada se a pessoa decidir se cadastrar.
+        await ref
+            .read(igrejaEscolhidaCadastroProvider.notifier)
+            .definir(church.id);
+
+        if (!mounted) return;
+        // Fecha o bottom sheet.
+        Navigator.of(context).pop();
+        if (!mounted) return;
+        // `pushReplacement` para a seleção não ficar empilhada atrás do
+        // Welcome — voltar dali levaria a uma tela já resolvida.
+        Navigator.of(context)
+            .pushReplacementNamed(VisualRoutes.welcomeAccess);
+
+      case ModoSelecaoIgreja.cadastro:
+        // Só a escolha do cadastro. NÃO mexe na unidade visualizada: o
+        // formulário está no meio do preenchimento e trocar o escopo agora
+        // recarregaria a tela por baixo.
+        await ref
+            .read(igrejaEscolhidaCadastroProvider.notifier)
+            .definir(church.id);
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // fecha o sheet
+        if (!mounted) return;
+        // Volta ao MESMO CadastroScreen, preservando o que já foi digitado.
+        Navigator.of(context).pop(church.id);
+
+      case ModoSelecaoIgreja.troca:
+        await ref.read(igrejaVisualizadaProvider.notifier).definir(church.id);
+
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        if (!mounted) return;
+        Navigator.of(context).pop(church.nome);
+    }
   }
 
   void _showChurchDetails(BuildContext context, IgrejaOpcao church) {

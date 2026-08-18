@@ -50,3 +50,22 @@ class IgrejaInfo {
   // ID do documento único da coleção igreja no Firestore
   static const String firestoreDocId = 'principal';
 }
+
+/// Identidade da REDE Nova Aliança — o que não varia por unidade.
+///
+/// Separado de [IgrejaInfo] de propósito: aqui ficam apenas dados
+/// institucionais da rede/produto. Nome, endereço, Instagram, PIX e
+/// programação de uma congregação específica vivem em `igrejas/{igrejaId}`.
+class RedeNovaAlianca {
+  RedeNovaAlianca._();
+
+  static const String nome = 'Comunidade Nova Aliança';
+  static const String sigla = 'CNA';
+
+  /// Contato de suporte do aplicativo (privacidade, exclusão de conta, ajuda).
+  ///
+  /// Antes as telas usavam `IgrejaInfo.pixChave` para isto — a chave PIX de
+  /// Olinda servindo de e-mail. Além de errado semanticamente, virava contato
+  /// de Olinda para quem estava visualizando outra unidade.
+  static const String suporteEmail = 'cnarecife01@gmail.com';
+}

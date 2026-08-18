@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants/igreja_info.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../core/services/reminder_service.dart';
 import '../../core/utils/formatters.dart';
 import '../mock/programacao_mock_data.dart';
@@ -13,7 +14,7 @@ import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/programacao_bottom_navigation.dart';
 import '../escala_tela.dart';
 
-class ProgramacaoDetalhesScreen extends StatefulWidget {
+class ProgramacaoDetalhesScreen extends ConsumerStatefulWidget {
   const ProgramacaoDetalhesScreen({
     super.key,
     required this.details,
@@ -24,11 +25,11 @@ class ProgramacaoDetalhesScreen extends StatefulWidget {
   final bool isLeader;
 
   @override
-  State<ProgramacaoDetalhesScreen> createState() =>
+  ConsumerState<ProgramacaoDetalhesScreen> createState() =>
       _ProgramacaoDetalhesScreenState();
 }
 
-class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
+class _ProgramacaoDetalhesScreenState extends ConsumerState<ProgramacaoDetalhesScreen> {
   static const _designWidth = 394.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -96,7 +97,9 @@ class _ProgramacaoDetalhesScreenState extends State<ProgramacaoDetalhesScreen> {
         ? widget.details.address
         : (widget.details.locationName.trim().isNotEmpty
             ? widget.details.locationName
-            : IgrejaInfo.endereco);
+            : (ref.read(igrejaAtualDadosProvider).valueOrNull?.endereco ?? ''));
+    // Sem endereco no evento nem na unidade em foco, nao abre mapa nenhum.
+    if (endereco.trim().isEmpty) return;
     final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(endereco)}',
     );

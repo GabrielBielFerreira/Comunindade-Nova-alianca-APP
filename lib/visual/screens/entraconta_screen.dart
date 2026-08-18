@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/data/auth_error.dart';
@@ -9,6 +10,7 @@ import '../../features/auth/providers/auth_controller.dart';
 import '../../features/igrejas/providers/escolha_igreja_provider.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/auth_widgets.dart';
 import '../escala_tela.dart';
 
@@ -129,7 +131,12 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
       // deixar a conta autenticada sem vinculo nenhum.
       if (mounted) {
         _showMessage('Escolha sua igreja para concluir o cadastro.');
-        Navigator.of(context).pushNamed(VisualRoutes.selectChurch);
+        Navigator.of(context).push<IgrejaId>(
+          MaterialPageRoute(
+            builder: (_) =>
+                const SelectChurchScreen(modo: ModoSelecaoIgreja.cadastro),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) _showMessage(mensagemErroAuth(e));

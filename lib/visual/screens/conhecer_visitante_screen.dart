@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/constants/igreja_info.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 import '../escala_tela.dart';
@@ -130,13 +133,16 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Content extends StatelessWidget {
+class _Content extends ConsumerWidget {
   const _Content({required this.scale});
 
   final double scale;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final igreja = ref.watch(igrejaAtualDadosProvider).valueOrNull;
+    final cultos = igreja?.cultosRecorrentes ?? const <String>[];
+    final enderecos = igreja?.enderecosExibicao ?? const <String>[];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -169,7 +175,7 @@ class _Content extends StatelessWidget {
               ),
               SizedBox(height: 12 * scale),
               Text(
-                IgrejaInfo.nome,
+                igreja?.nome ?? 'Comunidade Nova Aliança',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.montserrat(
                   fontSize: 22 * scale,
@@ -178,17 +184,19 @@ class _Content extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 6 * scale),
-              Text(
-                IgrejaInfo.slogan,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 14 * scale,
-                  fontWeight: FontWeight.w400,
-                  height: 21 / 14,
-                  color: Colors.white.withValues(alpha: 0.80),
+              if (igreja?.slogan != null) ...[
+                SizedBox(height: 6 * scale),
+                Text(
+                  igreja!.slogan!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14 * scale,
+                    fontWeight: FontWeight.w400,
+                    height: 21 / 14,
+                    color: Colors.white.withValues(alpha: 0.80),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -210,55 +218,53 @@ class _Content extends StatelessWidget {
         SizedBox(height: 24 * scale),
         _SectionTitle('Horários de culto', scale: scale),
         SizedBox(height: 12 * scale),
-        for (final culto in IgrejaInfo.cultos) ...[
+        // Programação da UNIDADE EM FOCO. Sem dados cadastrados, diz isso —
+        // nunca mostra os horários de outra igreja.
+        if (cultos.isEmpty)
           _InfoTile(
             scale: scale,
             icon: Icons.event,
-            title: culto['nome'] ?? '',
-            subtitle:
-                '${_formatDay(culto['dia'])} • ${culto['horario'] ?? ''}',
-          ),
-          SizedBox(height: 10 * scale),
-        ],
+            title: 'Não informado',
+            subtitle: 'Programação ainda não cadastrada',
+          )
+        else
+          for (final culto in cultos) ...[
+            _InfoTile(scale: scale, icon: Icons.event, title: culto),
+            SizedBox(height: 10 * scale),
+          ],
         SizedBox(height: 14 * scale),
         _SectionTitle('Onde estamos', scale: scale),
         SizedBox(height: 12 * scale),
-        _InfoTile(
-          scale: scale,
-          icon: Icons.location_on_outlined,
-          title: IgrejaInfo.cidadeEstado,
-          subtitle: IgrejaInfo.endereco,
-        ),
-        SizedBox(height: 10 * scale),
-        _InfoTile(
-          scale: scale,
-          icon: Icons.camera_alt_outlined,
-          title: 'Instagram',
-          subtitle: IgrejaInfo.instagram,
-        ),
+        if (enderecos.isEmpty)
+          _InfoTile(
+            scale: scale,
+            icon: Icons.location_on_outlined,
+            title: igreja?.cidadeEstado ?? 'Não informado',
+            subtitle: 'Endereço ainda não cadastrado',
+          )
+        else
+          for (var i = 0; i < enderecos.length; i++) ...[
+            _InfoTile(
+              scale: scale,
+              icon: Icons.location_on_outlined,
+              title: i == 0
+                  ? (igreja?.cidadeEstado ?? 'Endereço principal')
+                  : 'Outro endereço',
+              subtitle: enderecos[i],
+            ),
+            SizedBox(height: 10 * scale),
+          ],
+        if (igreja?.instagram != null) ...[
+          SizedBox(height: 10 * scale),
+          _InfoTile(
+            scale: scale,
+            icon: Icons.camera_alt_outlined,
+            title: 'Instagram',
+            subtitle: igreja!.instagram!,
+          ),
+        ],
       ],
     );
-  }
-
-  static String _formatDay(String? dia) {
-    switch (dia) {
-      case 'domingo':
-        return 'Domingo';
-      case 'segunda':
-        return 'Segunda-feira';
-      case 'terca':
-        return 'Terça-feira';
-      case 'quarta':
-        return 'Quarta-feira';
-      case 'quinta':
-        return 'Quinta-feira';
-      case 'sexta':
-        return 'Sexta-feira';
-      case 'sabado':
-        return 'Sábado';
-      default:
-        return dia ?? '';
-    }
   }
 }
 
@@ -287,7 +293,7 @@ class _InfoTile extends StatelessWidget {
     required this.scale,
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle = '',
   });
 
   final double scale;

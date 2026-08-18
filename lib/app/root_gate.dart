@@ -7,6 +7,7 @@ import '../core/services/fcm_service.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/igrejas/providers/igreja_providers.dart';
 import '../visual/screens/home_leader_screen.dart';
+import '../visual/screens/select_church_screen.dart';
 import '../visual/screens/home_member_screen.dart';
 import '../visual/screens/welcome_access_screen.dart';
 import 'screens/aguardando_aprovacao_screen.dart';
@@ -52,6 +53,19 @@ class RootGate extends ConsumerWidget {
       }
     });
 
+    // Ao AUTENTICAR, descarta a unidade pública escolhida antes do login.
+    //
+    // Sem isto, quem navegou como visitante em Petrolina e depois entrou com
+    // conta de Olinda continuaria vendo Petrolina — herdando silenciosamente
+    // um contexto que não é o seu. A sessão começa sempre na igreja do
+    // vínculo; visitar outra passa a exigir uma troca manual explícita.
+    ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
+      final entrou = previous?.valueOrNull == null && next.valueOrNull != null;
+      if (entrou) {
+        ref.read(igrejaVisualizadaProvider.notifier).limpar();
+      }
+    });
+
     final authState = ref.watch(authStateProvider);
 
     return authState.when(
@@ -59,6 +73,20 @@ class RootGate extends ConsumerWidget {
       error: (_, _) => const WelcomeAccessScreen(),
       data: (firebaseUser) {
         if (firebaseUser == null) {
+          // ── Onboarding do visitante ──────────────────────────────────
+          //
+          // O produto começa escolhendo a igreja: sem unidade em foco não há
+          // conteúdo a mostrar, porque tudo vive sob "igrejas/{igrejaId}".
+          final preferencia = ref.watch(igrejaVisualizadaProvider);
+
+          // Espera a leitura do disco. Decidir com nulo antes disso faria a
+          // tela de seleção piscar para quem já escolheu.
+          if (!preferencia.carregado) return const SplashScreen();
+
+          if (preferencia.id == null) {
+            return const SelectChurchScreen(modo: ModoSelecaoIgreja.onboarding);
+          }
+
           return const WelcomeAccessScreen();
         }
 

@@ -1,3 +1,4 @@
+import '../../igrejas/providers/igreja_providers.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -86,8 +87,11 @@ class _AvisoFormScreenState extends ConsumerState<AvisoFormScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final autor = ref.read(usuarioProvider);
-    if (autor == null || !autor.isLider) {
-      _mostrar('Ação restrita à liderança.');
+    // Autorizacao vem do VINCULO com a unidade em foco, nao do perfil global:
+    // liderar uma igreja nao autoriza escrever em outra. As Rules repetem
+    // esta checagem no servidor.
+    if (autor == null || !ref.read(podeGerenciarConteudoProvider)) {
+      _mostrar('Você não tem permissão para editar o conteúdo desta igreja.');
       return;
     }
 

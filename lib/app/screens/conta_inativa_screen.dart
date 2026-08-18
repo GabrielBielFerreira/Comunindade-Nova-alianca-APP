@@ -1,8 +1,8 @@
+import '../../features/igrejas/providers/igreja_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_strings.dart';
-import '../../core/constants/igreja_info.dart';
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_controller.dart';
 import '../../visual/visual_router.dart';
@@ -48,7 +48,7 @@ class ContaInativaScreen extends ConsumerWidget {
               const SizedBox(height: 12),
               Text(
                 'Sua conta está inativa. Entre em contato com a liderança da '
-                '${IgrejaInfo.nome} para reativá-la.',
+                '${ref.watch(nomeIgrejaEmFocoProvider)} para reativá-la.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 15,

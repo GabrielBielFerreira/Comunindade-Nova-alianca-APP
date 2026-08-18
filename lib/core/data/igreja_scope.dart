@@ -8,11 +8,15 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 /// (`avisos`, `eventos`, ...), que as Rules atuais negam — este tipo é o ponto
 /// único onde o `igrejaId` entra no caminho.
 class IgrejaScope {
-  IgrejaScope({required this.igrejaId, FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+  IgrejaScope({required this.igrejaId, FirebaseFirestore? db}) : _dbInjetado = db;
 
   final IgrejaId igrejaId;
-  final FirebaseFirestore _db;
+  final FirebaseFirestore? _dbInjetado;
+
+  /// Resolvido sob demanda: construir o escopo não exige Firebase
+  /// inicializado. Isso permite testar a lógica de troca de unidade sem subir
+  /// o Firebase — e o escopo é criado só por saber QUAL igreja está em foco.
+  late final FirebaseFirestore _db = _dbInjetado ?? FirebaseFirestore.instance;
 
   FirebaseFirestore get db => _db;
 

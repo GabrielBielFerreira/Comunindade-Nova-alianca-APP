@@ -24,12 +24,35 @@ final igrejaPrincipalProvider = Provider<IgrejaId?>((ref) {
   return IgrejaId.tentar(usuario?.igrejaPrincipalId);
 });
 
+/// Estado da preferência local de unidade.
+///
+/// [carregado] existe para separar "ainda não li o SharedPreferences" de
+/// "não há unidade escolhida". Sem essa distinção, a primeira tela do
+/// aplicativo pisca: o gate decide com `null` antes da leitura terminar e
+/// manda para a tela errada por uma fração de segundo.
+class EstadoIgrejaVisualizada {
+  const EstadoIgrejaVisualizada({required this.carregado, this.id});
+
+  const EstadoIgrejaVisualizada.carregando()
+      : carregado = false,
+        id = null;
+
+  final bool carregado;
+  final IgrejaId? id;
+
+  bool get temEscolha => carregado && id != null;
+}
+
 /// Preferência LOCAL de qual unidade está sendo visualizada.
 ///
 /// É apenas contexto de leitura: trocar aqui não altera vínculo, aprovação,
 /// ministérios nem concede qualquer permissão.
-class IgrejaVisualizadaNotifier extends StateNotifier<IgrejaId?> {
-  IgrejaVisualizadaNotifier() : super(null) {
+///
+/// Serve a dois papéis: a unidade que o VISITANTE escolheu no onboarding e a
+/// unidade que um usuário autenticado está visitando. Em ambos os casos o
+/// valor é preferência de leitura, nunca autorização.
+class IgrejaVisualizadaNotifier extends StateNotifier<EstadoIgrejaVisualizada> {
+  IgrejaVisualizadaNotifier() : super(const EstadoIgrejaVisualizada.carregando()) {
     _carregar();
   }
 
@@ -37,11 +60,14 @@ class IgrejaVisualizadaNotifier extends StateNotifier<IgrejaId?> {
 
   Future<void> _carregar() async {
     final prefs = await SharedPreferences.getInstance();
-    state = IgrejaId.tentar(prefs.getString(_chave));
+    state = EstadoIgrejaVisualizada(
+      carregado: true,
+      id: IgrejaId.tentar(prefs.getString(_chave)),
+    );
   }
 
   Future<void> definir(IgrejaId? id) async {
-    state = id;
+    state = EstadoIgrejaVisualizada(carregado: true, id: id);
     final prefs = await SharedPreferences.getInstance();
     if (id == null) {
       await prefs.remove(_chave);
@@ -54,8 +80,8 @@ class IgrejaVisualizadaNotifier extends StateNotifier<IgrejaId?> {
   Future<void> limpar() => definir(null);
 }
 
-final igrejaVisualizadaProvider =
-    StateNotifierProvider<IgrejaVisualizadaNotifier, IgrejaId?>(
+final igrejaVisualizadaProvider = StateNotifierProvider<
+    IgrejaVisualizadaNotifier, EstadoIgrejaVisualizada>(
   (ref) => IgrejaVisualizadaNotifier(),
 );
 
@@ -65,9 +91,16 @@ final igrejaVisualizadaProvider =
 /// muda, os providers dependentes são recriados automaticamente pelo Riverpod,
 /// o que descarta o cache da unidade anterior.
 final igrejaAtualProvider = Provider<IgrejaId?>((ref) {
-  final visualizada = ref.watch(igrejaVisualizadaProvider);
+  final visualizada = ref.watch(igrejaVisualizadaProvider).id;
   if (visualizada != null) return visualizada;
   return ref.watch(igrejaPrincipalProvider);
+});
+
+///  enquanto a preferência local ainda está sendo lida do disco.
+///
+/// O gate de entrada espera este valor antes de decidir a primeira tela.
+final preferenciaIgrejaCarregandoProvider = Provider<bool>((ref) {
+  return !ref.watch(igrejaVisualizadaProvider).carregado;
 });
 
 /// `true` quando o usuário está olhando uma unidade diferente da sua.
@@ -126,4 +159,37 @@ final autorizacaoAtualProvider = Provider<Autorizacao?>((ref) {
 /// Membro aprovado na unidade em foco?
 final isMembroAprovadoAtualProvider = Provider<bool>((ref) {
   return ref.watch(autorizacaoAtualProvider)?.temVinculoAtivo ?? false;
+});
+
+/// Liderança ministerial NA UNIDADE EM FOCO, para decisões de interface.
+///
+/// Substitui `usuarioProvider?.isLider`, que lia `perfil` do documento global
+/// `usuarios/{uid}` — campo que as Rules não gravam mais e que valia para
+/// qualquer igreja. Alguém aprovado como líder em Olinda aparecia como líder
+/// ao visualizar Petrolina.
+///
+/// Isto é só apresentação: a segurança real continua nas Rules e nas
+/// Functions, que repetem a autorização no servidor.
+final isLiderancaNaUnidadeProvider = Provider<bool>((ref) {
+  final autorizacao = ref.watch(autorizacaoAtualProvider);
+  if (autorizacao == null) return false;
+  return autorizacao.perfilEfetivo.isLiderancaMinisterial;
+});
+
+/// Pode criar/editar conteúdo da unidade em foco (avisos, eventos, campanhas,
+/// ministérios, devocionais).
+final podeGerenciarConteudoProvider = Provider<bool>((ref) {
+  return ref.watch(autorizacaoAtualProvider)?.podeGerenciarConteudo ?? false;
+});
+
+/// Nome da unidade EM FOCO, para cabeçalhos.
+///
+/// Enquanto carrega, usa o nome da rede em vez de string vazia ou do nome de
+/// outra unidade: é o único texto verdadeiro nesse instante.
+///
+/// Mostrar a unidade no cabeçalho é o que torna a troca de igreja visível —
+/// com o nome da rede fixo, mudar de Olinda para Petrolina não aparecia.
+final nomeIgrejaEmFocoProvider = Provider<String>((ref) {
+  return ref.watch(igrejaAtualDadosProvider).valueOrNull?.nome ??
+      'Comunidade Nova Aliança';
 });

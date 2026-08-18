@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
@@ -341,7 +342,9 @@ class _TopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final naoLidas = ref.watch(naoLidasCountProvider);
-    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
+    // Liderança na UNIDADE EM FOCO. O perfil global valia para qualquer
+    // igreja e mostrava o menu de liderança ao visualizar outra unidade.
+    final isLider = ref.watch(isLiderancaNaUnidadeProvider);
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -366,7 +369,7 @@ class _TopBar extends ConsumerWidget {
             SizedBox(width: 11 * scale),
             Expanded(
               child: Text(
-                HomeMockData.communityName,
+                ref.watch(nomeIgrejaEmFocoProvider),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(

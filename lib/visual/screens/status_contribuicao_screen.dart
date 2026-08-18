@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../models/contribuicao_visual_model.dart';
@@ -11,7 +13,7 @@ import '../widgets/leader_bottom_navigation.dart';
 import 'historico_contribuicoes_screen.dart';
 import '../escala_tela.dart';
 
-class StatusContribuicaoScreen extends StatelessWidget {
+class StatusContribuicaoScreen extends ConsumerWidget {
   const StatusContribuicaoScreen({
     super.key,
     required this.isLeader,
@@ -43,7 +45,7 @@ class StatusContribuicaoScreen extends StatelessWidget {
   final ContribuicaoCampaignData? campaign;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -72,7 +74,7 @@ class StatusContribuicaoScreen extends StatelessWidget {
                 method: paymentMethod,
                 status: ContribuicaoVisualStatus.aprovado,
                 dateLabel: 'Agora',
-                church: HomeMockData.communityName,
+                church: ref.watch(nomeIgrejaEmFocoProvider),
               );
 
               return Stack(
