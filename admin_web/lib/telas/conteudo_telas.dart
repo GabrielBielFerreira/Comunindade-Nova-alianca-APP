@@ -1262,7 +1262,9 @@ class _ListaOracao extends ConsumerWidget {
                     Text(p.texto),
                     if (moderavel) ...[
                       const SizedBox(height: 14),
-                      Row(children: [
+                      // Wrap, e nao Row: os dois botoes nao cabem lado a
+                      // lado em 320 px, e menos ainda com a fonte ampliada.
+                      Wrap(spacing: 10, runSpacing: 10, children: [
                         OutlinedButton(
                           onPressed: () async {
                             final motivo = await _pedirMotivo(context);
@@ -1280,7 +1282,6 @@ class _ListaOracao extends ConsumerWidget {
                               foregroundColor: Cores.erro),
                           child: const Text('Recusar'),
                         ),
-                        const SizedBox(width: 10),
                         FilledButton(
                           onPressed: () => _executar(
                             context,

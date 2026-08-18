@@ -399,25 +399,31 @@ class _MenuNovaAtividade extends ConsumerWidget {
             ),
         ],
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add, size: 19, color: Cores.primary),
-              SizedBox(width: 8),
-              Text(
-                'Nova atividade',
-                style: TextStyle(
-                  color: Cores.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
+          // Com a fonte do sistema ampliada, o rotulo passa da largura fixa
+          // da barra (268 px) e a Row estourava. FittedBox encolhe o
+          // conjunto em vez de cortar a palavra ou vazar o layout.
+          child: const FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add, size: 19, color: Cores.primary),
+                SizedBox(width: 8),
+                Text(
+                  'Nova atividade',
+                  style: TextStyle(
+                    color: Cores.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

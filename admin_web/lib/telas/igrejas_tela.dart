@@ -32,27 +32,40 @@ class IgrejasTela extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Igrejas',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 4),
-                    Text('Unidades da rede Nova Aliança.',
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-              ),
-              FilledButton.icon(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final titulo = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Igrejas',
+                      style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 4),
+                  Text('Unidades da rede Nova Aliança.',
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              );
+              final botao = FilledButton.icon(
                 onPressed: () => _criarIgreja(context, ref),
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text('Nova unidade'),
-              ),
-            ],
+              );
+
+              // Em aparelho estreito o botao desce para baixo do titulo em
+              // vez de disputar a mesma linha e estourar a largura.
+              if (constraints.maxWidth < 420) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [titulo, const SizedBox(height: 12), botao],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [Expanded(child: titulo), botao],
+              );
+            },
           ),
         ),
         const Divider(height: 1),
@@ -165,22 +178,24 @@ class _CartaoIgreja extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Um unico Wrap em vez de Row + Wrap: numa Row o Wrap recebe
+            // largura infinita e nunca quebra, entao as etiquetas vazavam o
+            // cartao num aparelho estreito.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: Text(igreja.nome,
-                      style: Theme.of(context).textTheme.titleMedium),
+                Text(igreja.nome,
+                    style: Theme.of(context).textTheme.titleMedium),
+                Etiqueta(
+                  texto: igreja.ativa ? 'Ativa' : 'Inativa',
+                  cor: igreja.ativa ? Cores.sucesso : Cores.muted,
                 ),
-                Wrap(spacing: 8, children: [
-                  Etiqueta(
-                    texto: igreja.ativa ? 'Ativa' : 'Inativa',
-                    cor: igreja.ativa ? Cores.sucesso : Cores.muted,
-                  ),
-                  Etiqueta(
-                    texto: igreja.configurada ? 'Configurada' : 'Não configurada',
-                    cor: igreja.configurada ? Cores.info : Cores.alerta,
-                  ),
-                ]),
+                Etiqueta(
+                  texto: igreja.configurada ? 'Configurada' : 'Não configurada',
+                  cor: igreja.configurada ? Cores.info : Cores.alerta,
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -189,13 +204,14 @@ class _CartaoIgreja extends ConsumerWidget {
             _Linha('Endereço', igreja.enderecoExibicao),
             _Linha('Mercado Pago', igreja.mercadoPagoStatus.rotulo),
             const SizedBox(height: 12),
-            Row(children: [
+            // Wrap, e nao Row: os dois botoes mais o aviso passam de 248 px,
+            // que e o que sobra do cartao num aparelho de 320 px.
+            Wrap(spacing: 10, runSpacing: 10, children: [
               OutlinedButton.icon(
                 icon: const Icon(Icons.edit_outlined, size: 16),
                 label: const Text('Editar dados'),
                 onPressed: () => _editar(context, ref),
               ),
-              const SizedBox(width: 10),
               OutlinedButton.icon(
                 icon: Icon(
                   igreja.ativa
@@ -210,15 +226,11 @@ class _CartaoIgreja extends ConsumerWidget {
                     ? null
                     : () => _alternarAtiva(context, ref),
               ),
-              if (!igreja.ativa && !igreja.configurada) ...[
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                    'Preencha os dados institucionais para poder ativar.',
-                    style: TextStyle(fontSize: 12, color: Cores.alerta),
-                  ),
+              if (!igreja.ativa && !igreja.configurada)
+                const Text(
+                  'Preencha os dados institucionais para poder ativar.',
+                  style: TextStyle(fontSize: 12, color: Cores.alerta),
                 ),
-              ],
             ]),
           ],
         ),
