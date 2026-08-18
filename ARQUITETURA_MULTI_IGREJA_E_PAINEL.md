@@ -204,6 +204,24 @@ Regras:
 - Impede novas leituras administrativas.
 - Mantém documentos históricos.
 
+`transferirVinculoIgreja`
+
+- Exclusiva do `super_admin`. Pastor da unidade NÃO transfere.
+- Move a igreja principal: inativa o vínculo de origem e aprova o de destino
+  na MESMA transação, junto com `usuarios/{uid}.igreja_principal_id`.
+- Não transporta perfil ministerial nem função administrativa: quem chega ao
+  destino sem vínculo prévio entra como `membro`, sem função e sem ministério.
+- Um vínculo JÁ APROVADO no destino conserva o perfil que era dele naquela
+  unidade — a transferência não rebaixa permissão legítima alheia à origem.
+- Transferir alguém com perfil `pastor` exige confirmação explícita
+  (`confirmarSaidaDePastor`), porque a unidade pode ficar sem pastor.
+- Idempotente: repetir a chamada com o estado final já aplicado devolve
+  sucesso sem reescrever nada e sem gerar segunda auditoria.
+- Audita nas DUAS unidades.
+
+Não confundir com a troca de igreja VISUALIZADA no aplicativo: aquela é
+preferência local de leitura, não passa pelo servidor e não altera permissão.
+
 ### Restrições
 
 - Motivo obrigatório.

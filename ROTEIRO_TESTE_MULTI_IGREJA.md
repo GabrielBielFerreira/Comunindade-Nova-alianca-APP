@@ -106,6 +106,38 @@ Contas do seed, senha `Teste123!`:
 - [ ] `membro@teste.local` (pendente) → tela de aguardando aprovação.
 - [ ] Um membro aprovado comum **não** vê o card do painel.
 
+### 3.7 Transferência OFICIAL de vínculo (painel → aplicativo)
+
+Diferente de tudo acima: aqui a pessoa **muda de igreja principal**, e não
+apenas de igreja visualizada. A ação existe só para `super_admin`.
+
+No painel (`admin_web`), logado com uma conta `super_admin`:
+
+- [ ] Menu **Liderança** → cartão de um membro aprovado de Olinda.
+- [ ] O botão **"Transferir para outra igreja"** aparece. Entrando com pastor
+      da unidade (sem `super_admin`), o botão **não** aparece.
+- [ ] O diálogo mostra a igreja atual, a lista de destinos (sem a própria
+      unidade) e o aviso de que cargos e permissões não são transportados.
+- [ ] Confirmar só habilita com destino, motivo e o aceite marcados.
+- [ ] Concluir → mensagem de sucesso.
+
+No Emulator UI, conferir:
+
+- [ ] `igrejas/olinda/membros/{uid}` → `status: inativo`, `funcoes_admin: []`,
+      `transferido_para: petrolina`. O documento **continua existindo**.
+- [ ] `igrejas/petrolina/membros/{uid}` → `status: aprovado`,
+      `perfil: membro`, `funcoes_admin: []`.
+- [ ] `usuarios/{uid}.igreja_principal_id` → `petrolina`.
+- [ ] `igrejas/olinda/auditoria` e `igrejas/petrolina/auditoria` têm um
+      registro `transferir_vinculo_igreja` cada, com autor e motivo.
+
+No aplicativo, com a conta transferida:
+
+- [ ] Sair e entrar de novo: a Home abre em **Petrolina**.
+- [ ] Se a pessoa era liderança em Olinda, **não** tem menu de liderança em
+      Petrolina nem em Olinda.
+- [ ] Visualizar Olinda mostra o conteúdo público, sem permissões.
+
 ---
 
 ## 4. O que os testes automatizados já cobrem
@@ -118,6 +150,8 @@ Não precisa reconferir manualmente:
 | `test/multi_igreja_test.dart` | vínculo de Olinda que não vale em Petrolina, PIX ausente, mapa da unidade certa |
 | `test_rules/cadastro.test.js` | o cadastro é aceito pelas Rules reais e o formato antigo é negado |
 | `test/responsivo_app_test.dart` | ausência de overflow em 320→1440 px, textScale 1.0 e 1.3 |
+| `functions/test/transferencia.test.js` | transferência oficial: autorização, atomicidade, idempotência, auditoria nas duas unidades |
+| `admin_web/test/transferencia_test.dart` | o botão só existe para `super_admin`, e o que o diálogo envia ao servidor |
 
 ```powershell
 flutter analyze
@@ -125,4 +159,5 @@ flutter test
 cd admin_web; flutter test; cd ..
 cd packages\nova_alianca_core; dart test; cd ..\..
 cd test_rules; npm test; cd ..
+cd functions; npm test; cd ..
 ```

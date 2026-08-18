@@ -13,6 +13,7 @@ export type AcaoAuditavel =
   | "promover_para_lideranca"
   | "remover_da_lideranca"
   | "desvincular_da_igreja"
+  | "transferir_vinculo_igreja"
   | "atribuir_funcao_admin"
   | "remover_funcao_admin"
   | "criar_igreja"

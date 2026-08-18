@@ -5,6 +5,7 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 import '../dados/membros_repository.dart';
 import '../estado/providers.dart';
 import '../ui/componentes.dart';
+import 'dialogo_transferencia.dart';
 import 'membros_tela.dart' show corDoStatus;
 
 /// Gestão do ciclo de vida da liderança.
@@ -156,6 +157,15 @@ class _CartaoLiderancaState extends ConsumerState<_CartaoLideranca> {
   Widget build(BuildContext context) {
     final vinculo = widget.membro.vinculo;
     final repo = ref.read(membrosRepositoryProvider);
+
+    // Assinados no build, e nao lidos dentro do callback: um StreamProvider
+    // lido so na hora do clique ainda estaria em loading, e o dialogo abriria
+    // sem nenhuma unidade de destino.
+    final unidades = widget.isSuperAdmin
+        ? (ref.watch(igrejasProvider).valueOrNull ?? const <IgrejaModel>[])
+        : const <IgrejaModel>[];
+    final nomeOrigem =
+        ref.watch(acessoAtualProvider)?.nome ?? vinculo.igrejaId.valor;
 
     final ehEuMesmo = vinculo.uid == widget.uidAtual;
     final ehPastor = vinculo.perfil.isPastor;
@@ -324,6 +334,40 @@ class _CartaoLiderancaState extends ConsumerState<_CartaoLideranca> {
                               },
                         label: Text('Tirar ${funcao.rotulo}'),
                       ),
+                  // Transferência oficial de vínculo — só o superadministrador.
+                  // Não confundir com trocar a unidade em foco no seletor:
+                  // aqui a pessoa muda de igreja principal.
+                  if (widget.isSuperAdmin)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.swap_horiz, size: 16),
+                      onPressed: _ocupado
+                          ? null
+                          : () async {
+                              final pedido = await DialogoTransferencia.mostrar(
+                                context,
+                                pessoa: widget.membro.exibicao,
+                                origem: vinculo.igrejaId,
+                                nomeOrigem: nomeOrigem,
+                                unidades: unidades,
+                                ehPastorNaOrigem: vinculo.perfil.isPastor,
+                              );
+                              if (pedido == null) return;
+
+                              await _executar(
+                                () => repo.transferir(
+                                  igrejaOrigemId: vinculo.igrejaId,
+                                  igrejaDestinoId: pedido.destino,
+                                  uid: vinculo.uid,
+                                  motivo: pedido.motivo,
+                                  confirmarSaidaDePastor:
+                                      pedido.confirmarSaidaDePastor,
+                                ),
+                                'Vínculo transferido. A pessoa passa a ser '
+                                'membro comum da unidade de destino.',
+                              );
+                            },
+                      label: const Text('Transferir para outra igreja'),
+                    ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.person_off_outlined, size: 16),
                     style: OutlinedButton.styleFrom(

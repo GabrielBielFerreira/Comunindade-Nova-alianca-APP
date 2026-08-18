@@ -24,5 +24,8 @@ export {
   removerFuncaoAdmin,
 } from "./members/membros";
 
+// Transferência oficial de vínculo entre unidades (exclusiva do super_admin)
+export { transferirVinculoIgreja } from "./members/transferencia";
+
 // Unidades
 export { criarIgreja, atualizarIgreja } from "./churches/igrejas";

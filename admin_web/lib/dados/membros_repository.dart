@@ -198,4 +198,24 @@ class MembrosRepository {
         'funcao': funcao.valor,
         'motivo': motivo,
       });
+
+  /// Transferência OFICIAL de vínculo entre unidades.
+  ///
+  /// Não confundir com trocar a unidade em foco no seletor: aqui a pessoa
+  /// deixa de ser membro da origem e passa a ser membro do destino. O servidor
+  /// exige `super_admin`, e nenhum cargo acompanha a transferência.
+  Future<void> transferir({
+    required IgrejaId igrejaOrigemId,
+    required IgrejaId igrejaDestinoId,
+    required String uid,
+    required String motivo,
+    bool confirmarSaidaDePastor = false,
+  }) =>
+      _chamar('transferirVinculoIgreja', {
+        'uid': uid,
+        'igrejaOrigemId': igrejaOrigemId.valor,
+        'igrejaDestinoId': igrejaDestinoId.valor,
+        'motivo': motivo,
+        'confirmarSaidaDePastor': confirmarSaidaDePastor,
+      });
 }

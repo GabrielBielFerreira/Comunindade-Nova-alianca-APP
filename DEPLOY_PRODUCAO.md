@@ -104,7 +104,8 @@ cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && 
 
 Funções publicadas: `meusAcessos`, `aprovarMembro`, `recusarMembro`,
 `promoverParaLideranca`, `removerDaLideranca`, `desvincularDaIgreja`,
-`atribuirFuncaoAdmin`, `removerFuncaoAdmin`, `criarIgreja`, `atualizarIgreja`.
+`atribuirFuncaoAdmin`, `removerFuncaoAdmin`, `transferirVinculoIgreja`,
+`criarIgreja`, `atualizarIgreja`.
 
 > Requer plano **Blaze**. Se o deploy falhar por faturamento, ative o Blaze e
 > repita — não há contorno.

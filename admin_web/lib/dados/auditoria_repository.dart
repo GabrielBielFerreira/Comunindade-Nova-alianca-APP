@@ -46,6 +46,7 @@ class RegistroAuditoria {
         'promover_para_lideranca' => 'Promoção para liderança',
         'remover_da_lideranca' => 'Remoção da liderança',
         'desvincular_da_igreja' => 'Vínculo inativado',
+        'transferir_vinculo_igreja' => 'Vínculo transferido entre unidades',
         'atribuir_funcao_admin' => 'Função administrativa atribuída',
         'remover_funcao_admin' => 'Função administrativa removida',
         'criar_igreja' => 'Unidade criada',
