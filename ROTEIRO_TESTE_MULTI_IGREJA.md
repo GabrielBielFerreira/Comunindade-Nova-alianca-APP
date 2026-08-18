@@ -147,6 +147,7 @@ Não precisa reconferir manualmente:
 | Suíte | O que garante |
 |---|---|
 | `test/fluxo_onboarding_test.dart` | primeira abertura, persistência, reinício, troca de escopo, visitante sem permissão |
+| `test/fluxo_onboarding_widget_test.dart` | as mesmas decisões pela INTERFACE: gate, lista de igrejas, toque no cartão, confirmação, busca e telas de bloqueio |
 | `test/multi_igreja_test.dart` | vínculo de Olinda que não vale em Petrolina, PIX ausente, mapa da unidade certa |
 | `test_rules/cadastro.test.js` | o cadastro é aceito pelas Rules reais e o formato antigo é negado |
 | `test/responsivo_app_test.dart` | ausência de overflow em 320→1440 px, textScale 1.0 e 1.3 |
