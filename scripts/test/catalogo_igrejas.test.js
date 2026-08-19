@@ -918,7 +918,7 @@ test("tokens duplicados do mesmo usuário viram um único documento canônico", 
   ]);
 });
 
-test("token ativo compartilhado entre UIDs bloqueia o preflight sem vazar dados", async () => {
+test("token ativo compartilhado entre UIDs cria duas quarentenas sem conflito ou vazamento", async () => {
   const tokenSecreto = "TOKEN-CRUZADO-SECRETO";
   const uidSecretoA = "uid-secreto-a";
   const uidSecretoB = "uid-secreto-b";
@@ -940,27 +940,181 @@ test("token ativo compartilhado entre UIDs bloqueia o preflight sem vazar dados"
     admin: fake.admin,
     db: fake.db,
     dryRun: true,
+    silencioso: false,
+  });
+  const saida = [];
+  const logOriginal = console.log;
+  let plano;
+  try {
+    console.log = (...partes) => saida.push(partes.join(" "));
+    plano = await prepararPlanoCompleto(ctx);
+  } finally {
+    console.log = logOriginal;
+  }
+  const operacoes = plano.operacoes.filter((item) =>
+    item.caminhoSeguro?.includes("tokens_dispositivo")
+  );
+
+  assert.equal(operacoes.length, 2);
+  assert.deepEqual(
+    operacoes.map((item) => item.caminho).sort(),
+    [
+      `usuarios/${uidSecretoA}/tokens_dispositivo/${tokenSecreto}`,
+      `usuarios/${uidSecretoB}/tokens_dispositivo/${tokenSecreto}`,
+    ]
+  );
+  assert.equal(operacoes.every((item) => item.dados.ativo === false), true);
+  assert.equal(
+    operacoes.every(
+      (item) =>
+        item.caminhoSeguro === "usuarios/{uid}/tokens_dispositivo/{id}"
+    ),
+    true
+  );
+  assert.deepEqual(plano.conflitos, []);
+
+  const textoImpresso = saida.join("\n");
+  assert.equal(textoImpresso.includes(tokenSecreto), false);
+  assert.equal(textoImpresso.includes(uidSecretoA), false);
+  assert.equal(textoImpresso.includes(uidSecretoB), false);
+});
+
+test("token compartilhado com origem ativa e inativa fica inativo nos dois perfis", async () => {
+  const token = "TOKEN-CRUZADO-MISTO";
+  const fake = criarFirestoreTransacionalFake({
+    "tokens_dispositivo/auto-a": {
+      perfil_id: "uid-a",
+      token,
+      plataforma: "android",
+      ativo: true,
+    },
+    "tokens_dispositivo/auto-b": {
+      perfil_id: "uid-b",
+      token,
+      plataforma: "android",
+      ativo: false,
+    },
+  });
+  const ctx = criarContexto({
+    admin: fake.admin,
+    db: fake.db,
+    dryRun: true,
     silencioso: true,
   });
-  const plano = await prepararPlanoCompleto(ctx, { validar: false });
+  const plano = await prepararPlanoCompleto(ctx);
+  const operacoes = plano.operacoes.filter((item) =>
+    item.caminhoSeguro?.includes("tokens_dispositivo")
+  );
 
+  assert.equal(operacoes.length, 2);
+  assert.equal(operacoes.every((item) => item.dados.ativo === false), true);
+  assert.deepEqual(plano.conflitos, []);
+});
+
+test("quarentena cruzada aplicada é idempotente e passa na pós-verificação", async () => {
+  const token = "TOKEN-CRUZADO-IDEMPOTENTE";
+  const fake = criarFirestoreTransacionalFake({
+    "tokens_dispositivo/auto-a": {
+      perfil_id: "uid-a",
+      token,
+      plataforma: "android",
+      ativo: true,
+    },
+    "tokens_dispositivo/auto-b": {
+      perfil_id: "uid-b",
+      token,
+      plataforma: "android",
+      ativo: true,
+    },
+  });
+  const ctx = criarContexto({
+    admin: fake.admin,
+    db: fake.db,
+    dryRun: false,
+    silencioso: true,
+  });
+  const plano = await prepararPlanoCompleto(ctx);
+  const resultado = await aplicarPlanoAtomico({
+    admin: fake.admin,
+    db: fake.db,
+    plano,
+    leituras: ctx.leituras,
+    projeto: "nova-alianca-app",
+    dryRun: false,
+  });
+
+  assert.equal(resultado.posVerificacao, true);
   assert.equal(
-    plano.operacoes.some((item) =>
-      item.caminhoSeguro?.includes("tokens_dispositivo")
-    ),
+    fake.obter(`usuarios/uid-a/tokens_dispositivo/${token}`).ativo,
     false
   );
-  assert.deepEqual(
-    plano.conflitos.filter((item) => item.includes("tokens_dispositivo")),
-    ["tokens_dispositivo/{id}[token_compartilhado_entre_perfis]"]
+  assert.equal(
+    fake.obter(`usuarios/uid-b/tokens_dispositivo/${token}`).ativo,
+    false
   );
-  assert.throws(() => validarPlanoAtomico(plano), (erro) => {
-    assert.match(erro.message, /tokens_dispositivo/);
-    assert.equal(erro.message.includes(tokenSecreto), false);
-    assert.equal(erro.message.includes(uidSecretoA), false);
-    assert.equal(erro.message.includes(uidSecretoB), false);
-    return true;
+
+  const segundoCtx = criarContexto({
+    admin: fake.admin,
+    db: fake.db,
+    dryRun: true,
+    silencioso: true,
   });
+  const segundoPlano = await prepararPlanoCompleto(segundoCtx);
+  assert.deepEqual(segundoPlano, { operacoes: [], conflitos: [] });
+});
+
+test("destino ativo ou divergente de token cruzado continua conflito sanitizado", async () => {
+  const tokenSecreto = "TOKEN-CRUZADO-DESTINO-ATIVO";
+  const uidSecretoA = "uid-destino-a";
+  const uidSecretoB = "uid-destino-b";
+  const origemA = "tokens_dispositivo/auto-a";
+  const casos = [
+    { campo: "ativo", ativo: true, plataforma: "android" },
+    { campo: "plataforma", ativo: false, plataforma: "ios" },
+  ];
+
+  for (const caso of casos) {
+    const fake = criarFirestoreTransacionalFake({
+      [origemA]: {
+        perfil_id: uidSecretoA,
+        token: tokenSecreto,
+        plataforma: "android",
+        ativo: true,
+      },
+      "tokens_dispositivo/auto-b": {
+        perfil_id: uidSecretoB,
+        token: tokenSecreto,
+        plataforma: "android",
+        ativo: true,
+      },
+      [`usuarios/${uidSecretoA}/tokens_dispositivo/${tokenSecreto}`]: {
+        perfil_id: uidSecretoA,
+        token: tokenSecreto,
+        plataforma: caso.plataforma,
+        ativo: caso.ativo,
+        migrado_de: [origemA],
+        migrado_em: new Date("2026-08-19T12:00:00.000Z"),
+      },
+    });
+    const ctx = criarContexto({
+      admin: fake.admin,
+      db: fake.db,
+      dryRun: true,
+      silencioso: true,
+    });
+
+    await assert.rejects(prepararPlanoCompleto(ctx), (erro) => {
+      assert.match(
+        erro.message,
+        /usuarios\/\{uid\}\/tokens_dispositivo\/\{id\}/
+      );
+      assert.equal(erro.message.includes(`[${caso.campo}]`), true);
+      assert.equal(erro.message.includes(tokenSecreto), false);
+      assert.equal(erro.message.includes(uidSecretoA), false);
+      assert.equal(erro.message.includes(uidSecretoB), false);
+      return true;
+    });
+  }
 });
 
 test("onze tokens globais acrescentam exatamente onze operações privadas", async () => {
