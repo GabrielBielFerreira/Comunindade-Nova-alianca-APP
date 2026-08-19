@@ -5,24 +5,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'navigation_service.dart';
-import 'notification_preferences.dart';
 
 class FcmService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   static Future<void> init() async {
     // Permissão contextual (chamada após o login, pelo RootGate).
-    await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await _messaging.requestPermission(alert: true, badge: true, sound: true);
 
     final token = await _messaging.getToken();
     if (token != null) await _salvarToken(token);
 
-    // Reaplica as preferências de notificação (inscrição nos tópicos).
-    await NotificationPreferences.aplicarTodas();
+    // As inscrições em tópico NÃO acontecem aqui: elas dependem da igreja
+    // PRINCIPAL, que ainda pode não estar carregada neste ponto. Quem as
+    // sincroniza é o RootGate, observando igrejaPrincipalProvider.
 
     _messaging.onTokenRefresh.listen(_salvarToken);
 
@@ -32,8 +28,9 @@ class FcmService {
     // App aberto a partir de estado terminado por uma notificação.
     final inicial = await _messaging.getInitialMessage();
     if (inicial != null) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _onNotificacaoAberta(inicial));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _onNotificacaoAberta(inicial),
+      );
     }
   }
 
@@ -52,12 +49,12 @@ class FcmService {
         .collection('tokens_dispositivo')
         .doc(token)
         .set({
-      'token': token,
-      'plataforma': defaultTargetPlatform.name,
-      'criado_em': Timestamp.now(),
-      'ultimo_uso': Timestamp.now(),
-      'ativo': true,
-    }, SetOptions(merge: true));
+          'token': token,
+          'plataforma': defaultTargetPlatform.name,
+          'criado_em': Timestamp.now(),
+          'ultimo_uso': Timestamp.now(),
+          'ativo': true,
+        }, SetOptions(merge: true));
   }
 
   static void _onMensagemForeground(RemoteMessage mensagem) {

@@ -365,6 +365,36 @@ Eles não podem editar manualmente o valor recebido nem transformar uma transaç
 - Separar tópicos FCM por igreja.
 - Remover rotas administrativas internas quando o painel atingir paridade.
 
+### Tópicos FCM por igreja
+
+Formato oficial — use exatamente este nome ao enviar pelo Firebase Console ou
+por uma Function futura:
+
+```text
+igreja_<igrejaId>_transmissoes
+igreja_<igrejaId>_eventos
+igreja_<igrejaId>_comunicacoes
+```
+
+Exemplos: `igreja_olinda_eventos`, `igreja_petrolina_comunicacoes`.
+
+Regras:
+
+- o tópico deriva do `IgrejaId`, nunca do NOME da igreja;
+- a inscrição segue a igreja **principal** (vínculo oficial). Visitar outra
+  unidade é contexto de leitura e não reconfigura para onde as notificações
+  vão;
+- os tópicos globais da versão anterior (`transmissoes`, `eventos`,
+  `comunicacoes`) misturavam Olinda e Petrolina. O aplicativo **cancela** essas
+  inscrições na primeira sincronização — quem já tinha o app instalado sai
+  delas sozinho;
+- transferência oficial cancela os tópicos da unidade antiga antes de assinar
+  os da nova;
+- o logout cancela os tópicos da unidade da sessão.
+
+Implementação e contrato: `lib/core/services/notification_preferences.dart`,
+coberto por `test/notificacoes_por_igreja_test.dart`.
+
 ## 12. Migração
 
 Como não existem usuários de produção:

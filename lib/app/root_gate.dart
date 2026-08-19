@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../core/services/fcm_service.dart';
+import '../core/services/notification_preferences.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/igrejas/providers/igreja_providers.dart';
 import '../visual/screens/home_leader_screen.dart';
@@ -53,6 +54,18 @@ class RootGate extends ConsumerWidget {
       }
     });
 
+    // Notificações seguem a igreja PRINCIPAL, nunca a visualizada.
+    //
+    // Antes as inscrições eram globais (`transmissoes`, `eventos`,
+    // `comunicacoes`) e um aviso de Olinda chegava no aparelho de quem é de
+    // Petrolina. Agora o tópico carrega o IgrejaId, e é este listener que
+    // reconcilia a inscrição quando o vínculo oficial muda — inclusive depois
+    // de uma transferência oficial entre unidades.
+    ref.listen<IgrejaId?>(igrejaPrincipalProvider, (anterior, atual) {
+      if (anterior == atual) return;
+      NotificationPreferences.sincronizar(atual).catchError((_) {});
+    });
+
     // Ao AUTENTICAR, descarta a unidade pública escolhida antes do login.
     //
     // Sem isto, quem navegou como visitante em Petrolina e depois entrou com
@@ -95,7 +108,8 @@ class RootGate extends ConsumerWidget {
           loading: () => const SplashScreen(),
           // Nunca deixa o usuário preso: oferece tentar de novo ou sair.
           error: (_, _) => SplashScreen(
-            mensagem: 'Não foi possível carregar seu perfil. '
+            mensagem:
+                'Não foi possível carregar seu perfil. '
                 'Verifique sua conexão e tente novamente.',
             onTentarNovamente: () => ref.invalidate(usuarioAtualProvider),
             onSair: () => ref.read(authServiceProvider).logout(),
@@ -120,7 +134,8 @@ class RootGate extends ConsumerWidget {
             return vinculoAsync.when(
               loading: () => const SplashScreen(),
               error: (_, _) => SplashScreen(
-                mensagem: 'Não foi possível verificar seu vínculo com a '
+                mensagem:
+                    'Não foi possível verificar seu vínculo com a '
                     'igreja. Verifique sua conexão e tente novamente.',
                 onTentarNovamente: () =>
                     ref.invalidate(vinculoPrincipalProvider),
@@ -175,8 +190,11 @@ class SemIgrejaVinculadaScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.church_outlined,
-                    size: 56, color: Color(0xFF7A0022)),
+                const Icon(
+                  Icons.church_outlined,
+                  size: 56,
+                  color: Color(0xFF7A0022),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Sua conta ainda não está vinculada a uma igreja',

@@ -22,7 +22,8 @@ class ConfiguracoesScreen extends ConsumerStatefulWidget {
   const ConfiguracoesScreen({super.key});
 
   @override
-  ConsumerState<ConfiguracoesScreen> createState() => _ConfiguracoesScreenState();
+  ConsumerState<ConfiguracoesScreen> createState() =>
+      _ConfiguracoesScreenState();
 }
 
 class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
@@ -33,7 +34,6 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
   static const _muted = Color(0xFF6B7280);
   static const _line = Color(0xFFE5E7EB);
   static const _danger = Color(0xFFDC2626);
-
 
   bool _liveNotifications = true;
   bool _eventNotifications = true;
@@ -66,7 +66,13 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
   }
 
   Future<void> _definirNotificacao(String chave, bool valor) async {
-    await NotificationPreferences.definir(chave, valor);
+    // A inscrição segue a igreja PRINCIPAL. Quem está apenas visitando outra
+    // unidade não muda para onde suas notificações vão.
+    await NotificationPreferences.definir(
+      chave,
+      valor,
+      igrejaId: ref.read(igrejaPrincipalProvider),
+    );
   }
 
   Future<void> _openChurchSelection() async {
@@ -75,8 +81,7 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            const SelectChurchScreen(modo: ModoSelecaoIgreja.troca),
+        builder: (_) => const SelectChurchScreen(modo: ModoSelecaoIgreja.troca),
       ),
     );
 
@@ -223,7 +228,9 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
                   Expanded(
                     child: SingleChildScrollView(
                       physics: const ClampingScrollPhysics(),
-                      padding: EdgeInsets.only(bottom: bottomPadding + 24 * scale),
+                      padding: EdgeInsets.only(
+                        bottom: bottomPadding + 24 * scale,
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -232,10 +239,7 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
                           // da Comunidade Nova Aliança). Só aparece com a flag
                           // MULTI_IGREJA ligada — desligada por padrão.
                           if (AppConfig.multiIgrejaHabilitada) ...[
-                            _SectionLabel(
-                              'Igreja em foco',
-                              scale: scale,
-                            ),
+                            _SectionLabel('Igreja em foco', scale: scale),
                             SizedBox(height: 12 * scale),
                             _SurfaceGroup(
                               scale: scale,
@@ -244,7 +248,8 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
                                   scale: scale,
                                   // Nome REAL da unidade em foco. Enquanto
                                   // carrega, não inventa nome nenhum.
-                                  label: ref
+                                  label:
+                                      ref
                                           .watch(igrejaAtualDadosProvider)
                                           .valueOrNull
                                           ?.nome ??
