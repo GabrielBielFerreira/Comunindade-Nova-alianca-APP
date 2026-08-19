@@ -9,9 +9,10 @@
  *   node bootstrap_super_admin.js --email pessoa@exemplo.com
  *   SUPER_ADMIN_UID=<UID> node bootstrap_super_admin.js
  *
- * Para PRODUÇÃO, este script exige confirmação dupla e credencial explícita:
- *   PERMITIR_PRODUCAO=1 GOOGLE_APPLICATION_CREDENTIALS=<chave.json> \
- *   GCLOUD_PROJECT=<projeto-real> node bootstrap_super_admin.js --uid <UID>
+ * Para PRODUÇÃO, este script exige confirmação, projectId exato e ADC válida:
+ *   gcloud auth application-default login
+ *   PERMITIR_PRODUCAO=1 GCLOUD_PROJECT=nova-alianca-app \
+ *   node bootstrap_super_admin.js --uid <UID>
  *
  * Por padrão, roda apenas contra o emulador.
  */
@@ -36,7 +37,19 @@ if (!uidAlvo && !emailAlvo) {
 }
 
 const permitirProducao = process.env.PERMITIR_PRODUCAO === "1";
-const projeto = process.env.GCLOUD_PROJECT || process.env.FIREBASE_PROJECT_ID;
+const PROJETO_PRODUCAO = "nova-alianca-app";
+const variaveisProjeto = [
+  "GCLOUD_PROJECT",
+  "GOOGLE_CLOUD_PROJECT",
+  "FIREBASE_PROJECT_ID",
+];
+const projetosInformados = variaveisProjeto
+  .map((nome) => ({ nome, valor: process.env[nome] }))
+  .filter(({ valor }) => Boolean(valor));
+const projeto =
+  process.env.GCLOUD_PROJECT ||
+  process.env.GOOGLE_CLOUD_PROJECT ||
+  process.env.FIREBASE_PROJECT_ID;
 const noEmulador = Boolean(process.env.FIREBASE_AUTH_EMULATOR_HOST);
 
 if (!noEmulador && !permitirProducao) {
@@ -44,21 +57,71 @@ if (!noEmulador && !permitirProducao) {
     "\n[ABORTADO] FIREBASE_AUTH_EMULATOR_HOST nao definida.\n" +
       "Este script roda contra o emulador por padrao.\n" +
       "Para um projeto real, defina explicitamente PERMITIR_PRODUCAO=1 e\n" +
-      "GOOGLE_APPLICATION_CREDENTIALS, ciente de que concede acesso total a rede.\n"
+      "GCLOUD_PROJECT=nova-alianca-app, com ADC valida, ciente de que concede\n" +
+      "acesso total a rede.\n"
   );
   process.exit(1);
 }
 
 if (!noEmulador && permitirProducao) {
-  console.warn(
-    `\n⚠️  ATENCAO: concedendo super_admin em PROJETO REAL (${projeto}).\n` +
-      "    super_admin le e administra TODAS as unidades da rede.\n"
+  const divergentes = projetosInformados.filter(
+    ({ valor }) => valor !== PROJETO_PRODUCAO
   );
+  if (projeto !== PROJETO_PRODUCAO || divergentes.length > 0) {
+    console.error(
+      `\n[ABORTADO] O projectId de producao deve ser exatamente ` +
+        `"${PROJETO_PRODUCAO}".\n` +
+        `Recebido: ${projeto || "(ausente)"}.` +
+        (divergentes.length
+          ? ` Variaveis divergentes: ${divergentes
+              .map(({ nome, valor }) => `${nome}=${valor}`)
+              .join(", ")}.`
+          : "") +
+        "\n"
+    );
+    process.exit(1);
+  }
 }
 
-admin.initializeApp({ projectId: projeto || "demo-nova-alianca" });
-
 (async () => {
+  let opcoesInicializacao;
+
+  if (noEmulador) {
+    opcoesInicializacao = { projectId: projeto || "demo-nova-alianca" };
+  } else {
+    let credencial;
+    try {
+      credencial = admin.credential.applicationDefault();
+      const token = await credencial.getAccessToken();
+      if (!token || !token.access_token) {
+        throw new Error("ADC nao retornou um access token");
+      }
+    } catch (erro) {
+      console.error(
+        "\n[ABORTADO] Application Default Credentials (ADC) ausente ou " +
+          "invalida.\nExecute `gcloud auth application-default login` (ou " +
+          "configure GOOGLE_APPLICATION_CREDENTIALS com uma credencial " +
+          `valida) e tente novamente.\nDetalhe: ${erro.message || erro}\n`
+      );
+      process.exit(1);
+    }
+
+    opcoesInicializacao = {
+      projectId: PROJETO_PRODUCAO,
+      credential: credencial,
+    };
+  }
+
+  admin.initializeApp(opcoesInicializacao);
+
+  if (!noEmulador) {
+    console.warn(
+      `\n⚠️  ATENCAO: concedendo super_admin em PROJETO REAL ` +
+        `(${PROJETO_PRODUCAO}).\n` +
+        "    super_admin le e administra TODAS as unidades da rede.\n"
+    );
+  }
+
   const auth = admin.auth();
 
   const usuario = uidAlvo
@@ -80,7 +143,7 @@ admin.initializeApp({ projectId: projeto || "demo-nova-alianca" });
     `\n${remover ? "Removido" : "Concedido"} super_admin:\n` +
       `  uid:   ${usuario.uid}\n` +
       `  email: ${usuario.email ?? "(sem e-mail)"}\n` +
-      `  projeto: ${projeto}\n`
+      `  projeto: ${noEmulador ? projeto || "demo-nova-alianca" : PROJETO_PRODUCAO}\n`
   );
   console.log(
     "A claim so entra em vigor no proximo token do usuario " +

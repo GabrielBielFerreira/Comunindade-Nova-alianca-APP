@@ -6,6 +6,7 @@ import 'package:admin_web/dados/membros_repository.dart';
 import 'package:admin_web/estado/providers.dart';
 import 'package:admin_web/telas/dashboard_tela.dart';
 import 'package:admin_web/telas/login_tela.dart';
+import 'package:admin_web/telas/conteudo_telas.dart';
 import 'package:admin_web/ui/tema.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -67,6 +68,7 @@ final _oracoes = <PedidoOracao>[
     id: 'p1',
     texto: 'Peço oração pela saúde da minha mãe, que está internada.',
     autorNome: 'Maria',
+    privado: true,
     urgente: true,
   ),
 ];
@@ -289,6 +291,41 @@ void main() {
         find.textContaining('Dados oficiais ainda não informados'),
         findsOneWidget,
       );
+    });
+  });
+
+  group('Moderação de oração', () {
+    testWidgets('pedido privado é identificado sem prometer publicação', (
+      tester,
+    ) async {
+      final tela = ProviderScope(
+        overrides: [
+          authStateProvider.overrideWith((ref) => Stream.value(null)),
+          acessoAtualProvider.overrideWithValue(acessoCompleto()),
+          oracoesPendentesProvider.overrideWith(
+            (ref) => Stream.value(Pagina(itens: _oracoes, truncada: false)),
+          ),
+          oracoesAprovadasProvider.overrideWith(
+            (ref) => Stream.value(const Pagina(itens: [], truncada: false)),
+          ),
+        ],
+        child: MaterialApp(theme: TemaPainel.claro(), home: const OracaoTela()),
+      );
+
+      await esperarSemOverflow(
+        tester,
+        tela,
+        tamanho: const Size(320, 568),
+        escalaTexto: 1,
+      );
+      // Resolve os StreamProvider sem esperar a animação contínua da TabBar.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('Privado'), findsOneWidget);
+      expect(find.text('Urgente'), findsOneWidget);
+      expect(find.text('Confirmar recebimento'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 

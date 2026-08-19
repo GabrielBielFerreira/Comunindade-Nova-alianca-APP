@@ -7,7 +7,7 @@ import '../../../core/utils/formatters.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/oracao_providers.dart';
 
-/// Moderação de pedidos de oração públicos da unidade em foco.
+/// Moderação de pedidos de oração da unidade em foco.
 ///
 /// Recusar NÃO apaga o pedido: marca `recusado` com motivo e autor, tirando-o
 /// da fila e do mural sem destruir o histórico.
@@ -49,8 +49,9 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.of(d).pop(),
-                  child: const Text('Cancelar')),
+                onPressed: () => Navigator.of(d).pop(),
+                child: const Text('Cancelar'),
+              ),
               FilledButton(
                 onPressed: valido
                     ? () => Navigator.of(d).pop(controller.text.trim())
@@ -77,25 +78,33 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
         backgroundColor: Colors.white,
         foregroundColor: AppColors.primary,
         elevation: 0,
-        title: Text('Pedidos a aprovar',
-            style: GoogleFonts.montserrat(
-                fontWeight: FontWeight.w700, color: AppColors.primary)),
+        title: Text(
+          'Pedidos a moderar',
+          style: GoogleFonts.montserrat(
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
+        ),
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, _) => const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
-            child: Text('Não foi possível carregar (requer liderança).',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.mutedForeground)),
+            child: Text(
+              'Não foi possível carregar (requer liderança).',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.mutedForeground),
+            ),
           ),
         ),
         data: (lista) {
           if (lista.isEmpty) {
             return const Center(
-              child: Text('Nenhum pedido aguardando aprovação.',
-                  style: TextStyle(color: AppColors.mutedForeground)),
+              child: Text(
+                'Nenhum pedido aguardando moderação.',
+                style: TextStyle(color: AppColors.mutedForeground),
+              ),
             );
           }
           return ListView.separated(
@@ -117,29 +126,42 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text('${p.nomeExibicao} • ${Formatters.dataRelativa(p.criadoEm)}',
-                              style: const TextStyle(
-                                  color: AppColors.mutedForeground, fontSize: 12)),
-                        ),
-                        if (p.urgente)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: AppColors.accentSoft,
-                                borderRadius: BorderRadius.circular(999)),
-                            child: const Text('URGENTE',
-                                style: TextStyle(
-                                    color: AppColors.accent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700)),
+                          child: Text(
+                            '${p.nomeExibicao} • ${Formatters.dataRelativa(p.criadoEm)}',
+                            style: const TextStyle(
+                              color: AppColors.mutedForeground,
+                              fontSize: 12,
+                            ),
                           ),
+                        ),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (p.privado)
+                              _EtiquetaPedido(
+                                texto: 'PRIVADO',
+                                cor: AppColors.primary,
+                                fundo: AppColors.primary.withValues(alpha: 0.1),
+                              ),
+                            if (p.urgente)
+                              const _EtiquetaPedido(
+                                texto: 'URGENTE',
+                                cor: AppColors.accent,
+                                fundo: AppColors.accentSoft,
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(p.texto,
-                        style: const TextStyle(
-                            fontSize: 15, color: AppColors.foreground)),
+                    Text(
+                      p.texto,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.foreground,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -169,8 +191,9 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
                               moderadorUid: moderadorUid,
                             ),
                             style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.primary),
-                            child: const Text('Aprovar'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                            child: Text(p.privado ? 'Confirmar' : 'Aprovar'),
                           ),
                         ),
                       ],
@@ -181,6 +204,33 @@ class ModeracaoOracaoScreen extends ConsumerWidget {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _EtiquetaPedido extends StatelessWidget {
+  const _EtiquetaPedido({
+    required this.texto,
+    required this.cor,
+    required this.fundo,
+  });
+
+  final String texto;
+  final Color cor;
+  final Color fundo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: fundo,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        texto,
+        style: TextStyle(color: cor, fontSize: 10, fontWeight: FontWeight.w700),
       ),
     );
   }

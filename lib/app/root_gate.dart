@@ -19,7 +19,7 @@ import 'screens/splash_screen.dart';
 ///
 /// Decide qual experiência renderizar:
 ///
-/// - Não autenticado          → [WelcomeAccessScreen]
+/// - Não autenticado/anônimo  → [WelcomeAccessScreen]
 /// - Sem documento de usuário → splash de provisionamento (com saída)
 /// - Sem igreja principal     → [SemIgrejaVinculadaScreen]
 /// - Vínculo pendente         → [AguardandoAprovacaoScreen]
@@ -44,11 +44,13 @@ class RootGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Inicializa o FCM assim que houver um usuário autenticado (contextual).
+    // Inicializa o FCM quando começa uma sessão REAL. A autenticação anônima
+    // existe apenas para permitir ações públicas (como pedido de oração) e
+    // não representa um membro nem deve registrar o aparelho como se fosse.
     ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
-      final estavaLogado = previous?.valueOrNull != null;
-      final estaLogado = next.valueOrNull != null;
-      if (!estavaLogado && estaLogado) {
+      final anterior = previous?.valueOrNull;
+      final atual = next.valueOrNull;
+      if (_iniciouContaReal(anterior, atual)) {
         // Falhas de FCM não devem quebrar o app (ex.: sem google-services.json).
         FcmService.init().catchError((_) {});
       }
@@ -66,15 +68,16 @@ class RootGate extends ConsumerWidget {
       NotificationPreferences.sincronizar(atual).catchError((_) {});
     });
 
-    // Ao AUTENTICAR, descarta a unidade pública escolhida antes do login.
+    // Ao entrar numa CONTA REAL, descarta a unidade pública escolhida antes
+    // do login. Isso também cobre a transição anônimo -> e-mail/Google, na
+    // qual os dois estados possuem User não nulo, mas são sessões diferentes.
     //
     // Sem isto, quem navegou como visitante em Petrolina e depois entrou com
     // conta de Olinda continuaria vendo Petrolina — herdando silenciosamente
     // um contexto que não é o seu. A sessão começa sempre na igreja do
     // vínculo; visitar outra passa a exigir uma troca manual explícita.
     ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
-      final entrou = previous?.valueOrNull == null && next.valueOrNull != null;
-      if (entrou) {
+      if (_iniciouContaReal(previous?.valueOrNull, next.valueOrNull)) {
         ref.read(igrejaVisualizadaProvider.notifier).limpar();
       }
     });
@@ -85,7 +88,10 @@ class RootGate extends ConsumerWidget {
       loading: () => const SplashScreen(),
       error: (_, _) => const WelcomeAccessScreen(),
       data: (firebaseUser) {
-        if (firebaseUser == null) {
+        // A sessão anônima é uma credencial técnica para gravar ações de
+        // visitante sob Rules seguras. Sem perfil/vínculo, ela continua na
+        // experiência pública e nunca cai em "Preparando sua conta...".
+        if (firebaseUser == null || firebaseUser.isAnonymous) {
           // ── Onboarding do visitante ──────────────────────────────────
           //
           // O produto começa escolhendo a igreja: sem unidade em foco não há
@@ -155,9 +161,20 @@ class RootGate extends ConsumerWidget {
                   case StatusVinculo.inativo:
                     return const ContaInativaScreen();
                   case StatusVinculo.aprovado:
-                    // Liderança ministerial vem do perfil VALIDADO no
-                    // servidor, dentro desta unidade.
-                    return vinculo.perfil.isLiderancaMinisterial
+                    // O vínculo PRINCIPAL decide se a conta pode entrar. A
+                    // navegação administrativa, porém, segue a unidade EM
+                    // FOCO. Um líder de Olinda que apenas visita Petrolina
+                    // continua vendo o conteúdo público de Petrolina, mas
+                    // não recebe botões de gestão dali sem um vínculo de
+                    // liderança aprovado também em Petrolina.
+                    final visualizandoOutra = ref.watch(
+                      visualizandoOutraIgrejaProvider,
+                    );
+                    final liderNaUnidadeEmFoco = visualizandoOutra
+                        ? ref.watch(isLiderancaNaUnidadeProvider)
+                        : vinculo.perfil.isLiderancaMinisterial;
+
+                    return liderNaUnidadeEmFoco
                         ? const HomeLeaderScreen()
                         : const HomeMemberScreen();
                 }
@@ -168,6 +185,14 @@ class RootGate extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Uma conta real começou quando saímos de nenhuma sessão, de uma sessão
+/// anônima ou trocamos de uid. Comparar apenas null/não-null falhava no caso
+/// anônimo -> e-mail/Google.
+bool _iniciouContaReal(User? anterior, User? atual) {
+  if (atual == null || atual.isAnonymous) return false;
+  return anterior == null || anterior.isAnonymous || anterior.uid != atual.uid;
 }
 
 /// Conta autenticada que não está vinculada a nenhuma unidade.

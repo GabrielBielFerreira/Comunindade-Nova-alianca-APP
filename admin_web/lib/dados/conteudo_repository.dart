@@ -480,34 +480,42 @@ class ConteudoRepository {
       _col('devocionais').doc(id).update({'ativo': ativo});
 
   // ── Oração ──────────────────────────────────────────────────────────
-  Query<Map<String, dynamic>> _oracoes({required bool aprovado}) => _col(
+  Query<Map<String, dynamic>> _oracoesPublicasAprovadas() => _col(
     'pedidos_oracao',
-  ).where('privado', isEqualTo: false).where('aprovado', isEqualTo: aprovado);
+  ).where('privado', isEqualTo: false).where('aprovado', isEqualTo: true);
 
-  /// Fila de moderação: públicos ainda não decididos.
+  /// Fila de moderação: todos os pedidos ainda não decididos.
+  ///
+  /// A capacidade de moderação é validada por unidade nas Rules. Não filtrar
+  /// `privado` é intencional: pedidos reservados, inclusive os urgentes,
+  /// precisam aparecer somente para essa equipe autorizada.
   ///
   /// `recusado` é filtrado no cliente de propósito: uma terceira igualdade
   /// exigiria mais um índice composto para separar pedidos já recusados, que
   /// são minoria dentro do teto da consulta.
   Stream<Pagina<PedidoOracao>> oracoesPendentes({int limite = limitePadrao}) =>
-      _oracoes(aprovado: false).limit(limite + 1).snapshots().map((s) {
-        final truncada = s.docs.length > limite;
-        final itens =
-            (truncada ? s.docs.take(limite) : s.docs)
-                .map((d) => PedidoOracao.doMapa(d.id, d.data()))
-                .where((p) => !p.recusado)
-                .toList()
-              ..sort(
-                (a, b) => (a.criadoEm ?? DateTime(0)).compareTo(
-                  b.criadoEm ?? DateTime(0),
-                ),
-              );
-        return Pagina(itens: itens, truncada: truncada);
-      });
+      _col('pedidos_oracao')
+          .where('aprovado', isEqualTo: false)
+          .limit(limite + 1)
+          .snapshots()
+          .map((s) {
+            final truncada = s.docs.length > limite;
+            final itens =
+                (truncada ? s.docs.take(limite) : s.docs)
+                    .map((d) => PedidoOracao.doMapa(d.id, d.data()))
+                    .where((p) => !p.recusado)
+                    .toList()
+                  ..sort(
+                    (a, b) => (a.criadoEm ?? DateTime(0)).compareTo(
+                      b.criadoEm ?? DateTime(0),
+                    ),
+                  );
+            return Pagina(itens: itens, truncada: truncada);
+          });
 
   /// Mural: públicos aprovados.
   Stream<Pagina<PedidoOracao>> oracoesAprovadas({int limite = limitePadrao}) =>
-      _oracoes(aprovado: true)
+      _oracoesPublicasAprovadas()
           .limit(limite + 1)
           .snapshots()
           .map(

@@ -1,50 +1,51 @@
-# Cloud Functions — Pagamentos (Mercado Pago)
+# Cloud Functions — administração multi-igreja
 
-Backend seguro para contribuições. **Nenhum segredo fica no app Flutter.**
+Backend privilegiado da rede Nova Aliança. As Functions publicadas nesta fase
+tratam autorização, vínculos, funções administrativas e cadastro de unidades.
+Elas usam Cloud Functions v2 e exigem o plano Blaze.
 
-> ⚠️ **Requer o plano Blaze** do Firebase (Cloud Functions v2). No plano Spark
-> (gratuito) não é possível fazer deploy destas functions.
+## Endpoints ativos
 
-## Endpoints
-- `criarContribuicaoPix` (callable) — cria pagamento PIX, retorna QR Code e
-  copia-e-cola; registra `transacoes/{id}` como **pendente**.
-- `criarContribuicaoCheckout` (callable) — cria preferência para **cartão/boleto**
-  (Checkout Pro), retorna `initPoint` (URL externa para WebView/navegador).
-- `mercadoPagoWebhook` (HTTP) — recebe notificações do MP e atualiza o status
-  (`aprovado`/`recusado`/`cancelado`/`pendente`) de forma **idempotente**.
+- `meusAcessos`
+- `aprovarMembro`, `recusarMembro`
+- `promoverParaLideranca`, `removerDaLideranca`
+- `desvincularDaIgreja`, `transferirVinculoIgreja`
+- `atribuirFuncaoAdmin`, `removerFuncaoAdmin`
+- `criarIgreja`, `atualizarIgreja`
+- `notificarPedidoOracaoUrgente` (gatilho do Firestore)
 
-## Princípios de segurança
-- Access token via **secret** (nunca no código/app).
-- Valores **validados no servidor** (`VALOR_MIN`/`VALOR_MAX`).
-- Confirmação sempre pelo **webhook** (server-side), nunca pelo cliente.
-- **Idempotência** na criação (`X-Idempotency-Key`) e na atualização (transação).
+A lista efetiva é a exportada por [`src/index.ts`](src/index.ts). Antes de todo
+deploy, o verificador reprova Functions antigas de pagamento e Functions sem os
+limites de custo definidos em `src/opcoes.ts`.
 
-## Configuração e deploy
+O gatilho de oração urgente envia apenas uma mensagem genérica à liderança
+aprovada da mesma igreja; nunca inclui o texto pastoral no push. Sessões
+anônimas permanecem na fila reservada, mas não disparam notificação. Para
+conter abuso e custo, cada autor pode gerar no máximo um push por igreja a
+cada dez minutos.
+
+## Mercado Pago está desativado
+
+O código da v1.3.0 permanece somente em `src/legacy/` para referência. Ele
+**não é exportado, não valida a assinatura do webhook e não pode ser
+publicado**. Não configure `MP_ACCESS_TOKEN`, não crie webhook e não tente
+chamar endpoints de pagamento descritos em documentação antiga. Por enquanto,
+o app oferece somente o PIX manual configurado separadamente em cada igreja.
+
+Uma integração futura exigirá OAuth/credenciais por igreja, validação oficial
+da assinatura e um projeto próprio de migração e testes.
+
+## Verificação e deploy
+
+Na raiz do repositório:
+
 ```bash
-cd functions
-npm install
-
-# Segredos (não versionados):
-firebase functions:secrets:set MP_ACCESS_TOKEN
-firebase functions:secrets:set MP_WEBHOOK_SECRET   # opcional (validar assinatura)
-
-firebase deploy --only functions
+npm --prefix functions ci
+npm --prefix functions test
+node scripts/verificar_producao.js --functions
+firebase deploy --only functions --project nova-alianca-app
 ```
-Depois, no painel do Mercado Pago, configure a **URL de notificação (webhook)**
-apontando para a função `mercadoPagoWebhook`.
 
-## Integração no app (cliente)
-O app já tem a dependência `cloud_functions`. Para usar (após o deploy):
-```dart
-final fn = FirebaseFunctions.instanceFor(region: 'southamerica-east1')
-    .httpsCallable('criarContribuicaoPix');
-final res = await fn.call({'tipo': 'dizimo', 'valor': 50.0, 'igrejaId': 'principal'});
-// res.data['copiaECola'], res.data['qrCodeBase64'], res.data['transacaoId']
-```
-Enquanto as functions não estiverem publicadas, o fluxo de contribuição
-permanece **honesto** no app (PIX manual identificado, cartão/boleto indisponíveis).
-
-## Pendências externas
-- Plano **Blaze** habilitado.
-- Credenciais **Mercado Pago** (access token de produção/sandbox).
-- URL de webhook configurada no painel do Mercado Pago.
+O deploy só deve ocorrer depois que os testes e o verificador passarem, com a
+conta autenticada no projeto exato `nova-alianca-app`. Consulte também
+`DEPLOY_PRODUCAO.md` e `CONTROLE_CUSTOS_FIREBASE.md`.

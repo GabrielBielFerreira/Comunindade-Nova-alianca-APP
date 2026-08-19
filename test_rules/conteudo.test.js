@@ -144,6 +144,37 @@ describe("CONTEÚDO — inativar em vez de apagar", () => {
 });
 
 describe("ORAÇÃO — moderação por unidade", () => {
+  test("fila inclui pedido privado somente para moderador da unidade", async () => {
+    await seed(testEnv, (fs) =>
+      fs.doc(`igrejas/${OLINDA}/pedidos_oracao/privado`).set({
+        autor_id: U.visitante,
+        texto: "Pedido pastoral reservado",
+        privado: true,
+        aprovado: false,
+        recusado: false,
+      })
+    );
+
+    const consultaOlinda = db(U.moderadorOlinda)
+      .collection(`igrejas/${OLINDA}/pedidos_oracao`)
+      .where("aprovado", "==", false);
+    const resultado = await assertSucceeds(consultaOlinda.get());
+    expect(resultado.docs.map((doc) => doc.id)).toContain("privado");
+
+    await assertFails(
+      db(U.membroOlinda)
+        .collection(`igrejas/${OLINDA}/pedidos_oracao`)
+        .where("aprovado", "==", false)
+        .get()
+    );
+    await assertFails(
+      db(U.moderadorOlinda)
+        .collection(`igrejas/${PETROLINA}/pedidos_oracao`)
+        .where("aprovado", "==", false)
+        .get()
+    );
+  });
+
   test("moderador aprova pedido da propria unidade", async () => {
     await assertSucceeds(
       db(U.moderadorOlinda)

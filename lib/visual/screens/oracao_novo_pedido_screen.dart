@@ -35,8 +35,6 @@ class _OracaoNovoPedidoScreenState
   final _descriptionController = TextEditingController();
 
   String? _category;
-  bool _wantsVisit = false;
-  bool _wantsCall = false;
   bool _publishToMural = false;
   bool _saving = false;
   bool _nomePreenchido = false;
@@ -80,13 +78,15 @@ class _OracaoNovoPedidoScreenState
       final uid =
           usuario?.uid ?? await ref.read(authActionsProvider).garantirUsuario();
 
-      final texto = '[$_category] ${_descriptionController.text.trim()}';
-      await ref.read(oracaoRepositoryProvider).criarPedido(
+      await ref
+          .read(oracaoRepositoryProvider)
+          .criarPedido(
             autorId: uid,
             autorNome: _nameController.text.trim(),
-            texto: texto,
+            texto: _descriptionController.text.trim(),
             // "Publicar no mural" => público; caso contrário, privado.
             privado: !_publishToMural,
+            categoria: _category,
           );
       if (!mounted) return;
       _showMessage('Pedido enviado com fé!');
@@ -208,26 +208,6 @@ class _OracaoNovoPedidoScreenState
                                 minLines: 6,
                                 maxLines: 6,
                                 textInputAction: TextInputAction.newline,
-                              ),
-                              SizedBox(height: 24 * scale),
-                              _YesNoGroup(
-                                scale: scale,
-                                question:
-                                    'Você gostaria de receber uma visita da igreja?',
-                                value: _wantsVisit,
-                                onChanged: (value) {
-                                  setState(() => _wantsVisit = value);
-                                },
-                              ),
-                              SizedBox(height: 24 * scale),
-                              _YesNoGroup(
-                                scale: scale,
-                                question:
-                                    'Deseja receber uma ligação da equipe pastoral?',
-                                value: _wantsCall,
-                                onChanged: (value) {
-                                  setState(() => _wantsCall = value);
-                                },
                               ),
                               SizedBox(height: 24 * scale),
                               _YesNoGroup(

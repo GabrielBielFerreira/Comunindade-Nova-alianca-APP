@@ -30,6 +30,7 @@ const path = require('path');
 
 const RAIZ = path.resolve(__dirname, '..');
 const PROJETO_ESPERADO = 'nova-alianca-app';
+const STORAGE_BUCKET_ESPERADO = 'nova-alianca-app.firebasestorage.app';
 const PACOTE_ANDROID_ESPERADO = 'br.com.novaalianca.nova_alianca_app';
 
 /** Marcadores que NUNCA podem existir num artefato de produção. */
@@ -202,6 +203,19 @@ function verificarPainel() {
   const apiKey = (process.env.FB_API_KEY || '').trim();
   if (apiKey && apiKey.includes('fake')) {
     falhar('FB_API_KEY parece ser a chave falsa do emulador.');
+  }
+
+  const storageBucket = (process.env.FB_STORAGE_BUCKET || '').trim();
+  if (storageBucket && storageBucket !== STORAGE_BUCKET_ESPERADO) {
+    falhar(
+      'FB_STORAGE_BUCKET e "' +
+        storageBucket +
+        '", e nao o bucket de producao "' +
+        STORAGE_BUCKET_ESPERADO +
+        '".'
+    );
+  } else if (storageBucket === STORAGE_BUCKET_ESPERADO) {
+    passou('FB_STORAGE_BUCKET aponta para ' + STORAGE_BUCKET_ESPERADO);
   }
 }
 

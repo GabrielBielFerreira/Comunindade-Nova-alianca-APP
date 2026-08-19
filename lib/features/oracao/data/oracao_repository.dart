@@ -5,8 +5,7 @@ import 'pedido_oracao_model.dart';
 
 /// Pedidos de oração de UMA unidade: `igrejas/{igrejaId}/pedidos_oracao`.
 ///
-/// Ordenação no cliente; os filtros de igualdade vão ao servidor porque as
-/// Rules exigem que a consulta declare `privado`/`aprovado`.
+/// Ordenação no cliente; filtros de igualdade estáveis vão ao servidor.
 class OracaoRepository {
   OracaoRepository(this._scope);
 
@@ -23,13 +22,13 @@ class OracaoRepository {
         .map((snap) => _ordenar(snap, decrescente: true));
   }
 
-  /// Fila de moderação: públicos ainda não aprovados e não recusados.
+  /// Fila reservada da equipe: TODOS os pedidos ainda não concluídos.
+  ///
+  /// O moderador autorizado pelas Rules pode ler públicos e privados. Filtrar
+  /// `privado == false` aqui fazia justamente os pedidos pastorais reservados
+  /// desaparecerem da única fila que deveria acolhê-los.
   Stream<List<PedidoOracaoModel>> streamPendentesModeracao() {
-    return _col
-        .where('privado', isEqualTo: false)
-        .where('aprovado', isEqualTo: false)
-        .snapshots()
-        .map((snap) {
+    return _col.where('aprovado', isEqualTo: false).snapshots().map((snap) {
       final lista = _ordenar(snap, decrescente: false);
       // Recusados continuam no banco (histórico) mas saem da fila.
       return lista.where((p) => !p.recusado).toList();
@@ -48,8 +47,11 @@ class OracaoRepository {
     required bool decrescente,
   }) {
     final lista = snap.docs.map(PedidoOracaoModel.fromFirestore).toList();
-    lista.sort((a, b) =>
-        decrescente ? b.criadoEm.compareTo(a.criadoEm) : a.criadoEm.compareTo(b.criadoEm));
+    lista.sort(
+      (a, b) => decrescente
+          ? b.criadoEm.compareTo(a.criadoEm)
+          : a.criadoEm.compareTo(b.criadoEm),
+    );
     return lista;
   }
 
@@ -88,6 +90,9 @@ class OracaoRepository {
     required bool privado,
     bool anonimo = false,
     bool urgente = false,
+    String? categoria,
+    bool solicitaVisita = false,
+    bool solicitaLigacao = false,
   }) async {
     final pedido = PedidoOracaoModel(
       id: '',
@@ -97,13 +102,15 @@ class OracaoRepository {
       privado: privado,
       anonimo: anonimo,
       urgente: urgente,
+      categoria: categoria,
+      solicitaVisita: solicitaVisita,
+      solicitaLigacao: solicitaLigacao,
       status: StatusPedidoOracao.recebido,
       criadoEm: DateTime.now(),
     );
     await _col.add(pedido.toMap());
-    // A notificação para a equipe de intercessão (pedido urgente) é disparada
-    // por Cloud Function no create deste documento — o cliente não tem
-    // permissão de escrever em notificações.
+    // A Function de urgência decide no servidor se o autor é elegível para
+    // push. Sessões anônimas permanecem na fila, mas não disparam notificação.
   }
 
   /// Reação "Estou orando".

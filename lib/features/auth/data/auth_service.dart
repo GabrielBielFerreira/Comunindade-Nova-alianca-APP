@@ -56,9 +56,18 @@ class AuthService {
       );
     } catch (erro) {
       // A conta do Auth já existe, mas sem os documentos ela não serve para
-      // nada. Encerrar a sessão evita prender a pessoa numa tela de
-      // "Preparando sua conta..." que nunca resolve.
-      await _auth.signOut();
+      // nada e também bloquearia uma nova tentativa com "e-mail já em uso".
+      // Como acabou de ser criada, a autenticação é recente e `delete()` deve
+      // ser permitido. Mesmo se a limpeza remota falhar, encerramos a sessão
+      // para não prender a pessoa numa conta parcialmente provisionada.
+      try {
+        await credential.user?.delete();
+      } catch (_) {
+        // Preserva o erro original do provisionamento. Uma conta residual
+        // ainda pode ser removida pelo fluxo explícito de recuperação.
+      } finally {
+        await _auth.signOut();
+      }
       rethrow;
     }
 
@@ -92,7 +101,11 @@ class AuthService {
     // Espelha exatamente o que as Rules aceitam no autocadastro: sempre
     // pendente, sempre membro, sempre sem funções administrativas.
     batch.set(
-      _db.collection('igrejas').doc(igrejaId.valor).collection('membros').doc(uid),
+      _db
+          .collection('igrejas')
+          .doc(igrejaId.valor)
+          .collection('membros')
+          .doc(uid),
       {
         'perfil': PerfilComunitario.membro.valor,
         'status': StatusVinculo.pendente.valor,
@@ -201,8 +214,10 @@ class AuthService {
         message: 'A conta não tem e-mail para vincular a senha.',
       );
     }
-    final credential =
-        EmailAuthProvider.credential(email: email, password: senha);
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: senha,
+    );
     await user.linkWithCredential(credential);
   }
 
@@ -210,9 +225,10 @@ class AuthService {
     // Desconecta também do Google para permitir trocar de conta no próximo
     // acesso. Falha/lentidão aqui NUNCA deve impedir o logout do Firebase.
     try {
-      await _googleSignIn
-          .signOut()
-          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      await _googleSignIn.signOut().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     await _auth.signOut();
   }
@@ -244,6 +260,5 @@ class IgrejaObrigatoriaNoCadastro implements Exception {
   const IgrejaObrigatoriaNoCadastro();
 
   @override
-  String toString() =>
-      'Escolha uma igreja para concluir seu cadastro.';
+  String toString() => 'Escolha uma igreja para concluir seu cadastro.';
 }

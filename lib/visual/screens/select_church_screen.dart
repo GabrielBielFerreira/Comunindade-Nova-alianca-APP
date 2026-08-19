@@ -9,7 +9,6 @@ import '../../features/igrejas/data/igreja_opcao.dart';
 import '../../features/igrejas/providers/escolha_igreja_provider.dart';
 import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
-import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../escala_tela.dart';
 
@@ -29,8 +28,8 @@ enum ModoSelecaoIgreja {
   /// Primeira abertura do aplicativo, sem sessão.
   ///
   /// Define a unidade pública em foco (o visitante passa a ver o conteúdo
-  /// dela) e também a pré-seleção do cadastro. Segue para "Bem-vindo"
-  /// SUBSTITUINDO a rota, para não empilhar a seleção atrás do Welcome.
+  /// dela) e também a pré-seleção do cadastro. O [RootGate] permanece como
+  /// rota raiz e reconstrói para "Bem-vindo" quando a preferência muda.
   onboarding,
 
   /// Aberta a partir do formulário de cadastro.
@@ -48,7 +47,12 @@ enum ModoSelecaoIgreja {
 }
 
 class SelectChurchScreen extends ConsumerStatefulWidget {
-  const SelectChurchScreen({super.key, this.modo = ModoSelecaoIgreja.onboarding});
+  const SelectChurchScreen({
+    super.key,
+    this.modo = ModoSelecaoIgreja.onboarding,
+  });
+
+  static const routeName = '/select-church';
 
   final ModoSelecaoIgreja modo;
 
@@ -57,7 +61,9 @@ class SelectChurchScreen extends ConsumerStatefulWidget {
   static double _scaleFor(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final effectiveWidth = math.min(width, _referenceWidth);
-    return (effectiveWidth / _referenceWidth).clamp(escalaMinima, 1.0).toDouble();
+    return (effectiveWidth / _referenceWidth)
+        .clamp(escalaMinima, 1.0)
+        .toDouble();
   }
 
   @override
@@ -130,7 +136,9 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
                             SizedBox(height: 24 * scale),
                             igrejasAsync.when(
                               loading: () => Padding(
-                                padding: EdgeInsets.symmetric(vertical: 32 * scale),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: 32 * scale,
+                                ),
                                 child: const Center(
                                   child: CircularProgressIndicator(),
                                 ),
@@ -206,21 +214,31 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
   Future<void> _confirmar(IgrejaOpcao church) async {
     switch (widget.modo) {
       case ModoSelecaoIgreja.onboarding:
-        // A unidade pública passa a ser o contexto do visitante...
-        await ref.read(igrejaVisualizadaProvider.notifier).definir(church.id);
-        // ...e já fica pré-selecionada se a pessoa decidir se cadastrar.
-        await ref
-            .read(igrejaEscolhidaCadastroProvider.notifier)
-            .definir(church.id);
+        final rotaDireta =
+            ModalRoute.of(context)?.settings.name ==
+            SelectChurchScreen.routeName;
+        final navigator = Navigator.of(context);
+        final escolhaCadastro = ref.read(
+          igrejaEscolhidaCadastroProvider.notifier,
+        );
+        final igrejaVisualizada = ref.read(igrejaVisualizadaProvider.notifier);
 
-        if (!mounted) return;
-        // Fecha o bottom sheet.
-        Navigator.of(context).pop();
-        if (!mounted) return;
-        // `pushReplacement` para a seleção não ficar empilhada atrás do
-        // Welcome — voltar dali levaria a uma tela já resolvida.
-        Navigator.of(context)
-            .pushReplacementNamed(VisualRoutes.welcomeAccess);
+        // Fecha o sheet ANTES de alterar o provider observado pelo RootGate.
+        // A mudança de estado é síncrona e pode desmontar esta tela enquanto
+        // o SharedPreferences ainda está sendo persistido.
+        navigator.pop();
+
+        // Persiste primeiro a pré-seleção do cadastro e, por último, muda a
+        // unidade pública. Esta última alteração faz o RootGate reconstruir
+        // para "Bem-vindo" com as duas preferências já coerentes.
+        await escolhaCadastro.definir(church.id);
+        await igrejaVisualizada.definir(church.id);
+
+        if (!rotaDireta || !navigator.mounted) return;
+        // Compatibilidade com links/rotas antigas: remove a rota própria e
+        // revela o RootGate, que já reagiu à preferência persistida. Assim a
+        // decisão de entrada continua centralizada no gate.
+        navigator.pop();
 
       case ModoSelecaoIgreja.cadastro:
         // Só a escolha do cadastro. NÃO mexe na unidade visualizada: o

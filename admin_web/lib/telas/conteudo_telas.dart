@@ -1395,6 +1395,8 @@ class _ListaOracao extends ConsumerWidget {
                         Etiqueta(texto: p.nomeExibicao, cor: Cores.corpo),
                         if (p.anonimo)
                           const Etiqueta(texto: 'Anônimo', cor: Cores.info),
+                        if (p.privado)
+                          const Etiqueta(texto: 'Privado', cor: Cores.alerta),
                         if (p.urgente)
                           const Etiqueta(texto: 'Urgente', cor: Cores.erro),
                         if (p.criadoEm != null)
@@ -1438,9 +1440,13 @@ class _ListaOracao extends ConsumerWidget {
                               () => ref
                                   .read(conteudoRepositoryProvider)!
                                   .aprovarOracao(p.id, uid),
-                              sucesso: 'Pedido publicado no mural.',
+                              sucesso: p.privado
+                                  ? 'Pedido privado confirmado para a equipe.'
+                                  : 'Pedido publicado no mural.',
                             ),
-                            child: const Text('Aprovar'),
+                            child: Text(
+                              p.privado ? 'Confirmar recebimento' : 'Aprovar',
+                            ),
                           ),
                         ],
                       ),

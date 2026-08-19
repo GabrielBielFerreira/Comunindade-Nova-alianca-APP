@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/auth/providers/auth_controller.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/oracao/providers/oracao_providers.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/oracao_bottom_navigation.dart';
 import '../escala_tela.dart';
 
-class OracaoPedidoUrgenteScreen extends StatefulWidget {
+class OracaoPedidoUrgenteScreen extends ConsumerStatefulWidget {
   const OracaoPedidoUrgenteScreen({super.key, required this.isLeader});
 
   final bool isLeader;
 
   @override
-  State<OracaoPedidoUrgenteScreen> createState() =>
+  ConsumerState<OracaoPedidoUrgenteScreen> createState() =>
       _OracaoPedidoUrgenteScreenState();
 }
 
-class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
+class _OracaoPedidoUrgenteScreenState
+    extends ConsumerState<OracaoPedidoUrgenteScreen> {
   static const _designWidth = 390.0;
   static const _background = Color(0xFFFAFAFA);
   static const _header = Color(0xFFFCF9F8);
@@ -33,7 +38,7 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
   final _descriptionController = TextEditingController();
 
   String _category = 'Outro';
-  String _privacy = 'Identificado para equipe';
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -49,13 +54,53 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
       );
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_saving) return;
     if (_descriptionController.text.trim().isEmpty) {
       _showMessage('Descreva brevemente o pedido');
       return;
     }
 
-    _showMessage('Pedido urgente visual enviado');
+    setState(() => _saving = true);
+    try {
+      // Visitantes recebem uma sessão anônima apenas para satisfazer as Rules.
+      // O RootGate continua tratando essa credencial como experiência pública.
+      final firebaseUser = ref.read(authStateProvider).valueOrNull;
+      final usuario = ref.read(usuarioProvider);
+      final uid =
+          firebaseUser?.uid ??
+          await ref.read(authActionsProvider).garantirUsuario();
+      final anonimo = firebaseUser == null || firebaseUser.isAnonymous;
+      final nome = usuario?.nome.trim().isNotEmpty == true
+          ? usuario!.nome.trim()
+          : (firebaseUser?.displayName?.trim().isNotEmpty == true
+                ? firebaseUser!.displayName!.trim()
+                : 'Visitante');
+
+      await ref
+          .read(oracaoRepositoryProvider)
+          .criarPedido(
+            autorId: uid,
+            autorNome: nome,
+            texto: _descriptionController.text.trim(),
+            // Urgência é sempre reservada. Publicação no mural deve passar
+            // pelo fluxo comum e pela decisão explícita de moderação.
+            privado: true,
+            anonimo: anonimo,
+            urgente: true,
+            categoria: _category,
+          );
+
+      if (!mounted) return;
+      _showMessage('Pedido urgente registrado com prioridade.');
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        _showMessage('Não foi possível enviar. Tente novamente.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -137,32 +182,25 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
                                 label: 'Privacidade do pedido',
                               ),
                               SizedBox(height: 8 * scale),
-                              _PrivacyCard(
-                                scale: scale,
-                                selected:
-                                    _privacy == 'Identificado para equipe',
-                                title: 'Identificado para equipe',
-                                description:
-                                    'A equipe saberá quem você é para\n'
-                                    'oferecer suporte pastoral direcionado.',
-                                onTap: () {
-                                  setState(
-                                    () => _privacy = 'Identificado para equipe',
-                                  );
-                                },
-                              ),
-                              SizedBox(height: 16 * scale),
-                              _PrivacyCard(
-                                scale: scale,
-                                selected: _privacy == 'Publico no mural',
-                                title: 'Publico no mural',
-                                description:
-                                    'o pedido será compartilhado com a\n'
-                                    'equipe de intercessão e pastoral tabem\n'
-                                    'no mural de oração',
-                                onTap: () {
-                                  setState(() => _privacy = 'Publico no mural');
-                                },
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(16 * scale),
+                                decoration: BoxDecoration(
+                                  color: _soft,
+                                  borderRadius: BorderRadius.circular(
+                                    10 * scale,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Este pedido ficará reservado e será '
+                                  'visível somente para a equipe autorizada '
+                                  'da igreja selecionada.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14 * scale,
+                                    height: 20 / 14,
+                                    color: _body,
+                                  ),
+                                ),
                               ),
                               SizedBox(height: 32 * scale),
                               Container(
@@ -179,7 +217,10 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
                                 ),
                                 child: _UrgentSubmitButton(
                                   scale: scale,
-                                  onTap: _submit,
+                                  label: _saving
+                                      ? 'Enviando...'
+                                      : 'Enviar pedido',
+                                  onTap: _saving ? null : _submit,
                                 ),
                               ),
                             ],
@@ -311,7 +352,7 @@ class _UrgentAlertCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'A equipe de intercessão\nserá acionada',
+                  'Pedido registrado com prioridade',
                   style: GoogleFonts.montserrat(
                     fontSize: 20 * scale,
                     fontWeight: FontWeight.w600,
@@ -323,7 +364,7 @@ class _UrgentAlertCard extends StatelessWidget {
                 Text.rich(
                   TextSpan(
                     text:
-                        'Sua mensagem será enviada com prioridade para a liderança. Este canal é para apoio espiritual e ',
+                        'O pedido ficará destacado na fila reservada da igreja. Este canal é para apoio espiritual e ',
                     children: [
                       TextSpan(
                         text:
@@ -521,115 +562,16 @@ class _UrgentTextArea extends StatelessWidget {
   }
 }
 
-class _PrivacyCard extends StatelessWidget {
-  const _PrivacyCard({
+class _UrgentSubmitButton extends StatelessWidget {
+  const _UrgentSubmitButton({
     required this.scale,
-    required this.selected,
-    required this.title,
-    required this.description,
+    required this.label,
     required this.onTap,
   });
 
   final double scale;
-  final bool selected;
-  final String title;
-  final String description;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: selected ? _OracaoPedidoUrgenteScreenState._soft : Colors.white,
-      borderRadius: BorderRadius.circular(10 * scale),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10 * scale),
-        child: Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(17 * scale),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected
-                  ? _OracaoPedidoUrgenteScreenState._primary
-                  : _OracaoPedidoUrgenteScreenState._line,
-            ),
-            borderRadius: BorderRadius.circular(10 * scale),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                offset: const Offset(0, 1),
-                blurRadius: 1.5,
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 20 * scale,
-                height: 20 * scale,
-                margin: EdgeInsets.only(top: 2 * scale),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    width: 2,
-                    color: selected
-                        ? _OracaoPedidoUrgenteScreenState._primary
-                        : _OracaoPedidoUrgenteScreenState._line,
-                  ),
-                ),
-                child: selected
-                    ? Container(
-                        width: 10 * scale,
-                        height: 10 * scale,
-                        decoration: const BoxDecoration(
-                          color: _OracaoPedidoUrgenteScreenState._primary,
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                    : null,
-              ),
-              SizedBox(width: 16 * scale),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 14 * scale,
-                        fontWeight: FontWeight.w500,
-                        height: 20 / 14,
-                        color: _OracaoPedidoUrgenteScreenState._title,
-                      ),
-                    ),
-                    SizedBox(height: 4 * scale),
-                    Text(
-                      description,
-                      style: GoogleFonts.inter(
-                        fontSize: 14 * scale,
-                        fontWeight: FontWeight.w400,
-                        height: 20 / 14,
-                        color: _OracaoPedidoUrgenteScreenState._muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _UrgentSubmitButton extends StatelessWidget {
-  const _UrgentSubmitButton({required this.scale, required this.onTap});
-
-  final double scale;
-  final VoidCallback onTap;
+  final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -652,7 +594,7 @@ class _UrgentSubmitButton extends StatelessWidget {
             Icon(Icons.send_rounded, size: 16 * scale),
             SizedBox(width: 8 * scale),
             Text(
-              'Enviar pedido',
+              label,
               style: GoogleFonts.inter(
                 fontSize: 14 * scale,
                 fontWeight: FontWeight.w500,

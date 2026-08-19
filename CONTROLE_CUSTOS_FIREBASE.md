@@ -50,6 +50,10 @@ setGlobalOptions({
 monitoramento (ver `DEPLOY_PRODUCAO.md`), para não derrubar o aplicativo e o
 painel reais antes de validá-los.
 
+A notificação de pedido de oração urgente tem ainda um limite transacional de
+**um push por autor e por igreja a cada dez minutos**. Pedidos adicionais
+continuam registrados para acolhimento, mas não repetem o disparo ao FCM.
+
 ### Como conferir antes de publicar
 
 ```bash
@@ -113,10 +117,27 @@ node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifa
 > seria criada num repositório de artefatos vazio e o nosso continuaria
 > acumulando imagens.
 
-Confira a política aplicada logo em seguida:
+O Firebase CLI usado aqui não oferece o comando
+`functions:artifacts:getpolicy`. Confira a política aplicada pelo Console:
+
+**Google Cloud Console** → **Artifact Registry** → **Repositórios** → região
+`southamerica-east1` → repositório `gcf-artifacts` → **Políticas de limpeza**.
+
+Se o `gcloud` estiver instalado e autenticado, a verificação equivalente é:
 
 ```bash
-node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifacts:getpolicy --location southamerica-east1 --project nova-alianca-app
+gcloud artifacts repositories describe gcf-artifacts \
+  --location=southamerica-east1 \
+  --project=nova-alianca-app \
+  --format="yaml(cleanupPolicies)"
+```
+
+Se o repositório tiver outro nome, descubra-o primeiro com:
+
+```bash
+gcloud artifacts repositories list \
+  --location=southamerica-east1 \
+  --project=nova-alianca-app
 ```
 
 Não use `--none`: isso desliga a limpeza.

@@ -15,6 +15,9 @@ class PedidoOracaoModel {
   final bool privado;
   final bool anonimo;
   final bool urgente;
+  final String? categoria;
+  final bool solicitaVisita;
+  final bool solicitaLigacao;
 
   /// Moderação: pedidos públicos só aparecem na Comunidade após `aprovado`.
   final bool aprovado;
@@ -41,6 +44,9 @@ class PedidoOracaoModel {
     required this.privado,
     this.anonimo = false,
     this.urgente = false,
+    this.categoria,
+    this.solicitaVisita = false,
+    this.solicitaLigacao = false,
     this.aprovado = false,
     this.recusado = false,
     this.motivoRecusa,
@@ -68,6 +74,9 @@ class PedidoOracaoModel {
       privado: data['privado'] as bool? ?? false,
       anonimo: data['anonimo'] as bool? ?? false,
       urgente: data['urgente'] as bool? ?? false,
+      categoria: data['categoria'] as String?,
+      solicitaVisita: data['solicita_visita'] as bool? ?? false,
+      solicitaLigacao: data['solicita_ligacao'] as bool? ?? false,
       aprovado: data['aprovado'] as bool? ?? false,
       recusado: data['recusado'] as bool? ?? false,
       motivoRecusa: data['motivo_recusa'] as String?,
@@ -87,21 +96,24 @@ class PedidoOracaoModel {
   }
 
   Map<String, dynamic> toMap() => {
-        'autor_id': autorId,
-        'autor_nome': autorNome,
-        'texto': texto,
-        'privado': privado,
-        'anonimo': anonimo,
-        'urgente': urgente,
-        'aprovado': aprovado,
-        'recusado': recusado,
-        'motivo_recusa': motivoRecusa,
-        'moderado_por': moderadoPor,
-        'moderado_em': moderadoEm != null ? Timestamp.fromDate(moderadoEm!) : null,
-        'status': status.name,
-        'criado_em': Timestamp.fromDate(criadoEm),
-        'testemunho': testemunho,
-        'oram_count': oramCount,
-        'oram_por': oramPor,
-      };
+    'autor_id': autorId,
+    'autor_nome': autorNome,
+    'texto': texto,
+    'privado': privado,
+    'anonimo': anonimo,
+    'urgente': urgente,
+    'categoria': categoria,
+    'solicita_visita': solicitaVisita,
+    'solicita_ligacao': solicitaLigacao,
+    'aprovado': aprovado,
+    'recusado': recusado,
+    'motivo_recusa': motivoRecusa,
+    'moderado_por': moderadoPor,
+    'moderado_em': moderadoEm != null ? Timestamp.fromDate(moderadoEm!) : null,
+    'status': status.name,
+    'criado_em': Timestamp.fromDate(criadoEm),
+    'testemunho': testemunho,
+    'oram_count': oramCount,
+    'oram_por': oramPor,
+  };
 }

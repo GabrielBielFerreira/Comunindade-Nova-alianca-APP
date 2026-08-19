@@ -13,7 +13,9 @@ final usuarioAtualProvider = StreamProvider<UsuarioModel?>((ref) {
   final authState = ref.watch(authStateProvider);
   return authState.when(
     data: (user) {
-      if (user == null) return Stream.value(null);
+      // Usuário anônimo é apenas a credencial técnica de um visitante para
+      // ações abertas. Ele não possui `usuarios/{uid}` nem vínculo de igreja.
+      if (user == null || user.isAnonymous) return Stream.value(null);
       return ref.watch(authServiceProvider).streamUsuarioAtual();
     },
     loading: () => Stream.value(null),
