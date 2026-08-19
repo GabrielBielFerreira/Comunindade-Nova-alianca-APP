@@ -96,7 +96,7 @@ class ConfiguracaoFirebase {
   //     --dart-define=FB_SENDER_ID=... \
   //     --dart-define=FB_PROJECT_ID=nova-alianca-app \
   //     --dart-define=FB_AUTH_DOMAIN=nova-alianca-app.firebaseapp.com \
-  //     --dart-define=FB_STORAGE_BUCKET=nova-alianca-app.appspot.com
+  //     --dart-define=FB_STORAGE_BUCKET=nova-alianca-app.firebasestorage.app
   static const String _apiKey = String.fromEnvironment('FB_API_KEY');
   static const String _appId = String.fromEnvironment('FB_APP_ID');
   static const String _senderId = String.fromEnvironment('FB_SENDER_ID');

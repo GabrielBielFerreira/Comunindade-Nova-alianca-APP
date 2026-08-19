@@ -5,6 +5,7 @@ import 'package:admin_web/telas/conteudo_telas.dart';
 import 'package:admin_web/telas/igrejas_tela.dart';
 import 'package:admin_web/telas/shell.dart';
 import 'package:admin_web/ui/tema.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -95,12 +96,13 @@ List<Override> _overrides({
   required AcessoIgreja acesso,
   bool isSuperAdmin = false,
   List<AcessoIgreja>? acessos,
+  User? usuario,
 }) {
   Stream<Pagina<T>> pagina<T>(List<T> itens) =>
       Stream.value(Pagina(itens: itens, truncada: false));
 
   return [
-    authStateProvider.overrideWith((ref) => Stream.value(null)),
+    authStateProvider.overrideWith((ref) => Stream.value(usuario)),
     meusAcessosProvider.overrideWith(
       (ref) async => MeusAcessos(
         uid: 'uid',
@@ -148,6 +150,7 @@ Widget _painel({
   required AcessoIgreja acesso,
   bool isSuperAdmin = true,
   List<AcessoIgreja>? acessos,
+  User? usuario,
   String rotaInicial = '/avisos',
 }) {
   return ProviderScope(
@@ -155,6 +158,7 @@ Widget _painel({
       acesso: acesso,
       isSuperAdmin: isSuperAdmin,
       acessos: acessos,
+      usuario: usuario,
     ),
     child: MaterialApp.router(
       theme: TemaPainel.claro(),
@@ -353,6 +357,60 @@ void main() {
       expect(find.textContaining('Petrolina com nome extenso'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+
+    for (final tamanho in const [Size(768, 1024), Size(1024, 768)]) {
+      testWidgets(
+        'em ${tamanho.width.toInt()}px o cabecalho tablet permanece compacto',
+        (tester) async {
+          final acessoAtual = AcessoIgreja(
+            igrejaId: _olinda,
+            nome: 'Comunidade Nova Aliança — Unidade Metropolitana de Olinda',
+            ativa: true,
+            perfil: PerfilComunitario.pastor,
+            status: 'aprovado',
+            funcoesAdmin: const {},
+            acessarPainel: true,
+            lerFinancas: true,
+            gerenciarConteudo: true,
+            moderarOracao: true,
+            aprovarMembro: true,
+            gerenciarLideranca: true,
+          );
+          final outroAcesso = AcessoIgreja(
+            igrejaId: _petrolina,
+            nome:
+                'Comunidade Nova Aliança — Unidade Metropolitana de Petrolina',
+            ativa: true,
+            perfil: PerfilComunitario.pastor,
+            status: 'aprovado',
+            funcoesAdmin: const {},
+            acessarPainel: true,
+            lerFinancas: true,
+            gerenciarConteudo: true,
+            moderarOracao: true,
+            aprovarMembro: true,
+            gerenciarLideranca: true,
+          );
+
+          await esperarSemOverflow(
+            tester,
+            _painel(
+              acesso: acessoAtual,
+              acessos: [acessoAtual, outroAcesso],
+              usuario: _UsuarioComEmailLongo(),
+            ),
+            tamanho: tamanho,
+            escalaTexto: 1.3,
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byTooltip('Trocar unidade'), findsOneWidget);
+          expect(find.byTooltip('Conta'), findsOneWidget);
+          expect(find.byType(DropdownButton<String>), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   });
 
   group('Telas restantes do painel', () {
@@ -382,4 +440,13 @@ void main() {
       });
     }
   });
+}
+
+class _UsuarioComEmailLongo extends Fake implements User {
+  @override
+  String? get displayName => null;
+
+  @override
+  String? get email =>
+      'responsavel.pela.administracao.geral@comunidadenovaalianca.org.br';
 }

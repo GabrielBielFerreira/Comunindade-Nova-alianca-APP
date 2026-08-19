@@ -167,7 +167,10 @@ class _Moldura extends ConsumerWidget {
                 _AcoesCabecalho(
                   acessos: acessos,
                   acessoAtual: acessoAtual,
-                  compacto: largura < Breakpoints.tablet,
+                  // A AppBar compartilha a largura com menu e título. Enquanto
+                  // o shell estiver sem a barra lateral fixa, seletor e conta
+                  // ficam em ícones e mantêm os detalhes nos respectivos menus.
+                  compacto: true,
                 ),
               ],
             ),

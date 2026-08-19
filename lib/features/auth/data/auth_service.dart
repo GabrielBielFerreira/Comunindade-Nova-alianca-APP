@@ -6,9 +6,14 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'usuario_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Dependências resolvidas sob demanda. Além de evitar trabalho antes de uma
+  // ação de autenticação, isto permite que os testes do RootGate substituam o
+  // serviço sem inicializar um app Firebase real.
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
+
+  GoogleSignIn? _googleSignInInstancia;
+  GoogleSignIn get _googleSignIn => _googleSignInInstancia ??= GoogleSignIn();
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -233,6 +238,45 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Recupera uma conta cuja credencial existe no Firebase Auth, mas cujo
+  /// cadastro atômico no Firestore não foi concluído.
+  ///
+  /// Não tentamos inventar perfil, igreja ou vínculo: antes de excluir a
+  /// credencial, uma leitura obrigatoriamente feita no servidor confirma que
+  /// `usuarios/{uid}` continua ausente. Se o documento já apareceu (por
+  /// exemplo, após uma demora de rede), preservamos a conta e o RootGate pode
+  /// recarregá-la normalmente.
+  ///
+  /// Falhas de rede, permissão ou exclusão são propagadas. Nesse caso a sessão
+  /// permanece aberta na tela segura de recuperação, permitindo tentar de
+  /// novo ou simplesmente sair.
+  Future<RecuperacaoCadastroIncompleto> recuperarCadastroIncompleto() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) {
+      throw const SessaoInvalidaParaRecuperacao();
+    }
+
+    final usuario = await _db
+        .collection('usuarios')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+
+    if (usuario.exists) {
+      return RecuperacaoCadastroIncompleto.cadastroEncontrado;
+    }
+
+    // O login que levou a esta tela é recente, então normalmente o Auth
+    // permite a exclusão. Se ainda assim exigir nova autenticação, não
+    // mascaramos a falha nem liberamos qualquer acesso sem vínculo.
+    await user.delete();
+
+    // `delete()` encerra a sessão atual, mas o sign-out explícito mantém o
+    // comportamento consistente entre plataformas e também solta a conta do
+    // Google para que a pessoa possa refazer o cadastro com outra escolha.
+    await logout();
+    return RecuperacaoCadastroIncompleto.credencialRemovida;
+  }
+
   Future<UsuarioModel?> getUsuarioAtual() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
@@ -261,4 +305,21 @@ class IgrejaObrigatoriaNoCadastro implements Exception {
 
   @override
   String toString() => 'Escolha uma igreja para concluir seu cadastro.';
+}
+
+/// Resultado seguro da recuperação de uma conta parcialmente provisionada.
+enum RecuperacaoCadastroIncompleto {
+  /// O documento apareceu no servidor; nada foi removido.
+  cadastroEncontrado,
+
+  /// Somente a credencial órfã foi removida; o cadastro pode ser refeito.
+  credencialRemovida,
+}
+
+/// A recuperação só é válida para uma conta real autenticada.
+class SessaoInvalidaParaRecuperacao implements Exception {
+  const SessaoInvalidaParaRecuperacao();
+
+  @override
+  String toString() => 'Não há uma conta autenticada para recuperar.';
 }

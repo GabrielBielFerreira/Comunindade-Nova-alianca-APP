@@ -6,6 +6,7 @@ import 'package:nova_alianca_app/app/root_gate.dart';
 import 'package:nova_alianca_app/app/screens/aguardando_aprovacao_screen.dart';
 import 'package:nova_alianca_app/app/screens/conta_inativa_screen.dart';
 import 'package:nova_alianca_app/app/screens/splash_screen.dart';
+import 'package:nova_alianca_app/features/auth/data/auth_service.dart';
 import 'package:nova_alianca_app/features/auth/data/usuario_model.dart';
 import 'package:nova_alianca_app/features/auth/providers/auth_provider.dart';
 import 'package:nova_alianca_app/core/services/notification_preferences.dart';
@@ -336,6 +337,97 @@ void main() {
     Override comVinculo(VinculoIgreja? vinculo) =>
         vinculoPrincipalProvider.overrideWith((ref) => Stream.value(vinculo));
 
+    testWidgets(
+      'conta sem documento mostra recuperação em vez de carregamento infinito',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final auth = _AuthServiceRecuperacaoFake();
+
+        await montar(
+          tester,
+          app(
+            overrides: [
+              comSessao,
+              comIgrejas(unidades),
+              usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+              authServiceProvider.overrideWithValue(auth),
+            ],
+          ),
+        );
+
+        expect(find.byType(ContaSemCadastroScreen), findsOneWidget);
+        expect(find.text('Preparando sua conta...'), findsNothing);
+        expect(
+          find.text('Não foi possível concluir seu cadastro'),
+          findsOneWidget,
+        );
+        expect(find.text('Recomeçar cadastro'), findsOneWidget);
+        expect(find.text('Tentar carregar novamente'), findsOneWidget);
+        expect(find.text('Sair'), findsOneWidget);
+        expect(find.byType(HomeMemberScreen), findsNothing);
+        expect(find.byType(HomeLeaderScreen), findsNothing);
+      },
+    );
+
+    testWidgets('recuperação da credencial órfã é acionável e repetível', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final auth = _AuthServiceRecuperacaoFake();
+
+      await montar(
+        tester,
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+            authServiceProvider.overrideWithValue(auth),
+          ],
+        ),
+      );
+
+      await tester.tap(find.text('Recomeçar cadastro'));
+      await tester.pumpAndSettle();
+
+      expect(auth.recuperacoes, 1);
+      expect(find.text('Recomeçar cadastro'), findsOneWidget);
+      expect(find.byType(HomeMemberScreen), findsNothing);
+      expect(find.byType(HomeLeaderScreen), findsNothing);
+    });
+
+    testWidgets(
+      'falha na recuperação mantém bloqueio e explica próximo passo',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final auth = _AuthServiceRecuperacaoFake(falhar: true);
+
+        await montar(
+          tester,
+          app(
+            overrides: [
+              comSessao,
+              comIgrejas(unidades),
+              usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+              authServiceProvider.overrideWithValue(auth),
+            ],
+          ),
+        );
+
+        await tester.tap(find.text('Recomeçar cadastro'));
+        await tester.pumpAndSettle();
+
+        expect(auth.recuperacoes, 1);
+        expect(
+          find.textContaining('Não foi possível liberar este acesso agora'),
+          findsOneWidget,
+        );
+        expect(find.text('Recomeçar cadastro'), findsOneWidget);
+        expect(find.byType(HomeMemberScreen), findsNothing);
+        expect(find.byType(HomeLeaderScreen), findsNothing);
+      },
+    );
+
     testWidgets('conta sem igreja principal não entra no aplicativo', (
       tester,
     ) async {
@@ -606,4 +698,21 @@ class _UsuarioAnonimoFake extends Fake implements User {
 
   @override
   bool get isAnonymous => true;
+}
+
+class _AuthServiceRecuperacaoFake extends AuthService {
+  _AuthServiceRecuperacaoFake({this.falhar = false});
+
+  final bool falhar;
+  int recuperacoes = 0;
+
+  @override
+  Future<RecuperacaoCadastroIncompleto> recuperarCadastroIncompleto() async {
+    recuperacoes++;
+    if (falhar) throw Exception('falha simulada');
+    return RecuperacaoCadastroIncompleto.credencialRemovida;
+  }
+
+  @override
+  Future<void> logout() async {}
 }
