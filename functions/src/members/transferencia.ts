@@ -10,6 +10,7 @@
  * - exclusiva do `super_admin` (custom claim), nunca do pastor da unidade;
  * - atômica: as duas igrejas e o perfil global mudam na mesma transação;
  * - preserva o documento e o histórico da origem — nada é apagado;
+ * - só parte da igreja PRINCIPAL: um vínculo secundário não move ninguém;
  * - NÃO transporta perfil ministerial nem função administrativa;
  * - idempotente: repetir a chamada não gera segundo efeito nem segunda
  *   auditoria;
@@ -103,11 +104,18 @@ export async function transferirVinculoIgrejaHandler(
 
   return db.runTransaction(async (tx: Transaction) => {
     // ── Leituras (todas antes de qualquer escrita) ────────────────────
-    const [origemSnap, destinoSnap, usuarioSnap] = await Promise.all([
-      tx.get(refVinculo(origemId, alvoUid)),
-      tx.get(refVinculo(destinoId, alvoUid)),
-      tx.get(refUsuario(alvoUid)),
-    ]);
+    const [origemSnap, destinoSnap, usuarioSnap, igrejaDestinoSnap] =
+      await Promise.all([
+        tx.get(refVinculo(origemId, alvoUid)),
+        tx.get(refVinculo(destinoId, alvoUid)),
+        tx.get(refUsuario(alvoUid)),
+        tx.get(db.doc(`igrejas/${destinoId}`)),
+      ]);
+
+    // Uma unidade em implantação fica INATIVA até ter dados institucionais.
+    // Transferir para ela é permitido de propósito — é assim que a primeira
+    // liderança chega antes da abertura —, mas a auditoria registra o fato.
+    const destinoAtiva = igrejaDestinoSnap.data()?.ativa === true;
 
     const origem = paraVinculo(origemId, alvoUid, origemSnap.data());
     const destino = paraVinculo(destinoId, alvoUid, destinoSnap.data());
@@ -140,6 +148,25 @@ export async function transferirVinculoIgrejaHandler(
       throw new HttpsError(
         "not-found",
         "Esta pessoa não possui vínculo com a unidade de origem."
+      );
+    }
+
+    // A origem precisa ser a igreja PRINCIPAL de hoje.
+    //
+    // Sem isto, um vínculo SECUNDÁRIO — alguém aprovado numa segunda unidade
+    // sem que ela seja a sua igreja — serviria de origem e reescreveria
+    // `igreja_principal_id` para um destino que nada tem a ver com o vínculo
+    // oficial. A transferência MOVE a igreja principal; ela só pode partir de
+    // onde a pessoa é membro de fato.
+    if (principalAtual !== origemId) {
+      throw new HttpsError(
+        "failed-precondition",
+        principalAtual === null
+          ? "Esta pessoa não tem igreja principal definida. Defina o vínculo " +
+              "oficial antes de transferir."
+          : "A unidade de origem não é a igreja principal atual " +
+              `("${principalAtual}"); um vínculo secundário não muda a ` +
+              "igreja principal."
       );
     }
     if (origem.status === "inativo") {
@@ -251,6 +278,7 @@ export async function transferirVinculoIgrejaHandler(
     const detalhes = {
       origem: origemId,
       destino: destinoId,
+      destino_ativa: destinoAtiva,
       igreja_principal_anterior: principalAtual,
       igreja_principal_nova: destinoId,
       funcoes_revogadas_na_origem: origem.funcoesAdmin,

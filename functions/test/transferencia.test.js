@@ -207,6 +207,103 @@ describe("transferirVinculoIgreja", () => {
     assert.equal(erro.code, "not-found");
   });
 
+  // ── A origem tem que ser a igreja PRINCIPAL ────────────────────────
+  //
+  // Sem esta regra, um vinculo SECUNDARIO (aprovado numa segunda unidade,
+  // sem ser a igreja da pessoa) serviria de origem e reescreveria
+  // igreja_principal_id para um destino sem relacao com o vinculo oficial.
+
+  it("recusa origem que nao e a igreja principal (vinculo secundario)", async () => {
+    // Ana e membro oficial de PETROLINA e tem um vinculo secundario aprovado
+    // em Olinda. Ninguem pode usar Olinda como origem.
+    await db.doc(`igrejas/${PETROLINA}/membros/membro_ana`).set({
+      status: "aprovado",
+      perfil: "membro",
+      funcoes_admin: [],
+    });
+    await db
+      .doc("usuarios/membro_ana")
+      .set({ igreja_principal_id: PETROLINA }, { merge: true });
+    await db.doc("igrejas/recife").set({ nome: "Nova Alianca Recife", ativa: true });
+
+    const erro = await capturarErro(
+      transferirVinculoIgrejaHandler(
+        requisicao(
+          "super",
+          { superAdmin: true },
+          pedidoTransferencia({ igrejaDestinoId: "recife" })
+        )
+      )
+    );
+
+    assert.equal(erro.code, "failed-precondition");
+    assert.match(erro.message, /igreja principal/i);
+
+    // Nada foi tocado.
+    assert.equal((await vinculo(OLINDA, "membro_ana")).status, "aprovado");
+    assert.equal((await vinculo(PETROLINA, "membro_ana")).status, "aprovado");
+    assert.equal(await vinculo("recife", "membro_ana"), null);
+    assert.equal(
+      (await db.doc("usuarios/membro_ana").get()).data().igreja_principal_id,
+      PETROLINA
+    );
+    assert.equal((await auditoria(OLINDA)).length, 0);
+    assert.equal((await auditoria("recife")).length, 0);
+  });
+
+  it("recusa quem nao tem igreja principal definida", async () => {
+    await db.doc("usuarios/membro_ana").set({ nome: "Ana" });
+
+    const erro = await capturarErro(
+      transferirVinculoIgrejaHandler(
+        requisicao("super", { superAdmin: true }, pedidoTransferencia())
+      )
+    );
+
+    assert.equal(erro.code, "failed-precondition");
+    assert.match(erro.message, /igreja principal/i);
+    assert.equal((await vinculo(OLINDA, "membro_ana")).status, "aprovado");
+    assert.equal(await vinculo(PETROLINA, "membro_ana"), null);
+  });
+
+  it("aceita quando a origem E a igreja principal", async () => {
+    // Contraprova do caso acima: mesmo pedido, com o principal correto.
+    assert.equal(
+      (await db.doc("usuarios/membro_ana").get()).data().igreja_principal_id,
+      OLINDA
+    );
+
+    const resultado = await transferirVinculoIgrejaHandler(
+      requisicao("super", { superAdmin: true }, pedidoTransferencia())
+    );
+    assert.equal(resultado.ok, true);
+    assert.equal(resultado.jaAplicada, false);
+  });
+
+  it("permite destino inativo e registra o fato na auditoria", async () => {
+    // Uma unidade em implantacao nasce inativa. Bloquear aqui impediria a
+    // primeira lideranca de chegar antes da abertura.
+    await db.doc(`igrejas/${PETROLINA}`).set({
+      nome: "Nova Alianca Petrolina",
+      ativa: false,
+    });
+
+    const resultado = await transferirVinculoIgrejaHandler(
+      requisicao("super", { superAdmin: true }, pedidoTransferencia())
+    );
+
+    assert.equal(resultado.ok, true);
+    assert.equal((await vinculo(PETROLINA, "membro_ana")).status, "aprovado");
+    assert.equal((await auditoria(PETROLINA))[0].detalhes.destino_ativa, false);
+  });
+
+  it("auditoria registra destino ativo quando a unidade ja esta no ar", async () => {
+    await transferirVinculoIgrejaHandler(
+      requisicao("super", { superAdmin: true }, pedidoTransferencia())
+    );
+    assert.equal((await auditoria(PETROLINA))[0].detalhes.destino_ativa, true);
+  });
+
   it("recusa vinculo pendente", async () => {
     await db
       .doc(`igrejas/${OLINDA}/membros/membro_ana`)

@@ -8,6 +8,7 @@ import 'package:nova_alianca_app/app/screens/conta_inativa_screen.dart';
 import 'package:nova_alianca_app/app/screens/splash_screen.dart';
 import 'package:nova_alianca_app/features/auth/data/usuario_model.dart';
 import 'package:nova_alianca_app/features/auth/providers/auth_provider.dart';
+import 'package:nova_alianca_app/core/services/notification_preferences.dart';
 import 'package:nova_alianca_app/features/igrejas/providers/igreja_providers.dart';
 import 'package:nova_alianca_app/visual/screens/select_church_screen.dart';
 import 'package:nova_alianca_app/visual/visual_router.dart';
@@ -63,10 +64,7 @@ void main() {
   }) {
     return ProviderScope(
       overrides: overrides,
-      child: MaterialApp(
-        home: home,
-        onGenerateRoute: rotas,
-      ),
+      child: MaterialApp(home: home, onGenerateRoute: rotas),
     );
   }
 
@@ -90,22 +88,21 @@ void main() {
   // ══════════════════════════════════════════════════════════════════
 
   group('Primeira abertura na interface', () {
-    testWidgets('sem escolha salva, o gate abre a seleção de igreja',
-        (tester) async {
+    testWidgets('sem escolha salva, o gate abre a seleção de igreja', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       expect(find.byType(SelectChurchScreen), findsOneWidget);
       expect(find.text('Comunidade Nova Aliança Olinda'), findsOneWidget);
       expect(find.text('Comunidade Nova Aliança Petrolina'), findsOneWidget);
     });
 
-    testWidgets('enquanto lê o disco mostra o splash, não a seleção',
-        (tester) async {
+    testWidgets('enquanto lê o disco mostra o splash, não a seleção', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({
         'igreja_visualizada_id': 'petrolina',
       });
@@ -120,16 +117,14 @@ void main() {
       expect(find.byType(SelectChurchScreen), findsNothing);
     });
 
-    testWidgets('com escolha salva, o gate não volta para a seleção',
-        (tester) async {
+    testWidgets('com escolha salva, o gate não volta para a seleção', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({
         'igreja_visualizada_id': 'petrolina',
       });
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       expect(find.byType(SelectChurchScreen), findsNothing);
     });
@@ -137,10 +132,7 @@ void main() {
     testWidgets('sem unidade ativa, o estado vazio é honesto', (tester) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(const [])]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(const [])]));
 
       expect(find.text('Nenhuma igreja disponível'), findsOneWidget);
       // Nada de unidade inventada para preencher a tela.
@@ -148,14 +140,12 @@ void main() {
       expect(find.textContaining('Petrolina'), findsNothing);
     });
 
-    testWidgets('unidade sem dados oficiais não herda endereço de outra',
-        (tester) async {
+    testWidgets('unidade sem dados oficiais não herda endereço de outra', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       expect(find.text('Endereço não informado'), findsOneWidget);
       expect(find.text('Rua da Sede, 100 — Olinda — PE'), findsOneWidget);
@@ -170,10 +160,7 @@ void main() {
     testWidgets('confirmar grava a escolha e sai da seleção', (tester) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       await tester.tap(find.text('Comunidade Nova Aliança Petrolina'));
       await tester.pumpAndSettle();
@@ -196,10 +183,7 @@ void main() {
     testWidgets('a busca filtra a lista pelo nome', (tester) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       await tester.enterText(find.byType(TextField).first, 'petro');
       await tester.pumpAndSettle();
@@ -208,14 +192,12 @@ void main() {
       expect(find.text('Comunidade Nova Aliança Olinda'), findsNothing);
     });
 
-    testWidgets('voltar para a lista não grava escolha nenhuma',
-        (tester) async {
+    testWidgets('voltar para a lista não grava escolha nenhuma', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
 
-      await montar(
-        tester,
-        app(overrides: [semSessao, comIgrejas(unidades)]),
-      );
+      await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       await tester.tap(find.text('Comunidade Nova Aliança Petrolina'));
       await tester.pumpAndSettle();
@@ -233,8 +215,9 @@ void main() {
   // ══════════════════════════════════════════════════════════════════
 
   group('Troca da unidade visualizada', () {
-    testWidgets('escolher Olinda no modo troca devolve o nome e persiste',
-        (tester) async {
+    testWidgets('escolher Olinda no modo troca devolve o nome e persiste', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({
         'igreja_visualizada_id': 'petrolina',
       });
@@ -287,8 +270,9 @@ void main() {
   // ══════════════════════════════════════════════════════════════════
 
   group('Gate com sessão', () {
-    final comSessao =
-        authStateProvider.overrideWith((ref) => Stream.value(_UsuarioFake()));
+    final comSessao = authStateProvider.overrideWith(
+      (ref) => Stream.value(_UsuarioFake()),
+    );
 
     Override comUsuario(String? igrejaPrincipalId) =>
         usuarioAtualProvider.overrideWith(
@@ -309,40 +293,48 @@ void main() {
     Override comVinculo(VinculoIgreja? vinculo) =>
         vinculoPrincipalProvider.overrideWith((ref) => Stream.value(vinculo));
 
-    testWidgets('conta sem igreja principal não entra no aplicativo',
-        (tester) async {
+    testWidgets('conta sem igreja principal não entra no aplicativo', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
 
       await montar(
         tester,
-        app(overrides: [
-          comSessao,
-          comIgrejas(unidades),
-          comUsuario(null),
-          comVinculo(null),
-        ]),
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario(null),
+            comVinculo(null),
+          ],
+        ),
       );
 
       expect(find.byType(SemIgrejaVinculadaScreen), findsOneWidget);
     });
 
-    testWidgets('vínculo pendente vai para aguardando aprovação',
-        (tester) async {
+    testWidgets('vínculo pendente vai para aguardando aprovação', (
+      tester,
+    ) async {
       SharedPreferences.setMockInitialValues({});
 
       await montar(
         tester,
-        app(overrides: [
-          comSessao,
-          comIgrejas(unidades),
-          comUsuario('olinda'),
-          comVinculo(VinculoIgreja(
-            uid: 'uid-ana',
-            igrejaId: olinda,
-            status: StatusVinculo.pendente,
-            perfil: PerfilComunitario.membro,
-          )),
-        ]),
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('olinda'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: olinda,
+                status: StatusVinculo.pendente,
+                perfil: PerfilComunitario.membro,
+              ),
+            ),
+          ],
+        ),
       );
 
       expect(find.byType(AguardandoAprovacaoScreen), findsOneWidget);
@@ -353,25 +345,30 @@ void main() {
 
       await montar(
         tester,
-        app(overrides: [
-          comSessao,
-          comIgrejas(unidades),
-          comUsuario('olinda'),
-          comVinculo(VinculoIgreja(
-            uid: 'uid-ana',
-            igrejaId: olinda,
-            // É o estado em que a origem fica depois de uma transferência.
-            status: StatusVinculo.inativo,
-            perfil: PerfilComunitario.lider,
-          )),
-        ]),
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('olinda'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: olinda,
+                // É o estado em que a origem fica depois de uma transferência.
+                status: StatusVinculo.inativo,
+                perfil: PerfilComunitario.lider,
+              ),
+            ),
+          ],
+        ),
       );
 
       expect(find.byType(ContaInativaScreen), findsOneWidget);
     });
 
-    testWidgets('depois da transferencia, o gate entra pela nova unidade',
-        (tester) async {
+    testWidgets('depois da transferencia, o gate entra pela nova unidade', (
+      tester,
+    ) async {
       // Estado que a transferencia oficial deixa: igreja principal ja e
       // Petrolina e o vinculo la esta aprovado. A preferencia local antiga
       // ainda aponta para Olinda e nao pode segurar a pessoa la.
@@ -381,17 +378,21 @@ void main() {
 
       await montar(
         tester,
-        app(overrides: [
-          comSessao,
-          comIgrejas(unidades),
-          comUsuario('petrolina'),
-          comVinculo(VinculoIgreja(
-            uid: 'uid-ana',
-            igrejaId: petrolina,
-            status: StatusVinculo.aprovado,
-            perfil: PerfilComunitario.membro,
-          )),
-        ]),
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('petrolina'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: petrolina,
+                status: StatusVinculo.aprovado,
+                perfil: PerfilComunitario.membro,
+              ),
+            ),
+          ],
+        ),
       );
 
       // Nenhuma tela de bloqueio: o vinculo de destino libera a entrada.
@@ -401,8 +402,65 @@ void main() {
       expect(find.byType(SelectChurchScreen), findsNothing);
     });
 
-    testWidgets('estar visualizando outra unidade não muda a decisão do gate',
-        (tester) async {
+    testWidgets(
+      'as notificacoes seguem a igreja PRINCIPAL, nao a visualizada',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final espiao = _TopicosEspiao();
+        NotificationPreferences.topicos = espiao;
+        addTearDown(() {
+          NotificationPreferences.topicos = const TopicosFcmFirebase();
+        });
+
+        final container = ProviderContainer(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('olinda'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: olinda,
+                status: StatusVinculo.aprovado,
+                perfil: PerfilComunitario.membro,
+              ),
+            ),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(home: const RootGate(), onGenerateRoute: rotas),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(espiao.inscritos, [
+          'igreja_olinda_transmissoes',
+          'igreja_olinda_eventos',
+          'igreja_olinda_comunicacoes',
+        ]);
+
+        espiao.inscritos.clear();
+        espiao.cancelados.clear();
+
+        // Visitar Petrolina e so contexto de leitura: nao pode reconfigurar de
+        // forma permanente para onde as notificacoes desta pessoa vao.
+        await container
+            .read(igrejaVisualizadaProvider.notifier)
+            .definir(petrolina);
+        await tester.pumpAndSettle();
+
+        expect(espiao.inscritos, isEmpty);
+        expect(espiao.cancelados, isEmpty);
+      },
+    );
+
+    testWidgets('estar visualizando outra unidade não muda a decisão do gate', (
+      tester,
+    ) async {
       // Visitando Petrolina, mas o vínculo oficial é de Olinda e está
       // pendente: o gate continua barrando. Ver outra igreja não libera nada.
       SharedPreferences.setMockInitialValues({
@@ -411,22 +469,38 @@ void main() {
 
       await montar(
         tester,
-        app(overrides: [
-          comSessao,
-          comIgrejas(unidades),
-          comUsuario('olinda'),
-          comVinculo(VinculoIgreja(
-            uid: 'uid-ana',
-            igrejaId: olinda,
-            status: StatusVinculo.pendente,
-            perfil: PerfilComunitario.membro,
-          )),
-        ]),
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('olinda'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: olinda,
+                status: StatusVinculo.pendente,
+                perfil: PerfilComunitario.membro,
+              ),
+            ),
+          ],
+        ),
       );
 
       expect(find.byType(AguardandoAprovacaoScreen), findsOneWidget);
     });
   });
+}
+
+/// Observa as inscricoes de topico sem precisar do Firebase.
+class _TopicosEspiao implements TopicosFcm {
+  final inscritos = <String>[];
+  final cancelados = <String>[];
+
+  @override
+  Future<void> inscrever(String topico) async => inscritos.add(topico);
+
+  @override
+  Future<void> cancelar(String topico) async => cancelados.add(topico);
 }
 
 /// `User` mínimo: o gate só precisa saber que existe uma sessão.

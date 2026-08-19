@@ -209,6 +209,12 @@ Regras:
 - Exclusiva do `super_admin`. Pastor da unidade NÃO transfere.
 - Move a igreja principal: inativa o vínculo de origem e aprova o de destino
   na MESMA transação, junto com `usuarios/{uid}.igreja_principal_id`.
+- A origem informada precisa ser a igreja principal ATUAL da pessoa. Um vínculo
+  SECUNDÁRIO — alguém aprovado numa segunda unidade sem que ela seja a sua
+  igreja — não serve de origem e não move ninguém (`failed-precondition`).
+- Destino INATIVO é permitido de propósito: uma unidade em implantação nasce
+  inativa e precisa receber a primeira liderança antes de abrir. A auditoria
+  registra `destino_ativa`.
 - Não transporta perfil ministerial nem função administrativa: quem chega ao
   destino sem vínculo prévio entra como `membro`, sem função e sem ministério.
 - Um vínculo JÁ APROVADO no destino conserva o perfil que era dele naquela
@@ -358,6 +364,36 @@ Eles não podem editar manualmente o valor recebido nem transformar uma transaç
 - Exibir a unidade recebedora antes de qualquer contribuição.
 - Separar tópicos FCM por igreja.
 - Remover rotas administrativas internas quando o painel atingir paridade.
+
+### Tópicos FCM por igreja
+
+Formato oficial — use exatamente este nome ao enviar pelo Firebase Console ou
+por uma Function futura:
+
+```text
+igreja_<igrejaId>_transmissoes
+igreja_<igrejaId>_eventos
+igreja_<igrejaId>_comunicacoes
+```
+
+Exemplos: `igreja_olinda_eventos`, `igreja_petrolina_comunicacoes`.
+
+Regras:
+
+- o tópico deriva do `IgrejaId`, nunca do NOME da igreja;
+- a inscrição segue a igreja **principal** (vínculo oficial). Visitar outra
+  unidade é contexto de leitura e não reconfigura para onde as notificações
+  vão;
+- os tópicos globais da versão anterior (`transmissoes`, `eventos`,
+  `comunicacoes`) misturavam Olinda e Petrolina. O aplicativo **cancela** essas
+  inscrições na primeira sincronização — quem já tinha o app instalado sai
+  delas sozinho;
+- transferência oficial cancela os tópicos da unidade antiga antes de assinar
+  os da nova;
+- o logout cancela os tópicos da unidade da sessão.
+
+Implementação e contrato: `lib/core/services/notification_preferences.dart`,
+coberto por `test/notificacoes_por_igreja_test.dart`.
 
 ## 12. Migração
 

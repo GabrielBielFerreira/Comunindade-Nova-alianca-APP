@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/fcm_service.dart';
+import '../../../core/services/notification_preferences.dart';
 import '../data/auth_service.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 
@@ -73,11 +74,25 @@ class AuthActions {
     // demorar/travar; ela NUNCA deve bloquear o logout. Limitamos o tempo e
     // ignoramos falhas — o token é reconciliado no próximo login.
     try {
-      await FcmService.desativarToken()
-          .timeout(const Duration(seconds: 3), onTimeout: () {});
+      await FcmService.desativarToken().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {},
+      );
     } catch (_) {
       // Timeout/falha ao desativar token não deve impedir o logout.
     }
+
+    // Sai dos tópicos da unidade: sem isto o aparelho continuaria recebendo
+    // avisos de uma igreja cuja sessão já terminou.
+    try {
+      await NotificationPreferences.cancelarTudo().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {},
+      );
+    } catch (_) {
+      // Idem: não pode travar o logout.
+    }
+
     await _auth.logout();
   }
 }

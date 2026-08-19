@@ -14,6 +14,7 @@
  * Uso:
  *   node scripts/verificar_producao.js --app
  *   node scripts/verificar_producao.js --painel
+ *   node scripts/verificar_producao.js --functions
  *   node scripts/verificar_producao.js --artefato build/app/outputs/flutter-apk/app-release.apk
  *   node scripts/verificar_producao.js --app --artefato <caminho>
  *
@@ -196,6 +197,125 @@ function verificarPainel() {
   }
 }
 
+// ── Cloud Functions: limites de custo e nada de pagamento legado ────────
+
+/** Limites exigidos, espelhando `functions/src/opcoes.ts`. */
+const LIMITES_FUNCTIONS = {
+  regiao: 'southamerica-east1',
+  minInstances: 0,
+  maxInstancesMax: 1,
+  memoriaMb: 256,
+  concurrency: 1,
+  cpu: 'gcf_gen1',
+  timeoutMax: 30,
+};
+
+/** Pagamento legado: webhook sem validação de assinatura. Nunca publicar. */
+const FUNCTIONS_PROIBIDAS = [
+  'criarPagamentoPix',
+  'criarPreferenciaCheckout',
+  'webhookMercadoPago',
+  'mercadoPagoWebhook',
+];
+
+function verificarFunctions() {
+  const bundle = path.join(RAIZ, 'functions', 'lib', 'index.js');
+  if (!fs.existsSync(bundle)) {
+    falhar(
+      'functions/lib/index.js nao existe: o deploy publicaria codigo antigo ou nada.\n' +
+        '    Rode: npm --prefix functions run build'
+    );
+    return;
+  }
+
+  // O bundle so e inspecionavel depois de carregado; o Admin SDK exige um
+  // projectId, e aqui ele e apenas nominal (nada e lido do Firestore).
+  process.env.GCLOUD_PROJECT = process.env.GCLOUD_PROJECT || PROJETO_ESPERADO;
+
+  let funcoes;
+  try {
+    funcoes = require(bundle);
+  } catch (erro) {
+    falhar('Nao foi possivel carregar functions/lib/index.js: ' + erro.message);
+    return;
+  }
+
+  const nomes = Object.keys(funcoes);
+  if (nomes.length === 0) {
+    falhar('Nenhuma Function exportada: o deploy nao publicaria nada.');
+    return;
+  }
+
+  for (const proibida of FUNCTIONS_PROIBIDAS) {
+    if (nomes.includes(proibida)) {
+      falhar(
+        'Function de pagamento legada exportada: ' +
+          proibida +
+          '.\n    O webhook legado nao valida x-signature. Nao pode ir ao ar.'
+      );
+    }
+  }
+
+  const semLimite = [];
+  for (const nome of nomes) {
+    const e = funcoes[nome].__endpoint;
+    if (!e) {
+      semLimite.push(nome + ' (sem endpoint de deploy)');
+      continue;
+    }
+
+    const problemas = [];
+    if (!Array.isArray(e.region) || e.region[0] !== LIMITES_FUNCTIONS.regiao) {
+      problemas.push('regiao=' + JSON.stringify(e.region));
+    }
+    if (e.maxInstances === undefined || e.maxInstances === null) {
+      problemas.push('sem maxInstances');
+    } else if (e.maxInstances > LIMITES_FUNCTIONS.maxInstancesMax) {
+      problemas.push('maxInstances=' + e.maxInstances);
+    }
+    if (e.minInstances > LIMITES_FUNCTIONS.minInstances) {
+      // Instancia aquecida e cobrada mesmo parada.
+      problemas.push('minInstances=' + e.minInstances);
+    }
+    if (e.availableMemoryMb > LIMITES_FUNCTIONS.memoriaMb) {
+      problemas.push('memoria=' + e.availableMemoryMb + 'MiB');
+    }
+    if (e.cpu !== LIMITES_FUNCTIONS.cpu) {
+      problemas.push('cpu=' + e.cpu);
+    }
+    if (e.concurrency > LIMITES_FUNCTIONS.concurrency) {
+      problemas.push('concurrency=' + e.concurrency);
+    }
+    if (e.timeoutSeconds > LIMITES_FUNCTIONS.timeoutMax) {
+      problemas.push('timeout=' + e.timeoutSeconds + 's');
+    }
+
+    if (problemas.length) semLimite.push(nome + ' (' + problemas.join(', ') + ')');
+  }
+
+  if (semLimite.length) {
+    falhar(
+      'Function(s) sem os limites de custo exigidos:\n    - ' +
+        semLimite.join('\n    - ') +
+        '\n    Corrija functions/src/opcoes.ts. No plano Blaze nao existe teto ' +
+        'automatico de gastos.'
+    );
+    return;
+  }
+
+  passou(
+    nomes.length +
+      ' Function(s) com limite de custo (max ' +
+      LIMITES_FUNCTIONS.maxInstancesMax +
+      ' instancia, ' +
+      LIMITES_FUNCTIONS.memoriaMb +
+      'MiB, timeout ' +
+      LIMITES_FUNCTIONS.timeoutMax +
+      's, sem instancia aquecida).'
+  );
+  passou('Nenhuma Function de pagamento legada exportada.');
+}
+
 // ── Artefato gerado ─────────────────────────────────────────────────────
 
 function verificarArtefato(caminho) {
@@ -266,6 +386,7 @@ function main() {
 
   if (args.includes('--app')) verificarApp();
   if (args.includes('--painel')) verificarPainel();
+  if (args.includes('--functions')) verificarFunctions();
 
   const i = args.indexOf('--artefato');
   if (i !== -1) {

@@ -10,6 +10,10 @@
  * por igreja e validação de x-signature.
  */
 
+// PRIMEIRO import, sempre: `setGlobalOptions` precisa rodar antes de qualquer
+// função ser construída, senão os limites de custo não são aplicados a ela.
+import "./opcoes";
+
 // Autorização/sessão
 export { meusAcessos } from "./auth/meusAcessos";
 

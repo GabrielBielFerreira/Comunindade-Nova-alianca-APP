@@ -110,11 +110,14 @@ class _DialogoTransferenciaState extends State<DialogoTransferencia> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Igreja atual: ${widget.nomeOrigem}',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: cores.outline),
+                // "Unidade de origem", e não "igreja atual": esta é a unidade
+                // em foco no painel, que o servidor exige ser também a igreja
+                // PRINCIPAL da pessoa. Se ela for membro de outra, a operação
+                // é recusada com essa explicação.
+                'Unidade de origem: ${widget.nomeOrigem}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: cores.outline),
               ),
               const SizedBox(height: 20),
 
@@ -152,6 +155,8 @@ class _DialogoTransferenciaState extends State<DialogoTransferencia> {
                 icone: Icons.info_outline,
                 cor: cores.outline,
                 texto:
+                    'Só é possível transferir a partir da igreja PRINCIPAL da '
+                    'pessoa: um vínculo secundário não muda onde ela é membro. '
                     'Cargos e permissões NÃO são transportados. A pessoa chega '
                     'ao destino como membro comum, sem função administrativa e '
                     'sem ministérios. O vínculo em ${widget.nomeOrigem} fica '
@@ -217,12 +222,12 @@ class _DialogoTransferenciaState extends State<DialogoTransferencia> {
         FilledButton(
           onPressed: _valido
               ? () => Navigator.of(context).pop(
-                    PedidoTransferencia(
-                      destino: _destino!,
-                      motivo: _motivo.text.trim(),
-                      confirmarSaidaDePastor: _confirmadoPastor,
-                    ),
-                  )
+                  PedidoTransferencia(
+                    destino: _destino!,
+                    motivo: _motivo.text.trim(),
+                    confirmarSaidaDePastor: _confirmadoPastor,
+                  ),
+                )
               : null,
           child: const Text('Transferir'),
         ),
@@ -248,8 +253,7 @@ class _Aviso extends StatelessWidget {
         Expanded(
           child: Text(
             texto,
-            style:
-                Theme.of(context).textTheme.bodySmall?.copyWith(color: cor),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cor),
           ),
         ),
       ],
