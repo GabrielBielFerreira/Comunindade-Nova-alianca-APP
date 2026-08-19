@@ -1,11 +1,11 @@
 {
-    "name": "admin_web",
-    "short_name": "admin_web",
+    "name": "Painel de Gestão — Nova Aliança",
+    "short_name": "Painel Nova Aliança",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Painel administrativo da rede Nova Aliança.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

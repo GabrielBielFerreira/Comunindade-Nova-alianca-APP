@@ -51,7 +51,7 @@ import '../features/ministerios/screens/meu_ministerio_screen.dart';
 abstract class VisualRoutes {
   static const entraconta = '/';
   static const login = '/login';
-  static const selectChurch = '/select-church';
+  static const selectChurch = SelectChurchScreen.routeName;
   static const welcomeAccess = '/welcome-access';
   static const cadastro = '/cadastro';
   static const recuperarSenha = '/recuperar-senha';

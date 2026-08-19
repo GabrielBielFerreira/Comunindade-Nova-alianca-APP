@@ -94,6 +94,25 @@ describe("CONTEÚDO — quem pode gerenciar", () => {
   }
 });
 
+describe("CONTEÚDO — consultas públicas exigem filtro", () => {
+  for (const col of COLECOES) {
+    test(`visitante consulta ${col} com publico == true`, async () => {
+      await assertSucceeds(
+        db(U.visitante)
+          .collection(`igrejas/${OLINDA}/${col}`)
+          .where("publico", "==", true)
+          .get()
+      );
+    });
+
+    test(`visitante NAO consulta ${col} sem filtro publico`, async () => {
+      await assertFails(
+        db(U.visitante).collection(`igrejas/${OLINDA}/${col}`).get()
+      );
+    });
+  }
+});
+
 describe("CONTEÚDO — inativar em vez de apagar", () => {
   test("editor inativa aviso (update), sem apagar", async () => {
     await assertSucceeds(
@@ -125,6 +144,37 @@ describe("CONTEÚDO — inativar em vez de apagar", () => {
 });
 
 describe("ORAÇÃO — moderação por unidade", () => {
+  test("fila inclui pedido privado somente para moderador da unidade", async () => {
+    await seed(testEnv, (fs) =>
+      fs.doc(`igrejas/${OLINDA}/pedidos_oracao/privado`).set({
+        autor_id: U.visitante,
+        texto: "Pedido pastoral reservado",
+        privado: true,
+        aprovado: false,
+        recusado: false,
+      })
+    );
+
+    const consultaOlinda = db(U.moderadorOlinda)
+      .collection(`igrejas/${OLINDA}/pedidos_oracao`)
+      .where("aprovado", "==", false);
+    const resultado = await assertSucceeds(consultaOlinda.get());
+    expect(resultado.docs.map((doc) => doc.id)).toContain("privado");
+
+    await assertFails(
+      db(U.membroOlinda)
+        .collection(`igrejas/${OLINDA}/pedidos_oracao`)
+        .where("aprovado", "==", false)
+        .get()
+    );
+    await assertFails(
+      db(U.moderadorOlinda)
+        .collection(`igrejas/${PETROLINA}/pedidos_oracao`)
+        .where("aprovado", "==", false)
+        .get()
+    );
+  });
+
   test("moderador aprova pedido da propria unidade", async () => {
     await assertSucceeds(
       db(U.moderadorOlinda)

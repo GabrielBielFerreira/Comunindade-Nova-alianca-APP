@@ -19,7 +19,8 @@
  *   node scripts/verificar_producao.js --app --artefato <caminho>
  *
  * Variáveis aceitas para o painel (mesmas do --dart-define):
- *   FB_API_KEY, FB_APP_ID, FB_SENDER_ID, FB_PROJECT_ID
+ *   FB_API_KEY, FB_APP_ID, FB_SENDER_ID, FB_PROJECT_ID,
+ *   FB_AUTH_DOMAIN, FB_STORAGE_BUCKET
  */
 
 'use strict';
@@ -29,6 +30,7 @@ const path = require('path');
 
 const RAIZ = path.resolve(__dirname, '..');
 const PROJETO_ESPERADO = 'nova-alianca-app';
+const STORAGE_BUCKET_ESPERADO = 'nova-alianca-app.firebasestorage.app';
 const PACOTE_ANDROID_ESPERADO = 'br.com.novaalianca.nova_alianca_app';
 
 /** Marcadores que NUNCA podem existir num artefato de produção. */
@@ -154,8 +156,8 @@ function verificarApp() {
   const keyProps = lerArquivo('android/key.properties');
   if (keyProps === null) {
     avisos.push(
-      'android/key.properties nao existe: o Gradle cairia na chave de DEBUG.\n' +
-        '    Gere a keystore e o key.properties antes de distribuir o APK.\n' +
+      'android/key.properties nao existe: o Gradle bloqueia tarefas de release.\n' +
+        '    Gere a keystore e o key.properties antes de distribuir APK/AAB.\n' +
         '    (Nao bloqueia builds de teste, mas bloqueia --exigir-assinatura.)'
     );
   } else {
@@ -166,7 +168,14 @@ function verificarApp() {
 // ── Painel web ──────────────────────────────────────────────────────────
 
 function verificarPainel() {
-  const exigidas = ['FB_API_KEY', 'FB_APP_ID', 'FB_PROJECT_ID'];
+  const exigidas = [
+    'FB_API_KEY',
+    'FB_APP_ID',
+    'FB_SENDER_ID',
+    'FB_PROJECT_ID',
+    'FB_AUTH_DOMAIN',
+    'FB_STORAGE_BUCKET',
+  ];
 
   const ausentes = exigidas.filter(
     (nome) => !process.env[nome] || process.env[nome].trim() === ''
@@ -194,6 +203,19 @@ function verificarPainel() {
   const apiKey = (process.env.FB_API_KEY || '').trim();
   if (apiKey && apiKey.includes('fake')) {
     falhar('FB_API_KEY parece ser a chave falsa do emulador.');
+  }
+
+  const storageBucket = (process.env.FB_STORAGE_BUCKET || '').trim();
+  if (storageBucket && storageBucket !== STORAGE_BUCKET_ESPERADO) {
+    falhar(
+      'FB_STORAGE_BUCKET e "' +
+        storageBucket +
+        '", e nao o bucket de producao "' +
+        STORAGE_BUCKET_ESPERADO +
+        '".'
+    );
+  } else if (storageBucket === STORAGE_BUCKET_ESPERADO) {
+    passou('FB_STORAGE_BUCKET aponta para ' + STORAGE_BUCKET_ESPERADO);
   }
 }
 

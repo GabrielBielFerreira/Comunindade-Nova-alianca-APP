@@ -5,6 +5,7 @@ import 'package:admin_web/telas/conteudo_telas.dart';
 import 'package:admin_web/telas/igrejas_tela.dart';
 import 'package:admin_web/telas/shell.dart';
 import 'package:admin_web/ui/tema.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -68,7 +69,8 @@ final _devocionais = <Devocional>[
 const _oracoes = <PedidoOracao>[
   PedidoOracao(
     id: 'p1',
-    texto: 'Peço oração pela saúde da minha mãe, que está internada há '
+    texto:
+        'Peço oração pela saúde da minha mãe, que está internada há '
         'duas semanas aguardando cirurgia.',
     autorNome: 'Maria das Graças Albuquerque',
     urgente: true,
@@ -94,12 +96,13 @@ List<Override> _overrides({
   required AcessoIgreja acesso,
   bool isSuperAdmin = false,
   List<AcessoIgreja>? acessos,
+  User? usuario,
 }) {
   Stream<Pagina<T>> pagina<T>(List<T> itens) =>
       Stream.value(Pagina(itens: itens, truncada: false));
 
   return [
-    authStateProvider.overrideWith((ref) => Stream.value(null)),
+    authStateProvider.overrideWith((ref) => Stream.value(usuario)),
     meusAcessosProvider.overrideWith(
       (ref) async => MeusAcessos(
         uid: 'uid',
@@ -131,7 +134,10 @@ Widget _tela(Widget corpo, {required AcessoIgreja acesso}) {
       routerConfig: GoRouter(
         initialLocation: '/tela',
         routes: [
-          GoRoute(path: '/tela', builder: (_, _) => Scaffold(body: corpo)),
+          GoRoute(
+            path: '/tela',
+            builder: (_, _) => Scaffold(body: corpo),
+          ),
         ],
       ),
     ),
@@ -144,6 +150,7 @@ Widget _painel({
   required AcessoIgreja acesso,
   bool isSuperAdmin = true,
   List<AcessoIgreja>? acessos,
+  User? usuario,
   String rotaInicial = '/avisos',
 }) {
   return ProviderScope(
@@ -151,6 +158,7 @@ Widget _painel({
       acesso: acesso,
       isSuperAdmin: isSuperAdmin,
       acessos: acessos,
+      usuario: usuario,
     ),
     child: MaterialApp.router(
       theme: TemaPainel.claro(),
@@ -162,8 +170,9 @@ Widget _painel({
             routes: [
               GoRoute(path: '/avisos', builder: (_, _) => const AvisosTela()),
               GoRoute(
-                  path: '/dashboard',
-                  builder: (_, _) => const SizedBox.shrink()),
+                path: '/dashboard',
+                builder: (_, _) => const SizedBox.shrink(),
+              ),
             ],
           ),
         ],
@@ -185,8 +194,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('em celular a barra lateral fica recolhida no drawer',
-        (tester) async {
+    testWidgets('em celular a barra lateral fica recolhida no drawer', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(390, 844);
       addTearDown(tester.view.reset);
@@ -206,8 +216,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('em desktop a barra lateral fica fixa, sem drawer',
-        (tester) async {
+    testWidgets('em desktop a barra lateral fica fixa, sem drawer', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -219,8 +230,9 @@ void main() {
       expect(find.byTooltip('Open navigation menu'), findsNothing);
     });
 
-    testWidgets('o menu só mostra o que a capacidade do servidor permite',
-        (tester) async {
+    testWidgets('o menu só mostra o que a capacidade do servidor permite', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -259,8 +271,9 @@ void main() {
       expect(find.text('Igrejas'), findsNothing);
     });
 
-    testWidgets('com um unico acesso nao existe seletor de unidade',
-        (tester) async {
+    testWidgets('com um unico acesso nao existe seletor de unidade', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -271,8 +284,9 @@ void main() {
       expect(find.byType(DropdownButton<String>), findsNothing);
     });
 
-    testWidgets('com dois acessos o seletor aparece e lista as duas unidades',
-        (tester) async {
+    testWidgets('com dois acessos o seletor aparece e lista as duas unidades', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -303,6 +317,100 @@ void main() {
       // O seletor apenas alterna entre unidades JA autorizadas pelo servidor.
       expect(find.byType(DropdownButton<String>), findsOneWidget);
     });
+
+    testWidgets('em 320px dois acessos usam seletor compacto sem overflow', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+
+      final petrolina = AcessoIgreja(
+        igrejaId: _petrolina,
+        nome: 'Comunidade Nova Aliança — Petrolina com nome extenso',
+        ativa: false,
+        perfil: PerfilComunitario.pastor,
+        status: 'aprovado',
+        funcoesAdmin: const {},
+        acessarPainel: true,
+        lerFinancas: true,
+        gerenciarConteudo: true,
+        moderarOracao: true,
+        aprovarMembro: true,
+        gerenciarLideranca: true,
+      );
+
+      await tester.pumpWidget(
+        _painel(
+          acesso: acessoCompleto(),
+          acessos: [acessoCompleto(), petrolina],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Trocar unidade'), findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byTooltip('Trocar unidade'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Petrolina com nome extenso'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final tamanho in const [Size(768, 1024), Size(1024, 768)]) {
+      testWidgets(
+        'em ${tamanho.width.toInt()}px o cabecalho tablet permanece compacto',
+        (tester) async {
+          final acessoAtual = AcessoIgreja(
+            igrejaId: _olinda,
+            nome: 'Comunidade Nova Aliança — Unidade Metropolitana de Olinda',
+            ativa: true,
+            perfil: PerfilComunitario.pastor,
+            status: 'aprovado',
+            funcoesAdmin: const {},
+            acessarPainel: true,
+            lerFinancas: true,
+            gerenciarConteudo: true,
+            moderarOracao: true,
+            aprovarMembro: true,
+            gerenciarLideranca: true,
+          );
+          final outroAcesso = AcessoIgreja(
+            igrejaId: _petrolina,
+            nome:
+                'Comunidade Nova Aliança — Unidade Metropolitana de Petrolina',
+            ativa: true,
+            perfil: PerfilComunitario.pastor,
+            status: 'aprovado',
+            funcoesAdmin: const {},
+            acessarPainel: true,
+            lerFinancas: true,
+            gerenciarConteudo: true,
+            moderarOracao: true,
+            aprovarMembro: true,
+            gerenciarLideranca: true,
+          );
+
+          await esperarSemOverflow(
+            tester,
+            _painel(
+              acesso: acessoAtual,
+              acessos: [acessoAtual, outroAcesso],
+              usuario: _UsuarioComEmailLongo(),
+            ),
+            tamanho: tamanho,
+            escalaTexto: 1.3,
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.byTooltip('Trocar unidade'), findsOneWidget);
+          expect(find.byTooltip('Conta'), findsOneWidget);
+          expect(find.byType(DropdownButton<String>), findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   });
 
   group('Telas restantes do painel', () {
@@ -316,7 +424,11 @@ void main() {
     };
 
     for (final caso in casos.entries) {
-      paraCadaTamanho('${caso.key} não estoura', (tester, tamanho, escala) async {
+      paraCadaTamanho('${caso.key} não estoura', (
+        tester,
+        tamanho,
+        escala,
+      ) async {
         await esperarSemOverflow(
           tester,
           _tela(caso.value, acesso: acessoCompleto()),
@@ -328,4 +440,13 @@ void main() {
       });
     }
   });
+}
+
+class _UsuarioComEmailLongo extends Fake implements User {
+  @override
+  String? get displayName => null;
+
+  @override
+  String? get email =>
+      'responsavel.pela.administracao.geral@comunidadenovaalianca.org.br';
 }

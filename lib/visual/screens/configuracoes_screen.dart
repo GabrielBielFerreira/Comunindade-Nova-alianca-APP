@@ -111,7 +111,7 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
       );
   }
 
-  void _onLinkTap(String label) {
+  Future<void> _onLinkTap(String label) async {
     switch (label) {
       case 'Compartilhar este aplicativo':
         Share.share(
@@ -129,22 +129,23 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
               'Desenvolvido para uso da comunidade.',
         );
       case 'Política de privacidade':
-        _showInfoDialog(
-          'Política de privacidade',
-          'Seus dados são usados apenas para o funcionamento do app e a '
-              'organização da comunidade, e não são compartilhados com '
-              'terceiros para fins comerciais. Para detalhes ou solicitações '
-              'sobre seus dados, fale com a liderança pelo e-mail '
-              '${RedeNovaAlianca.suporteEmail}.',
-        );
+        await _abrirPaginaLegal(AppConfig.politicaPrivacidadeUrl);
       case 'Termos de serviço':
-        _showInfoDialog(
-          'Termos de serviço',
-          'Ao usar este aplicativo, você concorda em utilizá-lo para os fins '
-              'da comunidade, respeitando os demais membros. O conteúdo é de '
-              'uso interno da ${RedeNovaAlianca.nome}. Dúvidas: '
-              '${RedeNovaAlianca.suporteEmail}.',
-        );
+        await _abrirPaginaLegal(AppConfig.termosUsoUrl);
+    }
+  }
+
+  Future<void> _abrirPaginaLegal(String endereco) async {
+    final abriu = await launchUrl(
+      Uri.parse(endereco),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!abriu && mounted) {
+      _showInfoDialog(
+        'Não foi possível abrir a página',
+        'Acesse $endereco no navegador ou fale com a liderança pelo e-mail '
+            '${RedeNovaAlianca.suporteEmail}.',
+      );
     }
   }
 
@@ -170,9 +171,9 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Excluir minha conta'),
         content: Text(
-          'A exclusão da conta é feita pela liderança, mediante solicitação, '
-          'para preservar os registros da comunidade. Deseja enviar um pedido '
-          'de exclusão por e-mail para ${RedeNovaAlianca.suporteEmail}?',
+          'A página pública explica quais dados são excluídos, quais registros '
+          'podem precisar ser retidos e como enviar a solicitação. Deseja '
+          'abri-la agora?',
         ),
         actions: [
           TextButton(
@@ -181,19 +182,14 @@ class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Enviar pedido'),
+            child: const Text('Abrir página'),
           ),
         ],
       ),
     );
 
     if (confirmar != true) return;
-    final uri = Uri.parse(
-      'mailto:${RedeNovaAlianca.suporteEmail}'
-      '?subject=${Uri.encodeComponent('Pedido de exclusão de conta')}'
-      '&body=${Uri.encodeComponent('Olá, gostaria de solicitar a exclusão da minha conta no app.')}',
-    );
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await _abrirPaginaLegal(AppConfig.exclusaoContaUrl);
   }
 
   @override

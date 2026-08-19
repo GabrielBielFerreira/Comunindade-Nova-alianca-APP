@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../biblia/data/bible_book.dart';
 import '../biblia/data/bible_models.dart';
 import '../biblia/providers/bible_providers.dart';
+import '../../core/data/igreja_scope.dart';
+import '../igrejas/providers/igreja_providers.dart';
 import 'palavra_dia_calendario.dart';
 import 'recife_time.dart';
 
@@ -46,14 +48,14 @@ class PalavraDoDia {
   bool get temTexto => texto.trim().isNotEmpty;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'texto': texto,
-        'referencia': referencia,
-        'traducao': traducao,
-        'data': RecifeTime.chaveData(data),
-        'reflexao': reflexao,
-        'especial': especial,
-      };
+    'id': id,
+    'texto': texto,
+    'referencia': referencia,
+    'traducao': traducao,
+    'data': RecifeTime.chaveData(data),
+    'reflexao': reflexao,
+    'especial': especial,
+  };
 
   factory PalavraDoDia.fromJson(Map<String, dynamic> j) {
     final dataStr = j['data'] as String?;
@@ -88,14 +90,31 @@ final dataHojeProvider = StateProvider<DateTime>((ref) => RecifeTime.hoje());
 const _kPrefixoCache = 'palavra_do_dia_';
 const _kCacheLegado = 'palavra_do_dia_cache';
 
+/// Carrega a publicação especial da unidade em foco.
+///
+/// O ponto de injeção mantém o caminho multi-igreja testável sem inicializar o
+/// Firebase: em produção, a leitura sempre acontece em
+/// `igrejas/{igrejaId}/configuracoes/palavra_do_dia`.
+typedef CarregarPalavraEspecial =
+    Future<Map<String, dynamic>?> Function(IgrejaScope scope);
+
+final carregarPalavraEspecialProvider = Provider<CarregarPalavraEspecial>(
+  (ref) => (scope) async {
+    final doc = await scope.configuracoes.doc('palavra_do_dia').get();
+    return doc.data();
+  },
+);
+
 /// Palavra do Dia. Ordem de resolução:
 /// 1) publicação ESPECIAL da liderança (Firebase), dentro da validade;
 /// 2) cache do DIA (offline correto — nunca o versículo de outro dia);
 /// 3) calendário anual (referência local) + texto pela integração bíblica;
 /// 4) offline sem cache: referência correta do dia (sem texto inventado).
-final palavraDoDiaProvider =
-    FutureProvider.autoDispose<PalavraDoDia>((ref) async {
+final palavraDoDiaProvider = FutureProvider.autoDispose<PalavraDoDia>((
+  ref,
+) async {
   final hoje = ref.watch(dataHojeProvider);
+  final scope = ref.watch(igrejaScopeProvider);
   final prefs = await SharedPreferences.getInstance();
   final repo = ref.read(bibleRepositoryProvider);
   final traducao = repo.traducao;
@@ -107,23 +126,29 @@ final palavraDoDiaProvider =
   final indice = PalavraDiaCalendario.indiceDoDia(hoje);
 
   // 1) Conteúdo especial da liderança (só quando online e dentro da validade).
-  try {
-    final doc = await FirebaseFirestore.instance
-        .collection('configuracoes')
-        .doc('palavra_do_dia')
-        .get();
-    final especial = lerPalavraEspecial(doc.data(), hoje, traducao);
-    if (especial != null) return especial; // não cacheia especial (tem validade)
-  } catch (_) {/* segue para o calendário */}
+  if (scope != null) {
+    try {
+      final dados = await ref.read(carregarPalavraEspecialProvider)(scope);
+      final especial = lerPalavraEspecial(dados, hoje, traducao);
+      if (especial != null) {
+        return especial; // não cacheia especial (tem validade)
+      }
+    } catch (_) {
+      /* indisponível: segue para o calendário da rede */
+    }
+  }
 
   // 2) Cache do dia (offline correto).
   final raw = prefs.getString(chaveHoje);
   if (raw != null) {
     try {
       final cached = PalavraDoDia.fromJson(
-          Map<String, dynamic>.from(jsonDecode(raw) as Map));
+        Map<String, dynamic>.from(jsonDecode(raw) as Map),
+      );
       if (cached.temTexto && !cached.especial) return cached;
-    } catch (_) {/* ignora cache corrompido */}
+    } catch (_) {
+      /* ignora cache corrompido */
+    }
   }
 
   // 3) Calendário anual + texto pela integração bíblica.
@@ -148,7 +173,9 @@ final palavraDoDiaProvider =
       );
       await prefs.setString(chaveHoje, jsonEncode(p.toJson()));
       return p;
-    } catch (_) {/* offline: cai para referência-somente */}
+    } catch (_) {
+      /* offline: cai para referência-somente */
+    }
   }
 
   // 4) Offline sem cache: referência correta do dia (sem texto de outro dia).
@@ -162,15 +189,19 @@ final palavraDoDiaProvider =
   );
 });
 
-/// Interpreta a publicação especial (`configuracoes/palavra_do_dia`). Público
-/// para permitir testes unitários das regras de validade.
+/// Interpreta a publicação especial de
+/// `igrejas/{igrejaId}/configuracoes/palavra_do_dia`. Público para permitir
+/// testes unitários das regras de validade.
 ///
 /// Regras: precisa estar `ativo`, ter TEXTO, e a data/hora atual deve estar
 /// dentro de [inicio, fim]. `fim` é OBRIGATÓRIO — assim uma publicação manual
 /// nunca fica ativa indefinidamente; ao expirar, retorna null (o app volta
 /// automaticamente ao calendário anual).
 PalavraDoDia? lerPalavraEspecial(
-    Map<String, dynamic>? d, DateTime hoje, String traducaoPadrao) {
+  Map<String, dynamic>? d,
+  DateTime hoje,
+  String traducaoPadrao,
+) {
   if (d == null) return null;
   final ativo = d['ativo'] as bool? ?? false;
   final texto = (d['texto'] as String? ?? '').trim();
@@ -178,12 +209,16 @@ PalavraDoDia? lerPalavraEspecial(
 
   final inicioTs = d['inicio'] as Timestamp?;
   final fimTs = d['fim'] as Timestamp?;
-  if (fimTs == null) return null; // sem término definido: ignora (não indefinido)
+  if (fimTs == null) {
+    return null; // sem término definido: ignora (não indefinido)
+  }
 
   final agora = RecifeTime.agora();
   final inicio = inicioTs?.toDate();
   final fim = fimTs.toDate();
-  if (inicio != null && agora.isBefore(inicio)) return null; // ainda não começou
+  if (inicio != null && agora.isBefore(inicio)) {
+    return null; // ainda não começou
+  }
   if (agora.isAfter(fim)) return null; // expirou → volta ao calendário
 
   final prioridade = (d['prioridade'] as num?)?.toInt() ?? 0;

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../../../core/data/igreja_scope.dart';
 import '../../avisos/data/ministerio_model.dart';
@@ -12,25 +13,30 @@ final ministeriosRepositoryProvider = Provider<MinisteriosRepository>((ref) {
 });
 
 /// Ministérios ativos da unidade em foco.
-final ministeriosProvider =
-    StreamProvider.autoDispose<List<MinisterioModel>>((ref) {
+final ministeriosProvider = StreamProvider.autoDispose<List<MinisterioModel>>((
+  ref,
+) {
   if (ref.watch(igrejaScopeProvider) == null) return Stream.value(const []);
-  return ref.watch(ministeriosRepositoryProvider).stream();
+  final vinculo = ref.watch(vinculoAtualProvider).valueOrNull;
+  final aprovado = vinculo?.status == StatusVinculo.aprovado;
+  final repo = ref.watch(ministeriosRepositoryProvider);
+  return aprovado ? repo.stream() : repo.streamPublicos();
 });
 
 /// Lista de gestão: todos os ministérios, inclusive inativos.
 final ministeriosGerenciarProvider =
     StreamProvider.autoDispose<List<MinisterioModel>>((ref) {
-  if (ref.watch(igrejaScopeProvider) == null) return Stream.value(const []);
-  return ref.watch(ministeriosRepositoryProvider).streamGerenciar();
-});
+      if (ref.watch(igrejaScopeProvider) == null) return Stream.value(const []);
+      return ref.watch(ministeriosRepositoryProvider).streamGerenciar();
+    });
 
 /// Ministério do usuário na unidade em foco.
 ///
 /// Vem do VÍNCULO daquela unidade — não do documento global — porque
 /// participar de um ministério é relação com a igreja, não com a conta.
-final meuMinisterioProvider =
-    FutureProvider.autoDispose<MinisterioModel?>((ref) async {
+final meuMinisterioProvider = FutureProvider.autoDispose<MinisterioModel?>((
+  ref,
+) async {
   if (ref.watch(igrejaScopeProvider) == null) return null;
 
   final vinculo = ref.watch(vinculoAtualProvider).valueOrNull;

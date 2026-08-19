@@ -6,6 +6,7 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 import '../core/services/fcm_service.dart';
 import '../core/services/notification_preferences.dart';
 import '../features/auth/providers/auth_provider.dart';
+import '../features/auth/data/auth_service.dart';
 import '../features/igrejas/providers/igreja_providers.dart';
 import '../visual/screens/home_leader_screen.dart';
 import '../visual/screens/select_church_screen.dart';
@@ -19,8 +20,8 @@ import 'screens/splash_screen.dart';
 ///
 /// Decide qual experiência renderizar:
 ///
-/// - Não autenticado          → [WelcomeAccessScreen]
-/// - Sem documento de usuário → splash de provisionamento (com saída)
+/// - Não autenticado/anônimo  → [WelcomeAccessScreen]
+/// - Sem documento de usuário → recuperação segura do cadastro incompleto
 /// - Sem igreja principal     → [SemIgrejaVinculadaScreen]
 /// - Vínculo pendente         → [AguardandoAprovacaoScreen]
 /// - Vínculo inativo          → [ContaInativaScreen]
@@ -44,11 +45,13 @@ class RootGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Inicializa o FCM assim que houver um usuário autenticado (contextual).
+    // Inicializa o FCM quando começa uma sessão REAL. A autenticação anônima
+    // existe apenas para permitir ações públicas (como pedido de oração) e
+    // não representa um membro nem deve registrar o aparelho como se fosse.
     ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
-      final estavaLogado = previous?.valueOrNull != null;
-      final estaLogado = next.valueOrNull != null;
-      if (!estavaLogado && estaLogado) {
+      final anterior = previous?.valueOrNull;
+      final atual = next.valueOrNull;
+      if (_iniciouContaReal(anterior, atual)) {
         // Falhas de FCM não devem quebrar o app (ex.: sem google-services.json).
         FcmService.init().catchError((_) {});
       }
@@ -66,15 +69,16 @@ class RootGate extends ConsumerWidget {
       NotificationPreferences.sincronizar(atual).catchError((_) {});
     });
 
-    // Ao AUTENTICAR, descarta a unidade pública escolhida antes do login.
+    // Ao entrar numa CONTA REAL, descarta a unidade pública escolhida antes
+    // do login. Isso também cobre a transição anônimo -> e-mail/Google, na
+    // qual os dois estados possuem User não nulo, mas são sessões diferentes.
     //
     // Sem isto, quem navegou como visitante em Petrolina e depois entrou com
     // conta de Olinda continuaria vendo Petrolina — herdando silenciosamente
     // um contexto que não é o seu. A sessão começa sempre na igreja do
     // vínculo; visitar outra passa a exigir uma troca manual explícita.
     ref.listen<AsyncValue<User?>>(authStateProvider, (previous, next) {
-      final entrou = previous?.valueOrNull == null && next.valueOrNull != null;
-      if (entrou) {
+      if (_iniciouContaReal(previous?.valueOrNull, next.valueOrNull)) {
         ref.read(igrejaVisualizadaProvider.notifier).limpar();
       }
     });
@@ -85,7 +89,10 @@ class RootGate extends ConsumerWidget {
       loading: () => const SplashScreen(),
       error: (_, _) => const WelcomeAccessScreen(),
       data: (firebaseUser) {
-        if (firebaseUser == null) {
+        // A sessão anônima é uma credencial técnica para gravar ações de
+        // visitante sob Rules seguras. Sem perfil/vínculo, ela continua na
+        // experiência pública e nunca cai em "Preparando sua conta...".
+        if (firebaseUser == null || firebaseUser.isAnonymous) {
           // ── Onboarding do visitante ──────────────────────────────────
           //
           // O produto começa escolhendo a igreja: sem unidade em foco não há
@@ -116,11 +123,12 @@ class RootGate extends ConsumerWidget {
           ),
           data: (usuario) {
             if (usuario == null) {
-              // Documento ainda sendo provisionado (logo após o cadastro).
-              return SplashScreen(
-                mensagem: 'Preparando sua conta...',
-                onSair: () => ref.read(authServiceProvider).logout(),
-              );
+              // Uma conta real sem `usuarios/{uid}` pode ser um cadastro cujo
+              // batch falhou e cuja exclusão compensatória também falhou. Não
+              // mostramos carregamento infinito nem criamos vínculo de forma
+              // implícita: a própria pessoa pode revalidar ou remover somente
+              // a credencial órfã e então refazer o cadastro.
+              return const ContaSemCadastroScreen();
             }
 
             // Conta sem unidade: cadastro antigo ou provisionamento parcial.
@@ -155,9 +163,20 @@ class RootGate extends ConsumerWidget {
                   case StatusVinculo.inativo:
                     return const ContaInativaScreen();
                   case StatusVinculo.aprovado:
-                    // Liderança ministerial vem do perfil VALIDADO no
-                    // servidor, dentro desta unidade.
-                    return vinculo.perfil.isLiderancaMinisterial
+                    // O vínculo PRINCIPAL decide se a conta pode entrar. A
+                    // navegação administrativa, porém, segue a unidade EM
+                    // FOCO. Um líder de Olinda que apenas visita Petrolina
+                    // continua vendo o conteúdo público de Petrolina, mas
+                    // não recebe botões de gestão dali sem um vínculo de
+                    // liderança aprovado também em Petrolina.
+                    final visualizandoOutra = ref.watch(
+                      visualizandoOutraIgrejaProvider,
+                    );
+                    final liderNaUnidadeEmFoco = visualizandoOutra
+                        ? ref.watch(isLiderancaNaUnidadeProvider)
+                        : vinculo.perfil.isLiderancaMinisterial;
+
+                    return liderNaUnidadeEmFoco
                         ? const HomeLeaderScreen()
                         : const HomeMemberScreen();
                 }
@@ -168,6 +187,150 @@ class RootGate extends ConsumerWidget {
       },
     );
   }
+}
+
+/// Estado fail-closed para uma credencial real sem documento de usuário.
+///
+/// Nenhuma Home ou permissão é liberada. A recuperação confirma no servidor
+/// que o documento continua ausente antes de excluir a credencial do Auth.
+class ContaSemCadastroScreen extends ConsumerStatefulWidget {
+  const ContaSemCadastroScreen({super.key});
+
+  @override
+  ConsumerState<ContaSemCadastroScreen> createState() =>
+      _ContaSemCadastroScreenState();
+}
+
+class _ContaSemCadastroScreenState
+    extends ConsumerState<ContaSemCadastroScreen> {
+  bool _recuperando = false;
+  String? _erro;
+
+  Future<void> _recomecarCadastro() async {
+    if (_recuperando) return;
+    setState(() {
+      _recuperando = true;
+      _erro = null;
+    });
+
+    try {
+      final resultado = await ref
+          .read(authServiceProvider)
+          .recuperarCadastroIncompleto();
+      if (!mounted) return;
+
+      if (resultado == RecuperacaoCadastroIncompleto.cadastroEncontrado) {
+        // O documento pode ter chegado depois do primeiro snapshot. Nada foi
+        // excluído; apenas forçamos uma nova assinatura do perfil.
+        ref.invalidate(usuarioAtualProvider);
+      }
+      // Quando a credencial é removida, o authState leva o RootGate de volta
+      // ao fluxo público. Não há navegação manual nem estado inventado aqui.
+      setState(() => _recuperando = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _recuperando = false;
+        _erro =
+            'Não foi possível liberar este acesso agora. Verifique sua '
+            'conexão e tente novamente. Se continuar, saia, entre novamente '
+            'e procure o responsável pelo aplicativo.';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.person_off_outlined,
+                    size: 56,
+                    color: Color(0xFF7A0022),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Não foi possível concluir seu cadastro',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Seu acesso foi criado, mas os dados do cadastro e o '
+                    'vínculo com uma igreja não foram encontrados. Nenhum '
+                    'acesso de membro foi liberado.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  if (_erro != null) ...[
+                    const SizedBox(height: 16),
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _erro!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _recuperando ? null : _recomecarCadastro,
+                      child: _recuperando
+                          ? const SizedBox.square(
+                              dimension: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Recomeçar cadastro'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _recuperando
+                          ? null
+                          : () => ref.invalidate(usuarioAtualProvider),
+                      child: const Text('Tentar carregar novamente'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _recuperando
+                        ? null
+                        : () => ref.read(authServiceProvider).logout(),
+                    child: const Text('Sair'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Uma conta real começou quando saímos de nenhuma sessão, de uma sessão
+/// anônima ou trocamos de uid. Comparar apenas null/não-null falhava no caso
+/// anônimo -> e-mail/Google.
+bool _iniciouContaReal(User? anterior, User? atual) {
+  if (atual == null || atual.isAnonymous) return false;
+  return anterior == null || anterior.isAnonymous || anterior.uid != atual.uid;
 }
 
 /// Conta autenticada que não está vinculada a nenhuma unidade.

@@ -33,3 +33,6 @@ export { transferirVinculoIgreja } from "./members/transferencia";
 
 // Unidades
 export { criarIgreja, atualizarIgreja } from "./churches/igrejas";
+
+// Oração urgente: push privado e genérico para a liderança aprovada da unidade.
+export { notificarPedidoOracaoUrgente } from "./notifications/pedidoOracaoUrgente";

@@ -6,8 +6,9 @@ import '../../../core/data/igreja_scope.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../data/igrejas_repository.dart';
 
-final igrejasRepositoryProvider =
-    Provider<IgrejasRepository>((ref) => IgrejasRepository());
+final igrejasRepositoryProvider = Provider<IgrejasRepository>(
+  (ref) => IgrejasRepository(),
+);
 
 /// Unidades ativas da rede (tela de seleção).
 final igrejasAtivasProvider = StreamProvider<List<IgrejaModel>>((ref) {
@@ -33,9 +34,7 @@ final igrejaPrincipalProvider = Provider<IgrejaId?>((ref) {
 class EstadoIgrejaVisualizada {
   const EstadoIgrejaVisualizada({required this.carregado, this.id});
 
-  const EstadoIgrejaVisualizada.carregando()
-      : carregado = false,
-        id = null;
+  const EstadoIgrejaVisualizada.carregando() : carregado = false, id = null;
 
   final bool carregado;
   final IgrejaId? id;
@@ -52,7 +51,8 @@ class EstadoIgrejaVisualizada {
 /// unidade que um usuário autenticado está visitando. Em ambos os casos o
 /// valor é preferência de leitura, nunca autorização.
 class IgrejaVisualizadaNotifier extends StateNotifier<EstadoIgrejaVisualizada> {
-  IgrejaVisualizadaNotifier() : super(const EstadoIgrejaVisualizada.carregando()) {
+  IgrejaVisualizadaNotifier()
+    : super(const EstadoIgrejaVisualizada.carregando()) {
     _carregar();
   }
 
@@ -80,10 +80,10 @@ class IgrejaVisualizadaNotifier extends StateNotifier<EstadoIgrejaVisualizada> {
   Future<void> limpar() => definir(null);
 }
 
-final igrejaVisualizadaProvider = StateNotifierProvider<
-    IgrejaVisualizadaNotifier, EstadoIgrejaVisualizada>(
-  (ref) => IgrejaVisualizadaNotifier(),
-);
+final igrejaVisualizadaProvider =
+    StateNotifierProvider<IgrejaVisualizadaNotifier, EstadoIgrejaVisualizada>(
+      (ref) => IgrejaVisualizadaNotifier(),
+    );
 
 /// Unidade em foco: a visualizada, ou a principal quando não houver troca.
 ///
@@ -192,4 +192,25 @@ final podeGerenciarConteudoProvider = Provider<bool>((ref) {
 final nomeIgrejaEmFocoProvider = Provider<String>((ref) {
   return ref.watch(igrejaAtualDadosProvider).valueOrNull?.nome ??
       'Comunidade Nova Aliança';
+});
+
+/// Dados institucionais da igreja PRINCIPAL — não muda ao visitar outra.
+final igrejaPrincipalDadosProvider = StreamProvider<IgrejaModel?>((ref) {
+  final id = ref.watch(igrejaPrincipalProvider);
+  if (id == null) return Stream.value(null);
+  return ref.watch(igrejasRepositoryProvider).streamIgreja(id);
+});
+
+/// Nome da igreja do VÍNCULO OFICIAL.
+///
+/// Diferente de [nomeIgrejaEmFocoProvider], que segue a unidade visualizada e
+/// serve a cabeçalhos de conteúdo. Onde a tela afirma um vínculo — "igreja
+/// vinculada" na ficha cadastral, por exemplo —, usar o nome em foco faria a
+/// pessoa de Olinda aparecer como membro de Petrolina por estar apenas
+/// visitando.
+///
+/// Devolve `null` enquanto não houver vínculo: a tela mostra um rótulo
+/// honesto em vez de inventar uma unidade.
+final nomeIgrejaPrincipalProvider = Provider<String?>((ref) {
+  return ref.watch(igrejaPrincipalDadosProvider).valueOrNull?.nome;
 });

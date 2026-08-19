@@ -13,6 +13,23 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// Páginas públicas exigidas para transparência e publicação nas lojas.
+  /// Podem ser trocadas por domínio próprio sem alterar o código.
+  static const String politicaPrivacidadeUrl = String.fromEnvironment(
+    'POLITICA_PRIVACIDADE_URL',
+    defaultValue: 'https://nova-alianca-app.web.app/privacidade',
+  );
+
+  static const String exclusaoContaUrl = String.fromEnvironment(
+    'EXCLUSAO_CONTA_URL',
+    defaultValue: 'https://nova-alianca-app.web.app/excluir-conta',
+  );
+
+  static const String termosUsoUrl = String.fromEnvironment(
+    'TERMOS_USO_URL',
+    defaultValue: 'https://nova-alianca-app.web.app/termos',
+  );
+
   /// Habilita recursos multi-igreja (seleção/troca de igreja). Desligado por
   /// padrão: a V1 é exclusiva da Comunidade Nova Aliança.
   static const bool multiIgrejaHabilitada = bool.fromEnvironment(

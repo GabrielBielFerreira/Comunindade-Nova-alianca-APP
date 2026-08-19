@@ -1,6 +1,9 @@
 rules_version = '2';
 
-// Regras do Firebase Storage — Comunidade Nova Aliança.
+// Regras do Firebase Storage — rede Nova Aliança.
+//
+// NEGA POR PADRÃO. Só existe um caminho gravável hoje: a foto de perfil.
+// Qualquer outro uso precisa de uma regra explícita, com teste.
 service firebase.storage {
   match /b/{bucket}/o {
 
@@ -8,30 +11,49 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isDono(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // `contentType` chega nulo quando o cliente não o informa; nesse caso o
+    // Storage assumiria `application/octet-stream`. Comparar direto com null
+    // evita erro de avaliação da regra.
     function isImagem() {
-      return request.resource.contentType.matches('image/.*');
+      return request.resource.contentType != null
+             && request.resource.contentType.matches('image/.*');
     }
 
+    // 2 MB, igual ao limite validado no aplicativo antes do upload.
     function tamanhoOk() {
-      return request.resource.size < 5 * 1024 * 1024; // 5 MB
+      return request.resource.size > 0
+             && request.resource.size <= 2 * 1024 * 1024;
     }
 
-    // Foto de perfil: cada usuário gerencia a sua; leitura por autenticados.
-    match /perfil/{uid}/{arquivo} {
+    // ── Foto de perfil ────────────────────────────────────────────────
+    //
+    // Caminho FIXO `perfil/{uid}/avatar`: a foto nova sobrescreve a anterior.
+    // Um nome com timestamp acumularia um arquivo por troca, e ninguém
+    // apagaria os antigos — armazenamento pago crescendo para sempre.
+    //
+    // A leitura é aberta a autenticados porque o avatar aparece em listas da
+    // própria unidade. O nome do arquivo não é adivinhável sem o uid, e o uid
+    // já é conhecido por quem administra a unidade.
+    match /perfil/{uid}/avatar {
       allow read: if isSignedIn();
-      allow write: if isSignedIn()
-                   && request.auth.uid == uid
-                   && isImagem()
-                   && tamanhoOk();
+      allow write: if isDono(uid) && isImagem() && tamanhoOk();
+      allow delete: if isDono(uid);
     }
 
-    // Anexos de avisos/eventos: leitura por autenticados; escrita via painel/servidor.
-    match /avisos/{arquivo=**} {
-      allow read: if isSignedIn();
-      allow write: if false;
+    // Nada além do avatar entra na pasta de perfil — nem do próprio dono.
+    // Sem isto, `perfil/{uid}/qualquer-coisa` viraria armazenamento livre.
+    match /perfil/{uid}/{arquivo=**} {
+      allow read, write: if false;
     }
 
-    // Bloqueia todo o resto por padrão.
+    // ── Tudo o mais ───────────────────────────────────────────────────
+    //
+    // Anexos de avisos/eventos ainda NÃO são usados pelo código. Quando
+    // forem, entram aqui com regra e teste próprios.
     match /{allPaths=**} {
       allow read, write: if false;
     }

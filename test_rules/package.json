@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "preflight": "node preflight.js",
-    "emu": "npm run preflight && firebase emulators:start --only firestore --project demo-nova-alianca",
+    "emu": "npm run preflight && firebase emulators:start --only firestore,storage --project demo-nova-alianca",
     "pretest": "node preflight.js",
-    "test": "firebase emulators:exec --only firestore --project demo-nova-alianca \"jest --runInBand\""
+    "test": "firebase emulators:exec --only firestore,storage --project demo-nova-alianca \"jest --runInBand\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

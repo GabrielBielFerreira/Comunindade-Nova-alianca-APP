@@ -9,12 +9,22 @@ plugins {
 }
 
 // Assinatura de release: lida de android/key.properties (não versionado).
-// Sem esse arquivo, cai na chave de debug para que `flutter build apk` funcione
-// durante o desenvolvimento. NUNCA publique um release assinado com a chave de debug.
+// Builds debug continuam funcionando sem ela; qualquer tarefa Release falha
+// antes de gerar um artefato assinado com a chave errada.
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+val releaseSolicitado = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
+if (releaseSolicitado && !keystorePropertiesFile.exists()) {
+    throw GradleException(
+        "Build release bloqueado: android/key.properties não existe. " +
+            "Configure a chave de upload antes de gerar APK/AAB de produção."
+    )
 }
 
 android {
@@ -37,7 +47,7 @@ android {
         applicationId = "br.com.novaalianca.nova_alianca_app"
         // minSdk 23: requisito confortável para Firebase Auth/Firestore e FCM.
         minSdk = flutter.minSdkVersion
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
@@ -59,7 +69,8 @@ android {
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
-                // Fallback de desenvolvimento — não usar para publicação.
+                // Este ramo só é alcançável por tarefas não-release. A trava
+                // acima encerra assembleRelease/bundleRelease antes do build.
                 signingConfigs.getByName("debug")
             }
             // R8/shrink desativado por padrão (comportamento padrão do Flutter).

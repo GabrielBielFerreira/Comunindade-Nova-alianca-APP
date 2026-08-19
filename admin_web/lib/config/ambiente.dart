@@ -20,18 +20,36 @@ enum AmbientePainel {
     defaultValue: 'production',
   );
 
-  static final AmbientePainel atual = switch (_bruto.toLowerCase().trim()) {
-    'emulator' || 'emulador' || 'dev' || 'local' => AmbientePainel.emulator,
-    _ => AmbientePainel.production,
-  };
+  /// Decisão de ambiente em tempo de COMPILAÇÃO.
+  ///
+  /// Precisa ser `const`, e não `final`: com um valor apenas `final` o
+  /// compilador não consegue provar qual ramo do `opcoes` será usado e mantém
+  /// os DOIS no bundle. O resultado era um `main.dart.js` de produção
+  /// carregando `demo-nova-alianca`, `fake-api-key` e `localhost` como dados
+  /// mortos — inofensivos em execução, mas suficientes para cegar a
+  /// verificação que procura exatamente essas marcas num artefato publicado.
+  ///
+  /// Por ser `const`, a comparação é literal: use exatamente `emulator`,
+  /// `emulador`, `dev` ou `local`. Qualquer outra grafia cai em produção, que
+  /// falha alto por falta das variáveis em vez de conectar no lugar errado.
+  static const bool emuladorEmTempoDeBuild =
+      _bruto == 'emulator' ||
+      _bruto == 'emulador' ||
+      _bruto == 'dev' ||
+      _bruto == 'local';
+
+  /// Derivado do mesmo `const`, para rótulo e configuração nunca divergirem.
+  static const AmbientePainel atual = emuladorEmTempoDeBuild
+      ? AmbientePainel.emulator
+      : AmbientePainel.production;
 
   bool get isEmulador => this == AmbientePainel.emulator;
   bool get isProducao => this == AmbientePainel.production;
 
   String get rotulo => switch (this) {
-        AmbientePainel.emulator => 'AMBIENTE LOCAL (EMULADOR)',
-        AmbientePainel.production => 'Produção',
-      };
+    AmbientePainel.emulator => 'AMBIENTE LOCAL (EMULADOR)',
+    AmbientePainel.production => 'Produção',
+  };
 }
 
 /// Atalho de leitura para a interface.
@@ -78,17 +96,23 @@ class ConfiguracaoFirebase {
   //     --dart-define=FB_SENDER_ID=... \
   //     --dart-define=FB_PROJECT_ID=nova-alianca-app \
   //     --dart-define=FB_AUTH_DOMAIN=nova-alianca-app.firebaseapp.com \
-  //     --dart-define=FB_STORAGE_BUCKET=nova-alianca-app.appspot.com
+  //     --dart-define=FB_STORAGE_BUCKET=nova-alianca-app.firebasestorage.app
   static const String _apiKey = String.fromEnvironment('FB_API_KEY');
   static const String _appId = String.fromEnvironment('FB_APP_ID');
   static const String _senderId = String.fromEnvironment('FB_SENDER_ID');
   static const String _projectId = String.fromEnvironment('FB_PROJECT_ID');
   static const String _authDomain = String.fromEnvironment('FB_AUTH_DOMAIN');
-  static const String _storageBucket =
-      String.fromEnvironment('FB_STORAGE_BUCKET');
+  static const String _storageBucket = String.fromEnvironment(
+    'FB_STORAGE_BUCKET',
+  );
 
   static bool get producaoConfigurada =>
-      _apiKey.isNotEmpty && _appId.isNotEmpty && _projectId.isNotEmpty;
+      _apiKey.isNotEmpty &&
+      _appId.isNotEmpty &&
+      _senderId.isNotEmpty &&
+      _projectId.isNotEmpty &&
+      _authDomain.isNotEmpty &&
+      _storageBucket.isNotEmpty;
 
   static FirebaseOptions get opcoesProducao {
     if (!producaoConfigurada) {
@@ -117,25 +141,27 @@ class ConfiguracaoFirebase {
       appId: _appId,
       messagingSenderId: _senderId,
       projectId: _projectId,
-      authDomain: _authDomain.isEmpty ? '$_projectId.firebaseapp.com' : _authDomain,
-      storageBucket:
-          _storageBucket.isEmpty ? '$_projectId.appspot.com' : _storageBucket,
+      authDomain: _authDomain,
+      storageBucket: _storageBucket,
     );
   }
 
-  static FirebaseOptions get opcoes => AmbientePainel.atual.isEmulador
-      ? opcoesEmulador
-      : opcoesProducao;
+  /// A condicao e `const`: o compilador remove do bundle o ramo que nao vale
+  /// para este build.
+  static FirebaseOptions get opcoes =>
+      AmbientePainel.emuladorEmTempoDeBuild ? opcoesEmulador : opcoesProducao;
 
   /// Liga os SDKs ao Emulator Suite. Só roda em `APP_ENV=emulator`.
   static Future<void> conectarAoEmulador() async {
     await FirebaseAuth.instance.useAuthEmulator(host, portaAuth);
 
     FirebaseFirestore.instance.useFirestoreEmulator(host, portaFirestore);
-    FirebaseFirestore.instance.settings =
-        const Settings(persistenceEnabled: false);
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: false,
+    );
 
-    FirebaseFunctions.instanceFor(region: regiaoFunctions)
-        .useFunctionsEmulator(host, portaFunctions);
+    FirebaseFunctions.instanceFor(
+      region: regiaoFunctions,
+    ).useFunctionsEmulator(host, portaFunctions);
   }
 }

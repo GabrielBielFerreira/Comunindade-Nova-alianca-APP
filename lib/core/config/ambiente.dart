@@ -22,18 +22,36 @@ enum Ambiente {
     defaultValue: 'production',
   );
 
-  static final Ambiente atual = switch (_bruto.toLowerCase().trim()) {
-    'emulator' || 'emulador' || 'dev' || 'local' => Ambiente.emulator,
-    _ => Ambiente.production,
-  };
+  /// Decisao de ambiente em tempo de COMPILACAO.
+  ///
+  /// Precisa ser `const`, e nao `final`: com um valor apenas `final` o
+  /// compilador nao consegue provar que `conectarAoEmulador()` nunca roda num
+  /// build de producao, e mantem no APK o host `10.0.2.2` e as chamadas
+  /// `useFirestoreEmulator`/`useAuthEmulator`/`useFunctionsEmulator`. Era
+  /// codigo morto, mas cegava a verificacao do artefato, que procura
+  /// exatamente essas marcas.
+  ///
+  /// Por ser `const`, a comparacao e literal: use exatamente `emulator`,
+  /// `emulador`, `dev` ou `local`. Outra grafia cai em producao, que falha
+  /// alto em vez de conectar no lugar errado.
+  static const bool emuladorEmTempoDeBuild =
+      _bruto == 'emulator' ||
+      _bruto == 'emulador' ||
+      _bruto == 'dev' ||
+      _bruto == 'local';
+
+  /// Derivado do mesmo `const`, para rotulo e comportamento nao divergirem.
+  static const Ambiente atual = emuladorEmTempoDeBuild
+      ? Ambiente.emulator
+      : Ambiente.production;
 
   bool get isEmulador => this == Ambiente.emulator;
   bool get isProducao => this == Ambiente.production;
 
   String get rotulo => switch (this) {
-        Ambiente.emulator => 'AMBIENTE LOCAL (EMULADOR)',
-        Ambiente.production => 'Produção',
-      };
+    Ambiente.emulator => 'AMBIENTE LOCAL (EMULADOR)',
+    Ambiente.production => 'Produção',
+  };
 }
 
 /// Projeto Firebase real do produto.
@@ -47,7 +65,8 @@ const String projetoFirebaseProducao = 'nova-alianca-app';
 ///
 /// Em `APP_ENV=emulator` não faz nada — ali apontar para `demo-` é o correto.
 void exigirConfiguracaoDeProducao(FirebaseOptions opcoes) {
-  if (Ambiente.atual.isEmulador) return;
+  // Const: o compilador resolve o desvio e nao arrasta o ramo do emulador.
+  if (Ambiente.emuladorEmTempoDeBuild) return;
 
   final problemas = <String>[
     if (opcoes.projectId != projetoFirebaseProducao)
@@ -108,12 +127,17 @@ Future<void> conectarAoEmulador() async {
 
   await FirebaseAuth.instance.useAuthEmulator(host, HostsEmulador.auth);
 
-  FirebaseFirestore.instance.useFirestoreEmulator(host, HostsEmulador.firestore);
+  FirebaseFirestore.instance.useFirestoreEmulator(
+    host,
+    HostsEmulador.firestore,
+  );
   // Persistência desligada evita cache local mascarar erro de regra durante
   // os testes manuais.
-  FirebaseFirestore.instance.settings =
-      const Settings(persistenceEnabled: false);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: false,
+  );
 
-  FirebaseFunctions.instanceFor(region: 'southamerica-east1')
-      .useFunctionsEmulator(host, HostsEmulador.functions);
+  FirebaseFunctions.instanceFor(
+    region: 'southamerica-east1',
+  ).useFunctionsEmulator(host, HostsEmulador.functions);
 }

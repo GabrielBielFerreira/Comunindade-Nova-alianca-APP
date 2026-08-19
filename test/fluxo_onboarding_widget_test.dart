@@ -6,11 +6,15 @@ import 'package:nova_alianca_app/app/root_gate.dart';
 import 'package:nova_alianca_app/app/screens/aguardando_aprovacao_screen.dart';
 import 'package:nova_alianca_app/app/screens/conta_inativa_screen.dart';
 import 'package:nova_alianca_app/app/screens/splash_screen.dart';
+import 'package:nova_alianca_app/features/auth/data/auth_service.dart';
 import 'package:nova_alianca_app/features/auth/data/usuario_model.dart';
 import 'package:nova_alianca_app/features/auth/providers/auth_provider.dart';
 import 'package:nova_alianca_app/core/services/notification_preferences.dart';
 import 'package:nova_alianca_app/features/igrejas/providers/igreja_providers.dart';
+import 'package:nova_alianca_app/visual/screens/home_leader_screen.dart';
+import 'package:nova_alianca_app/visual/screens/home_member_screen.dart';
 import 'package:nova_alianca_app/visual/screens/select_church_screen.dart';
+import 'package:nova_alianca_app/visual/screens/welcome_access_screen.dart';
 import 'package:nova_alianca_app/visual/visual_router.dart';
 import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -46,25 +50,13 @@ void main() {
     ),
   ];
 
-  /// Rota de destino simplificada: o teste verifica que a navegação
-  /// aconteceu, sem montar a `WelcomeAccessScreen` inteira.
-  Route<dynamic>? rotas(RouteSettings settings) {
-    if (settings.name == VisualRoutes.welcomeAccess) {
-      return MaterialPageRoute<void>(
-        builder: (_) => const Scaffold(body: Text('destino: bem-vindo')),
-        settings: settings,
-      );
-    }
-    return null;
-  }
-
   Widget app({
     required List<Override> overrides,
     Widget home = const RootGate(),
   }) {
     return ProviderScope(
       overrides: overrides,
-      child: MaterialApp(home: home, onGenerateRoute: rotas),
+      child: MaterialApp(home: home),
     );
   }
 
@@ -177,7 +169,59 @@ void main() {
       expect(prefs.getString('igreja_escolhida_cadastro_id'), 'petrolina');
 
       expect(find.byType(SelectChurchScreen), findsNothing);
-      expect(find.text('destino: bem-vindo'), findsOneWidget);
+      // O RootGate continua como raiz e reage ao provider. Substituir a rota
+      // raiz aqui quebrava o encaminhamento para a Home depois do login.
+      expect(find.byType(WelcomeAccessScreen), findsOneWidget);
+    });
+
+    testWidgets('rota direta volta ao RootGate sem empilhar outro Welcome', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+
+      await montar(
+        tester,
+        ProviderScope(
+          overrides: [semSessao, comIgrejas(unidades)],
+          child: MaterialApp(
+            initialRoute: VisualRoutes.selectChurch,
+            routes: {
+              ...visualRoutes,
+              VisualRoutes.entraconta: (_) => const RootGate(),
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Comunidade Nova Aliança Petrolina'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar escolha'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SelectChurchScreen), findsNothing);
+      expect(find.byType(WelcomeAccessScreen), findsOneWidget);
+      final navigator = Navigator.of(
+        tester.element(find.byType(WelcomeAccessScreen)),
+      );
+      expect(navigator.canPop(), isFalse);
+    });
+
+    testWidgets('sessão anônima continua como visitante', (tester) async {
+      SharedPreferences.setMockInitialValues({
+        'igreja_visualizada_id': 'petrolina',
+      });
+
+      final sessaoAnonima = authStateProvider.overrideWith(
+        (ref) => Stream.value(_UsuarioAnonimoFake()),
+      );
+
+      await montar(
+        tester,
+        app(overrides: [sessaoAnonima, comIgrejas(unidades)]),
+      );
+
+      expect(find.byType(WelcomeAccessScreen), findsOneWidget);
+      expect(find.text('Preparando sua conta...'), findsNothing);
     });
 
     testWidgets('a busca filtra a lista pelo nome', (tester) async {
@@ -292,6 +336,97 @@ void main() {
 
     Override comVinculo(VinculoIgreja? vinculo) =>
         vinculoPrincipalProvider.overrideWith((ref) => Stream.value(vinculo));
+
+    testWidgets(
+      'conta sem documento mostra recuperação em vez de carregamento infinito',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final auth = _AuthServiceRecuperacaoFake();
+
+        await montar(
+          tester,
+          app(
+            overrides: [
+              comSessao,
+              comIgrejas(unidades),
+              usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+              authServiceProvider.overrideWithValue(auth),
+            ],
+          ),
+        );
+
+        expect(find.byType(ContaSemCadastroScreen), findsOneWidget);
+        expect(find.text('Preparando sua conta...'), findsNothing);
+        expect(
+          find.text('Não foi possível concluir seu cadastro'),
+          findsOneWidget,
+        );
+        expect(find.text('Recomeçar cadastro'), findsOneWidget);
+        expect(find.text('Tentar carregar novamente'), findsOneWidget);
+        expect(find.text('Sair'), findsOneWidget);
+        expect(find.byType(HomeMemberScreen), findsNothing);
+        expect(find.byType(HomeLeaderScreen), findsNothing);
+      },
+    );
+
+    testWidgets('recuperação da credencial órfã é acionável e repetível', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      final auth = _AuthServiceRecuperacaoFake();
+
+      await montar(
+        tester,
+        app(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+            authServiceProvider.overrideWithValue(auth),
+          ],
+        ),
+      );
+
+      await tester.tap(find.text('Recomeçar cadastro'));
+      await tester.pumpAndSettle();
+
+      expect(auth.recuperacoes, 1);
+      expect(find.text('Recomeçar cadastro'), findsOneWidget);
+      expect(find.byType(HomeMemberScreen), findsNothing);
+      expect(find.byType(HomeLeaderScreen), findsNothing);
+    });
+
+    testWidgets(
+      'falha na recuperação mantém bloqueio e explica próximo passo',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        final auth = _AuthServiceRecuperacaoFake(falhar: true);
+
+        await montar(
+          tester,
+          app(
+            overrides: [
+              comSessao,
+              comIgrejas(unidades),
+              usuarioAtualProvider.overrideWith((ref) => Stream.value(null)),
+              authServiceProvider.overrideWithValue(auth),
+            ],
+          ),
+        );
+
+        await tester.tap(find.text('Recomeçar cadastro'));
+        await tester.pumpAndSettle();
+
+        expect(auth.recuperacoes, 1);
+        expect(
+          find.textContaining('Não foi possível liberar este acesso agora'),
+          findsOneWidget,
+        );
+        expect(find.text('Recomeçar cadastro'), findsOneWidget);
+        expect(find.byType(HomeMemberScreen), findsNothing);
+        expect(find.byType(HomeLeaderScreen), findsNothing);
+      },
+    );
 
     testWidgets('conta sem igreja principal não entra no aplicativo', (
       tester,
@@ -432,7 +567,7 @@ void main() {
         await tester.pumpWidget(
           UncontrolledProviderScope(
             container: container,
-            child: MaterialApp(home: const RootGate(), onGenerateRoute: rotas),
+            child: const MaterialApp(home: RootGate()),
           ),
         );
         await tester.pumpAndSettle();
@@ -488,6 +623,51 @@ void main() {
 
       expect(find.byType(AguardandoAprovacaoScreen), findsOneWidget);
     });
+
+    testWidgets(
+      'lider sem vinculo na unidade visitada recebe navegacao de membro',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+
+        final container = ProviderContainer(
+          overrides: [
+            comSessao,
+            comIgrejas(unidades),
+            comUsuario('olinda'),
+            comVinculo(
+              VinculoIgreja(
+                uid: 'uid-ana',
+                igrejaId: olinda,
+                status: StatusVinculo.aprovado,
+                perfil: PerfilComunitario.lider,
+              ),
+            ),
+            vinculoAtualProvider.overrideWith((ref) => Stream.value(null)),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await montar(
+          tester,
+          UncontrolledProviderScope(
+            container: container,
+            child: const MaterialApp(home: RootGate()),
+          ),
+        );
+
+        expect(find.byType(HomeLeaderScreen), findsOneWidget);
+
+        // A visita acontece depois de a sessão já estar estabelecida, como no
+        // botão "Trocar igreja" das configurações.
+        await container
+            .read(igrejaVisualizadaProvider.notifier)
+            .definir(petrolina);
+        await tester.pumpAndSettle();
+
+        expect(find.byType(HomeMemberScreen), findsOneWidget);
+        expect(find.byType(HomeLeaderScreen), findsNothing);
+      },
+    );
   });
 }
 
@@ -507,4 +687,32 @@ class _TopicosEspiao implements TopicosFcm {
 class _UsuarioFake extends Fake implements User {
   @override
   String get uid => 'uid-ana';
+
+  @override
+  bool get isAnonymous => false;
+}
+
+class _UsuarioAnonimoFake extends Fake implements User {
+  @override
+  String get uid => 'uid-visitante';
+
+  @override
+  bool get isAnonymous => true;
+}
+
+class _AuthServiceRecuperacaoFake extends AuthService {
+  _AuthServiceRecuperacaoFake({this.falhar = false});
+
+  final bool falhar;
+  int recuperacoes = 0;
+
+  @override
+  Future<RecuperacaoCadastroIncompleto> recuperarCadastroIncompleto() async {
+    recuperacoes++;
+    if (falhar) throw Exception('falha simulada');
+    return RecuperacaoCadastroIncompleto.credencialRemovida;
+  }
+
+  @override
+  Future<void> logout() async {}
 }

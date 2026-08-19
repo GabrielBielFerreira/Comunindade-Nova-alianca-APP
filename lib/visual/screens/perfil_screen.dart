@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +9,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
 import '../widgets/mais_menu.dart';
 import '../mock_data.dart';
-import '../profile_photo_notifier.dart';
+import '../../features/perfil/providers/foto_perfil_provider.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
@@ -267,34 +265,7 @@ class _ProfileHero extends ConsumerWidget {
       padding: EdgeInsets.symmetric(vertical: 24 * scale),
       child: Column(
         children: [
-          ValueListenableBuilder<File?>(
-            valueListenable: profilePhotoNotifier,
-            builder: (context, photo, _) {
-              return Container(
-                width: 96 * scale,
-                height: 96 * scale,
-                padding: EdgeInsets.all(2 * scale),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF6F3F2),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: PerfilScreen._soft,
-                    width: 2 * scale,
-                  ),
-                ),
-                child: ClipOval(
-                  child: photo != null
-                      ? Image.file(photo, fit: BoxFit.cover)
-                      : Image.asset(
-                          PerfilScreen._avatar,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, error, stackTrace) =>
-                              const SizedBox.shrink(),
-                        ),
-                ),
-              );
-            },
-          ),
+          _FotoDoPerfil(scale: scale),
           SizedBox(height: 24 * scale),
           Text(
             nome,
@@ -487,10 +458,9 @@ class _LogoutButton extends ConsumerWidget {
     // pushNamedAndRemoveUntil, sem isto o "voltar" revelaria a Home de membro
     // em vez da tela de boas-vindas. O RootGate reage à sessão encerrada.
     if (context.mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        VisualRoutes.entraconta,
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil(VisualRoutes.entraconta, (route) => false);
     }
   }
 
@@ -696,4 +666,54 @@ class _ProfileOptionData {
   final String label;
   final IconData icon;
   final String route;
+}
+
+/// Avatar do topo do Perfil.
+///
+/// Mesma precedencia da ficha cadastral: preview do upload em curso, depois
+/// a foto persistida em `usuarios/{uid}.foto_url`, e o avatar empacotado so
+/// como ultimo recurso.
+class _FotoDoPerfil extends ConsumerWidget {
+  const _FotoDoPerfil({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preview = ref.watch(fotoPerfilProvider).previewLocal;
+    final url = ref.watch(fotoPerfilUrlProvider);
+
+    Widget imagem;
+    if (preview != null) {
+      imagem = Image.file(preview, fit: BoxFit.cover);
+    } else if (url != null) {
+      imagem = Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Image.asset(
+          PerfilScreen._avatar,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+        ),
+      );
+    } else {
+      imagem = Image.asset(
+        PerfilScreen._avatar,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+      );
+    }
+
+    return Container(
+      width: 96 * scale,
+      height: 96 * scale,
+      padding: EdgeInsets.all(2 * scale),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F3F2),
+        shape: BoxShape.circle,
+        border: Border.all(color: PerfilScreen._soft, width: 2 * scale),
+      ),
+      child: ClipOval(child: imagem),
+    );
+  }
 }

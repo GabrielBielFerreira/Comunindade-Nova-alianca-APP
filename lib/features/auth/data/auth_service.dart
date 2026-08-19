@@ -6,9 +6,14 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'usuario_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  // Dependências resolvidas sob demanda. Além de evitar trabalho antes de uma
+  // ação de autenticação, isto permite que os testes do RootGate substituam o
+  // serviço sem inicializar um app Firebase real.
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _db => FirebaseFirestore.instance;
+
+  GoogleSignIn? _googleSignInInstancia;
+  GoogleSignIn get _googleSignIn => _googleSignInInstancia ??= GoogleSignIn();
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
@@ -56,9 +61,18 @@ class AuthService {
       );
     } catch (erro) {
       // A conta do Auth já existe, mas sem os documentos ela não serve para
-      // nada. Encerrar a sessão evita prender a pessoa numa tela de
-      // "Preparando sua conta..." que nunca resolve.
-      await _auth.signOut();
+      // nada e também bloquearia uma nova tentativa com "e-mail já em uso".
+      // Como acabou de ser criada, a autenticação é recente e `delete()` deve
+      // ser permitido. Mesmo se a limpeza remota falhar, encerramos a sessão
+      // para não prender a pessoa numa conta parcialmente provisionada.
+      try {
+        await credential.user?.delete();
+      } catch (_) {
+        // Preserva o erro original do provisionamento. Uma conta residual
+        // ainda pode ser removida pelo fluxo explícito de recuperação.
+      } finally {
+        await _auth.signOut();
+      }
       rethrow;
     }
 
@@ -92,7 +106,11 @@ class AuthService {
     // Espelha exatamente o que as Rules aceitam no autocadastro: sempre
     // pendente, sempre membro, sempre sem funções administrativas.
     batch.set(
-      _db.collection('igrejas').doc(igrejaId.valor).collection('membros').doc(uid),
+      _db
+          .collection('igrejas')
+          .doc(igrejaId.valor)
+          .collection('membros')
+          .doc(uid),
       {
         'perfil': PerfilComunitario.membro.valor,
         'status': StatusVinculo.pendente.valor,
@@ -201,8 +219,10 @@ class AuthService {
         message: 'A conta não tem e-mail para vincular a senha.',
       );
     }
-    final credential =
-        EmailAuthProvider.credential(email: email, password: senha);
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: senha,
+    );
     await user.linkWithCredential(credential);
   }
 
@@ -210,11 +230,51 @@ class AuthService {
     // Desconecta também do Google para permitir trocar de conta no próximo
     // acesso. Falha/lentidão aqui NUNCA deve impedir o logout do Firebase.
     try {
-      await _googleSignIn
-          .signOut()
-          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+      await _googleSignIn.signOut().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => null,
+      );
     } catch (_) {}
     await _auth.signOut();
+  }
+
+  /// Recupera uma conta cuja credencial existe no Firebase Auth, mas cujo
+  /// cadastro atômico no Firestore não foi concluído.
+  ///
+  /// Não tentamos inventar perfil, igreja ou vínculo: antes de excluir a
+  /// credencial, uma leitura obrigatoriamente feita no servidor confirma que
+  /// `usuarios/{uid}` continua ausente. Se o documento já apareceu (por
+  /// exemplo, após uma demora de rede), preservamos a conta e o RootGate pode
+  /// recarregá-la normalmente.
+  ///
+  /// Falhas de rede, permissão ou exclusão são propagadas. Nesse caso a sessão
+  /// permanece aberta na tela segura de recuperação, permitindo tentar de
+  /// novo ou simplesmente sair.
+  Future<RecuperacaoCadastroIncompleto> recuperarCadastroIncompleto() async {
+    final user = _auth.currentUser;
+    if (user == null || user.isAnonymous) {
+      throw const SessaoInvalidaParaRecuperacao();
+    }
+
+    final usuario = await _db
+        .collection('usuarios')
+        .doc(user.uid)
+        .get(const GetOptions(source: Source.server));
+
+    if (usuario.exists) {
+      return RecuperacaoCadastroIncompleto.cadastroEncontrado;
+    }
+
+    // O login que levou a esta tela é recente, então normalmente o Auth
+    // permite a exclusão. Se ainda assim exigir nova autenticação, não
+    // mascaramos a falha nem liberamos qualquer acesso sem vínculo.
+    await user.delete();
+
+    // `delete()` encerra a sessão atual, mas o sign-out explícito mantém o
+    // comportamento consistente entre plataformas e também solta a conta do
+    // Google para que a pessoa possa refazer o cadastro com outra escolha.
+    await logout();
+    return RecuperacaoCadastroIncompleto.credencialRemovida;
   }
 
   Future<UsuarioModel?> getUsuarioAtual() async {
@@ -244,6 +304,22 @@ class IgrejaObrigatoriaNoCadastro implements Exception {
   const IgrejaObrigatoriaNoCadastro();
 
   @override
-  String toString() =>
-      'Escolha uma igreja para concluir seu cadastro.';
+  String toString() => 'Escolha uma igreja para concluir seu cadastro.';
+}
+
+/// Resultado seguro da recuperação de uma conta parcialmente provisionada.
+enum RecuperacaoCadastroIncompleto {
+  /// O documento apareceu no servidor; nada foi removido.
+  cadastroEncontrado,
+
+  /// Somente a credencial órfã foi removida; o cadastro pode ser refeito.
+  credencialRemovida,
+}
+
+/// A recuperação só é válida para uma conta real autenticada.
+class SessaoInvalidaParaRecuperacao implements Exception {
+  const SessaoInvalidaParaRecuperacao();
+
+  @override
+  String toString() => 'Não há uma conta autenticada para recuperar.';
 }

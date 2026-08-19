@@ -7,7 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// atualize seu documento desde que NÃO altere `perfil`/`status`.
 class PerfilRepository {
   PerfilRepository({FirebaseFirestore? db})
-      : _db = db ?? FirebaseFirestore.instance;
+    : _db = db ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -25,14 +25,11 @@ class PerfilRepository {
     required String telefone,
     required Map<String, dynamic> dadosPessoais,
   }) async {
-    await _doc(uid).set(
-      {
-        'nome': nome,
-        'telefone': telefone,
-        'dados_pessoais': dadosPessoais,
-        'atualizado_em': Timestamp.now(),
-      },
-      SetOptions(merge: true),
-    );
+    await _doc(uid).set({
+      'nome': nome,
+      'telefone': telefone,
+      'dados_pessoais': dadosPessoais,
+      'atualizado_em': Timestamp.now(),
+    }, SetOptions(merge: true));
   }
 }

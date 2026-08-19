@@ -369,24 +369,31 @@ class AuthPrimaryButton extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(text, style: style),
-            if (iconAsset != null) ...[
-              SizedBox(width: 8 * scale),
-              SizedBox(
-                width: 12 * scale,
-                height: 12 * scale,
-                child: AuthAssetImage(
-                  iconAsset!,
+        // FittedBox: a altura do botao e fixa (52 * scale) e a largura vem do
+        // desenho. Com a fonte do sistema ampliada o rotulo passava da caixa e
+        // era CORTADO. Encolher o conjunto mantem a palavra inteira legivel,
+        // que e melhor que reticencias no meio de um botao.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(text, style: style),
+              if (iconAsset != null) ...[
+                SizedBox(width: 8 * scale),
+                SizedBox(
                   width: 12 * scale,
                   height: 12 * scale,
+                  child: AuthAssetImage(
+                    iconAsset!,
+                    width: 12 * scale,
+                    height: 12 * scale,
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -75,8 +75,8 @@ keytool -genkey -v -keystore android/nova-alianca-release.jks \
   -keyalg RSA -keysize 2048 -validity 10000 -alias nova-alianca
 ```
 Copie `android/key.properties.example` para `android/key.properties` e preencha.
-Sem esse arquivo, o release cai na chave de debug (apenas para testes — **não
-publique** assim).
+Sem esse arquivo, qualquer tarefa de release é bloqueada antes da compilação;
+o projeto nunca usa a chave de debug como fallback de produção.
 
 ## Execução
 ```bash
