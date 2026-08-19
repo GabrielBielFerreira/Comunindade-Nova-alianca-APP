@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "nova-alianca-app"
+  },
+  "targets": {
+    "nova-alianca-app": {
+      "hosting": {
+        "painel": [
+          "nova-alianca-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

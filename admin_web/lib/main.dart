@@ -16,7 +16,8 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: ConfiguracaoFirebase.opcoes);
 
-  if (AmbientePainel.atual.isEmulador) {
+  // Condicao `const`: num build de producao este bloco inteiro sai do bundle.
+  if (AmbientePainel.emuladorEmTempoDeBuild) {
     await ConfiguracaoFirebase.conectarAoEmulador();
     debugPrint('Painel conectado ao EMULADOR (${ConfiguracaoFirebase.host}).');
   }
