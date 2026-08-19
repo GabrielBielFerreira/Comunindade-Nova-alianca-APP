@@ -60,7 +60,9 @@ Future<void> main() async {
     // Só conecta ao Emulator Suite quando o build pediu explicitamente
     // (--dart-define=APP_ENV=emulator). Um build sem a flag é de produção e
     // jamais aponta para localhost.
-    if (Ambiente.atual.isEmulador) {
+    // Condicao `const`: num build de producao este bloco inteiro — e o
+    // `conectarAoEmulador()` junto — sai do APK.
+    if (Ambiente.emuladorEmTempoDeBuild) {
       await conectarAoEmulador();
       debugPrint('Firebase conectado ao EMULADOR (${HostsEmulador.host}).');
     }

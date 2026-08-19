@@ -43,7 +43,59 @@ function linhaDeComando(pid) {
   }
 }
 
+/**
+ * Encerra processos ÓRFÃOS dos emuladores, mesmo sem porta ocupada.
+ *
+ * Checar só a porta 8080 não bastava: o Firestore Emulator e o
+ * `cloud-storage-rules-runtime` sobrevivem ao SIGINT do `emulators:exec` sem
+ * necessariamente continuar escutando. Na execução seguinte o emulador novo
+ * morria com "exited with code 4294967295" e TODOS os testes falhavam — um
+ * problema de ambiente que parece falha de regra.
+ *
+ * A seleção é por ASSINATURA DA LINHA DE COMANDO (o caminho do .jar dentro de
+ * `.cache/firebase/emulators`). Nunca por nome de processo: esta máquina roda
+ * Gradle, Android Studio e VS Code em Java, e matar por nome derrubaria tudo.
+ */
+function encerrarOrfaosDoEmulador() {
+  if (process.platform !== "win32") return;
+
+  const ASSINATURAS = [
+    "cloud-firestore-emulator",
+    "cloud-storage-rules-runtime",
+  ];
+
+  let saida;
+  try {
+    // Só aspas simples: o wrapper `powershell()` escapa aspas duplas, e um
+    // -Filter com aspas duplas aqui chega deformado ao PowerShell.
+    saida = powershell(
+      "Get-CimInstance Win32_Process | " +
+        "Where-Object { $_.Name -eq 'java.exe' -and $_.CommandLine } | " +
+        "ForEach-Object { $_.ProcessId.ToString() + '|' + $_.CommandLine }"
+    );
+  } catch {
+    return; // sem WMI disponível, segue o fluxo normal
+  }
+
+  for (const linha of saida.split(/\r?\n/)) {
+    const corte = linha.indexOf("|");
+    if (corte < 0) continue;
+    const pid = linha.slice(0, corte).trim();
+    const cmd = linha.slice(corte + 1);
+    if (!ASSINATURAS.some((a) => cmd.includes(a))) continue;
+
+    console.log(`[preflight] encerrando emulador orfao (PID ${pid}).`);
+    try {
+      powershell(`Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue`);
+    } catch {
+      /* processo ja saiu */
+    }
+  }
+}
+
 function main() {
+  encerrarOrfaosDoEmulador();
+
   const pids = pidsNaPorta(PORTA);
   if (pids.length === 0) {
     console.log(`[preflight] porta ${PORTA} livre.`);
