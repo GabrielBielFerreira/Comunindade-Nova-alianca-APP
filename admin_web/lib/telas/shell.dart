@@ -34,16 +34,29 @@ const gruposMenu = <String, List<ItemMenu>>{
   ],
   'Pessoas': [
     ItemMenu('/membros', 'Membros', Icons.people_outline, _sempre),
-    ItemMenu('/lideranca', 'Liderança', Icons.workspace_premium_outlined,
-        _lideranca),
+    ItemMenu(
+      '/lideranca',
+      'Liderança',
+      Icons.workspace_premium_outlined,
+      _lideranca,
+    ),
   ],
   'Conteúdo': [
     ItemMenu('/avisos', 'Avisos', Icons.campaign_outlined, _conteudo),
     ItemMenu('/programacao', 'Programação', Icons.event_outlined, _conteudo),
-    ItemMenu('/campanhas', 'Campanhas', Icons.volunteer_activism_outlined,
-        _conteudo),
+    ItemMenu(
+      '/campanhas',
+      'Campanhas',
+      Icons.volunteer_activism_outlined,
+      _conteudo,
+    ),
     ItemMenu('/ministerios', 'Ministérios', Icons.groups_outlined, _conteudo),
-    ItemMenu('/devocionais', 'Devocionais', Icons.menu_book_outlined, _conteudo),
+    ItemMenu(
+      '/devocionais',
+      'Devocionais',
+      Icons.menu_book_outlined,
+      _conteudo,
+    ),
     ItemMenu('/oracao', 'Oração', Icons.favorite_outline, _oracao),
   ],
   'Administração': [
@@ -56,7 +69,10 @@ const gruposMenu = <String, List<ItemMenu>>{
 /// no shell, onde o `MeusAcessos` está disponível.
 bool _sempreSuperAdmin(AcessoIgreja _) => true;
 
-List<ItemMenu> itensVisiveis(AcessoIgreja acesso, {required bool isSuperAdmin}) {
+List<ItemMenu> itensVisiveis(
+  AcessoIgreja acesso, {
+  required bool isSuperAdmin,
+}) {
   final lista = <ItemMenu>[];
   for (final entrada in gruposMenu.entries) {
     for (final item in entrada.value) {
@@ -126,8 +142,10 @@ class _Moldura extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final largura = MediaQuery.sizeOf(context).width;
     final desktop = largura >= Breakpoints.desktop;
-    final visiveis =
-        itensVisiveis(acessoAtual, isSuperAdmin: acessos.isSuperAdmin);
+    final visiveis = itensVisiveis(
+      acessoAtual,
+      isSuperAdmin: acessos.isSuperAdmin,
+    );
 
     final barra = _BarraLateral(
       acessos: acessos,
@@ -142,11 +160,15 @@ class _Moldura extends ConsumerWidget {
       appBar: desktop
           ? null
           : AppBar(
-              title: const Text('Painel de Gestão'),
+              title: Text(largura < 380 ? 'Painel' : 'Painel de Gestão'),
               backgroundColor: Cores.primary,
               foregroundColor: Colors.white,
               actions: [
-                _AcoesCabecalho(acessos: acessos, acessoAtual: acessoAtual),
+                _AcoesCabecalho(
+                  acessos: acessos,
+                  acessoAtual: acessoAtual,
+                  compacto: largura < Breakpoints.tablet,
+                ),
               ],
             ),
       body: Row(
@@ -201,7 +223,12 @@ class _BarraLateral extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   for (final grupo in gruposMenu.entries)
-                    ..._construirGrupo(context, grupo.key, grupo.value, rotaAtual),
+                    ..._construirGrupo(
+                      context,
+                      grupo.key,
+                      grupo.value,
+                      rotaAtual,
+                    ),
                 ],
               ),
             ),
@@ -220,8 +247,9 @@ class _BarraLateral extends ConsumerWidget {
     List<ItemMenu> doGrupo,
     String rotaAtual,
   ) {
-    final visiveisDoGrupo =
-        doGrupo.where((i) => itens.any((v) => v.rota == i.rota)).toList();
+    final visiveisDoGrupo = doGrupo
+        .where((i) => itens.any((v) => v.rota == i.rota))
+        .toList();
     if (visiveisDoGrupo.isEmpty) return const [];
 
     return [
@@ -238,10 +266,7 @@ class _BarraLateral extends ConsumerWidget {
         ),
       ),
       for (final item in visiveisDoGrupo)
-        _ItemNavegacao(
-          item: item,
-          ativo: rotaAtual.startsWith(item.rota),
-        ),
+        _ItemNavegacao(item: item, ativo: rotaAtual.startsWith(item.rota)),
     ];
   }
 }
@@ -360,18 +385,30 @@ class _MenuNovaAtividade extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final opcoes = <({String rota, String rotulo, IconData icone})>[
       if (acesso.gerenciarConteudo) ...[
-        (rota: '/avisos?novo=1', rotulo: 'Novo aviso', icone: Icons.campaign_outlined),
-        (rota: '/programacao?novo=1', rotulo: 'Novo evento', icone: Icons.event_outlined),
+        (
+          rota: '/avisos?novo=1',
+          rotulo: 'Novo aviso',
+          icone: Icons.campaign_outlined,
+        ),
+        (
+          rota: '/programacao?novo=1',
+          rotulo: 'Novo evento',
+          icone: Icons.event_outlined,
+        ),
         (
           rota: '/campanhas?novo=1',
           rotulo: 'Nova campanha',
-          icone: Icons.volunteer_activism_outlined
+          icone: Icons.volunteer_activism_outlined,
         ),
-        (rota: '/ministerios?novo=1', rotulo: 'Novo ministério', icone: Icons.groups_outlined),
+        (
+          rota: '/ministerios?novo=1',
+          rotulo: 'Novo ministério',
+          icone: Icons.groups_outlined,
+        ),
         (
           rota: '/devocionais?novo=1',
           rotulo: 'Novo devocional',
-          icone: Icons.menu_book_outlined
+          icone: Icons.menu_book_outlined,
         ),
       ],
     ];
@@ -448,8 +485,10 @@ class _ItemSair extends ConsumerWidget {
               children: [
                 Icon(Icons.logout, size: 20, color: Colors.white),
                 SizedBox(width: 12),
-                Text('Sair',
-                    style: TextStyle(color: Colors.white, fontSize: 14.5)),
+                Text(
+                  'Sair',
+                  style: TextStyle(color: Colors.white, fontSize: 14.5),
+                ),
               ],
             ),
           ),
@@ -509,10 +548,15 @@ class _Cabecalho extends ConsumerWidget {
 }
 
 class _AcoesCabecalho extends ConsumerWidget {
-  const _AcoesCabecalho({required this.acessos, required this.acessoAtual});
+  const _AcoesCabecalho({
+    required this.acessos,
+    required this.acessoAtual,
+    this.compacto = false,
+  });
 
   final MeusAcessos acessos;
   final AcessoIgreja acessoAtual;
+  final bool compacto;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -520,9 +564,17 @@ class _AcoesCabecalho extends ConsumerWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (acessos.precisaSeletor)
-          _SeletorIgreja(acessos: acessos, atual: acessoAtual),
+          _SeletorIgreja(
+            acessos: acessos,
+            atual: acessoAtual,
+            compacto: compacto,
+          ),
         const SizedBox(width: 8),
-        _MenuUsuario(acessos: acessos, acessoAtual: acessoAtual),
+        _MenuUsuario(
+          acessos: acessos,
+          acessoAtual: acessoAtual,
+          compacto: compacto,
+        ),
       ],
     );
   }
@@ -531,13 +583,52 @@ class _AcoesCabecalho extends ConsumerWidget {
 /// Alterna entre unidades JÁ AUTORIZADAS. Nunca concede permissão: a lista vem
 /// de `meusAcessos`, e trocar aqui só muda o foco de leitura.
 class _SeletorIgreja extends ConsumerWidget {
-  const _SeletorIgreja({required this.acessos, required this.atual});
+  const _SeletorIgreja({
+    required this.acessos,
+    required this.atual,
+    this.compacto = false,
+  });
 
   final MeusAcessos acessos;
   final AcessoIgreja atual;
+  final bool compacto;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    void selecionar(String? valor) {
+      final id = IgrejaId.tentar(valor);
+      if (id == null) return;
+      ref.read(igrejaSelecionadaProvider.notifier).state = id;
+      // Filtros são por unidade: trocar de igreja limpa o contexto.
+      ref.invalidate(filtroFinancasProvider);
+    }
+
+    if (compacto) {
+      return PopupMenuButton<String>(
+        tooltip: 'Trocar unidade',
+        icon: const Icon(Icons.church_outlined),
+        initialValue: atual.igrejaId.valor,
+        onSelected: selecionar,
+        itemBuilder: (context) => [
+          for (final acesso in acessos.acessos)
+            PopupMenuItem(
+              value: acesso.igrejaId.valor,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(acesso.nome, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (!acesso.ativa) ...[
+                    const SizedBox(width: 8),
+                    const Etiqueta(texto: 'inativa', cor: Cores.muted),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -557,9 +648,13 @@ class _SeletorIgreja extends ConsumerWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(acesso.nome,
-                        style: const TextStyle(
-                            color: Cores.primary, fontWeight: FontWeight.w600)),
+                    Text(
+                      acesso.nome,
+                      style: const TextStyle(
+                        color: Cores.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                     if (!acesso.ativa) ...[
                       const SizedBox(width: 8),
                       const Etiqueta(texto: 'inativa', cor: Cores.muted),
@@ -568,13 +663,7 @@ class _SeletorIgreja extends ConsumerWidget {
                 ),
               ),
           ],
-          onChanged: (valor) {
-            final id = IgrejaId.tentar(valor);
-            if (id == null) return;
-            ref.read(igrejaSelecionadaProvider.notifier).state = id;
-            // Filtros são por unidade: trocar de igreja limpa o contexto.
-            ref.invalidate(filtroFinancasProvider);
-          },
+          onChanged: selecionar,
         ),
       ),
     );
@@ -583,10 +672,15 @@ class _SeletorIgreja extends ConsumerWidget {
 
 /// Mostra SEMPRE o usuário autenticado — nunca nome ou foto fictícios.
 class _MenuUsuario extends ConsumerWidget {
-  const _MenuUsuario({required this.acessos, required this.acessoAtual});
+  const _MenuUsuario({
+    required this.acessos,
+    required this.acessoAtual,
+    this.compacto = false,
+  });
 
   final MeusAcessos acessos;
   final AcessoIgreja acessoAtual;
+  final bool compacto;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -599,6 +693,17 @@ class _MenuUsuario extends ConsumerWidget {
     final papel = acessos.isSuperAdmin
         ? 'Superadministrador'
         : acessoAtual.perfil.rotulo;
+    final avatar = CircleAvatar(
+      radius: 17,
+      backgroundColor: Cores.soft,
+      child: Text(
+        nome.isEmpty ? '?' : nome[0].toUpperCase(),
+        style: const TextStyle(
+          color: Cores.primary,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
 
     return PopupMenuButton<String>(
       tooltip: 'Conta',
@@ -613,14 +718,20 @@ class _MenuUsuario extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(usuario?.email ?? '—',
-                  style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                usuario?.email ?? '—',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               const SizedBox(height: 4),
-              Text('$papel · ${acessoAtual.nome}',
-                  style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                '$papel · ${acessoAtual.nome}',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
               if (acessoAtual.funcoesAdmin.isNotEmpty)
-                Text(acessoAtual.funcoesAdmin.map((f) => f.rotulo).join(', '),
-                    style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  acessoAtual.funcoesAdmin.map((f) => f.rotulo).join(', '),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
             ],
           ),
         ),
@@ -634,39 +745,41 @@ class _MenuUsuario extends ConsumerWidget {
           ),
         ),
       ],
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 17,
-            backgroundColor: Cores.soft,
-            child: Text(
-              nome.isEmpty ? '?' : nome[0].toUpperCase(),
-              style: const TextStyle(
-                  color: Cores.primary, fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(width: 10),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 180),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: compacto
+          ? avatar
+          : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(nome,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Cores.titulo)),
-                Text(papel,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: Cores.muted)),
+                avatar,
+                const SizedBox(width: 10),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        nome,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Cores.titulo,
+                        ),
+                      ),
+                      Text(
+                        papel,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Cores.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -689,8 +802,10 @@ class AcessoNegado extends ConsumerWidget {
               children: [
                 const Icon(Icons.lock_outline, size: 56, color: Cores.erro),
                 const SizedBox(height: 16),
-                Text('Acesso negado',
-                    style: Theme.of(context).textTheme.headlineSmall),
+                Text(
+                  'Acesso negado',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
                 const SizedBox(height: 8),
                 Text(
                   'Sua conta não possui função administrativa em nenhuma '

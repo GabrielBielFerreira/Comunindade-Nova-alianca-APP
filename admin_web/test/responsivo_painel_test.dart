@@ -22,19 +22,19 @@ import 'responsivo.dart';
 // ══════════════════════════════════════════════════════════════════════
 
 AcessoIgreja acessoCompleto({bool lerFinancas = true}) => AcessoIgreja(
-      igrejaId: IgrejaId('olinda'),
-      nome: 'Comunidade Nova Aliança — Olinda (Sede)',
-      ativa: true,
-      perfil: PerfilComunitario.pastor,
-      status: 'aprovado',
-      funcoesAdmin: {FuncaoAdmin.tesoureiro, FuncaoAdmin.editor},
-      acessarPainel: true,
-      lerFinancas: lerFinancas,
-      gerenciarConteudo: true,
-      moderarOracao: true,
-      aprovarMembro: true,
-      gerenciarLideranca: true,
-    );
+  igrejaId: IgrejaId('olinda'),
+  nome: 'Comunidade Nova Aliança — Olinda (Sede)',
+  ativa: true,
+  perfil: PerfilComunitario.pastor,
+  status: 'aprovado',
+  funcoesAdmin: {FuncaoAdmin.tesoureiro, FuncaoAdmin.editor},
+  acessarPainel: true,
+  lerFinancas: lerFinancas,
+  gerenciarConteudo: true,
+  moderarOracao: true,
+  aprovarMembro: true,
+  gerenciarLideranca: true,
+);
 
 final _avisos = <Aviso>[
   Aviso(
@@ -151,8 +151,9 @@ void main() {
   // Sem esta verificação, os testes de responsividade poderiam passar por não
   // detectarem nada — e não por não haver overflow.
   group('O detector de overflow funciona', () {
-    testWidgets('uma Row propositalmente larga demais é reprovada',
-        (tester) async {
+    testWidgets('uma Row propositalmente larga demais é reprovada', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(320, 568);
       addTearDown(tester.view.reset);
@@ -176,16 +177,15 @@ void main() {
     paraCadaTamanho('não estoura', (tester, tamanho, escala) async {
       await esperarSemOverflow(
         tester,
-        const ProviderScope(
-          child: MaterialApp(home: LoginTela()),
-        ),
+        const ProviderScope(child: MaterialApp(home: LoginTela())),
         tamanho: tamanho,
         escalaTexto: escala,
       );
     });
 
-    testWidgets('identifica o painel e oferece recuperação de senha',
-        (tester) async {
+    testWidgets('identifica o painel e oferece recuperação de senha', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(390, 844);
       addTearDown(tester.view.reset);
@@ -201,10 +201,32 @@ void main() {
       // Sem faixa de emulador: o teste roda com APP_ENV padrão (produção).
       expect(find.textContaining('EMULADOR'), findsNothing);
     });
+
+    testWidgets('usa apresentação ampla no desktop sem duplicar a marca', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(1440, 900);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        const ProviderScope(child: MaterialApp(home: LoginTela())),
+      );
+      await tester.pump();
+
+      expect(find.text('Painel de Gestão'), findsOneWidget);
+      expect(find.text('Acesse sua conta'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('Dashboard do painel', () {
-    paraCadaTamanho('não estoura com dados reais', (tester, tamanho, escala) async {
+    paraCadaTamanho('não estoura com dados reais', (
+      tester,
+      tamanho,
+      escala,
+    ) async {
       await esperarSemOverflow(
         tester,
         painelComDados(acesso: acessoCompleto()),
@@ -252,8 +274,9 @@ void main() {
       expect(find.text('Ver finanças'), findsNothing);
     });
 
-    testWidgets('unidade não configurada é dita com honestidade',
-        (tester) async {
+    testWidgets('unidade não configurada é dita com honestidade', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -278,8 +301,10 @@ void main() {
     });
 
     test('sem displayName, usa a parte local do e-mail', () {
-      expect(SaudacaoDashboard.primeiroNome(null, 'pastor@exemplo.com'),
-          'pastor');
+      expect(
+        SaudacaoDashboard.primeiroNome(null, 'pastor@exemplo.com'),
+        'pastor',
+      );
     });
 
     test('sem nenhum dado, não inventa nome', () {
@@ -287,11 +312,18 @@ void main() {
     });
 
     test('cumprimento acompanha o horário', () {
-      expect(SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 9)), 'Bom dia');
       expect(
-          SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 15)), 'Boa tarde');
+        SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 9)),
+        'Bom dia',
+      );
       expect(
-          SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 21)), 'Boa noite');
+        SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 15)),
+        'Boa tarde',
+      );
+      expect(
+        SaudacaoDashboard.cumprimento(DateTime(2026, 8, 17, 21)),
+        'Boa noite',
+      );
     });
   });
 }

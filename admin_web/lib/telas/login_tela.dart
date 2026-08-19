@@ -15,23 +15,25 @@ String mensagemDeErroAuth(Object erro) {
   if (erro is FirebaseAuthException) {
     return switch (erro.code) {
       'invalid-email' => 'E-mail inválido.',
-      'user-disabled' => 'Esta conta está desativada. Fale com o pastor da '
-          'sua igreja.',
+      'user-disabled' =>
+        'Esta conta está desativada. Fale com o pastor da '
+            'sua igreja.',
       'user-not-found' ||
       'wrong-password' ||
-      'invalid-credential' =>
-        'E-mail ou senha incorretos.',
+      'invalid-credential' => 'E-mail ou senha incorretos.',
       'missing-password' => 'Informe a senha.',
       'too-many-requests' =>
         'Muitas tentativas. Aguarde alguns minutos e tente de novo.',
       'operation-not-allowed' =>
         'Este método de acesso não está habilitado para o painel.',
-      'network-request-failed' => ambienteAtual.isEmulador
-          ? 'Sem conexão com o servidor. Verifique se os emuladores estão '
-              'rodando.'
-          : 'Sem conexão. Verifique sua internet e tente novamente.',
-      _ => 'Não foi possível entrar. Se o problema continuar, informe este '
-          'código ao suporte: ${erro.code}.',
+      'network-request-failed' =>
+        ambienteAtual.isEmulador
+            ? 'Sem conexão com o servidor. Verifique se os emuladores estão '
+                  'rodando.'
+            : 'Sem conexão. Verifique sua internet e tente novamente.',
+      _ =>
+        'Não foi possível entrar. Se o problema continuar, informe este '
+            'código ao suporte: ${erro.code}.',
     };
   }
   return 'Não foi possível entrar. Tente novamente.';
@@ -67,7 +69,9 @@ class _LoginTelaState extends ConsumerState<LoginTela> {
     });
 
     try {
-      await ref.read(authProvider).signInWithEmailAndPassword(
+      await ref
+          .read(authProvider)
+          .signInWithEmailAndPassword(
             email: _email.text.trim(),
             password: _senha.text,
           );
@@ -82,95 +86,139 @@ class _LoginTelaState extends ConsumerState<LoginTela> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final layoutAmplo = constraints.maxWidth >= 840;
+            final paddingExterno = layoutAmplo ? 32.0 : 12.0;
+            final paddingCard = constraints.maxWidth < 360 ? 20.0 : 28.0;
+
+            final formulario = Card(
               child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const _FaixaAmbiente(),
-                      const _Marca(),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _email,
-                        autofocus: true,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'E-mail',
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (v) =>
-                            (v == null || !v.contains('@')) ? 'Informe um e-mail válido.' : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _senha,
-                        obscureText: !_mostrarSenha,
-                        onFieldSubmitted: (_) => _entrar(),
-                        decoration: InputDecoration(
-                          labelText: 'Senha',
-                          border: const OutlineInputBorder(),
-                          suffixIcon: IconButton(
-                            icon: Icon(_mostrarSenha
-                                ? Icons.visibility_off
-                                : Icons.visibility),
-                            onPressed: () =>
-                                setState(() => _mostrarSenha = !_mostrarSenha),
-                          ),
-                        ),
-                        validator: (v) =>
-                            (v == null || v.isEmpty) ? 'Informe a senha.' : null,
-                      ),
-                      if (_erro != null) ...[
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(_erro!)),
-                            ],
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _carregando ? null : _entrar,
-                        child: _carregando
-                            ? const SizedBox(
-                                height: 18,
-                                width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Entrar'),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _carregando
-                            ? null
-                            : () => context.push('/recuperar-senha'),
-                        child: const Text('Esqueci minha senha'),
-                      ),
-                    ],
+                padding: EdgeInsets.all(layoutAmplo ? 32 : paddingCard),
+                child: _conteudoFormulario(mostrarMarca: !layoutAmplo),
+              ),
+            );
+
+            return Center(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.all(paddingExterno),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: layoutAmplo ? 1000 : 480,
                   ),
+                  child: layoutAmplo
+                      ? Row(
+                          children: [
+                            const Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 32),
+                                child: _Marca(),
+                              ),
+                            ),
+                            const SizedBox(width: 32),
+                            SizedBox(width: 420, child: formulario),
+                          ],
+                        )
+                      : formulario,
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _conteudoFormulario({required bool mostrarMarca}) {
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _FaixaAmbiente(),
+          if (mostrarMarca) ...[
+            const _Marca(),
+            const SizedBox(height: 24),
+          ] else ...[
+            Text(
+              'Acesse sua conta',
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Entre com as credenciais autorizadas pela liderança.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 24),
+          ],
+          TextFormField(
+            controller: _email,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'E-mail',
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => (v == null || !v.contains('@'))
+                ? 'Informe um e-mail válido.'
+                : null,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _senha,
+            obscureText: !_mostrarSenha,
+            onFieldSubmitted: (_) => _entrar(),
+            decoration: InputDecoration(
+              labelText: 'Senha',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _mostrarSenha ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
+              ),
+            ),
+            validator: (v) =>
+                (v == null || v.isEmpty) ? 'Informe a senha.' : null,
+          ),
+          if (_erro != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_erro!)),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: _carregando ? null : _entrar,
+            child: _carregando
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Entrar'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _carregando
+                ? null
+                : () => context.push('/recuperar-senha'),
+            child: const Text('Esqueci minha senha'),
+          ),
+        ],
       ),
     );
   }
@@ -204,18 +252,17 @@ class _Marca extends StatelessWidget {
           'Nova Aliança',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Cores.primary,
-                fontWeight: FontWeight.w700,
-              ),
+            color: Cores.primary,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'Acesso exclusivo da liderança e da administração.',
           textAlign: TextAlign.center,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: Theme.of(context).colorScheme.outline),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
         ),
       ],
     );
@@ -282,7 +329,9 @@ class _RecuperarSenhaTelaState extends ConsumerState<RecuperarSenhaTela> {
       _erro = null;
     });
     try {
-      await ref.read(authProvider).sendPasswordResetEmail(email: _email.text.trim());
+      await ref
+          .read(authProvider)
+          .sendPasswordResetEmail(email: _email.text.trim());
       if (mounted) setState(() => _enviado = true);
     } catch (erro) {
       if (mounted) setState(() => _erro = mensagemDeErroAuth(erro));
@@ -342,9 +391,12 @@ class _RecuperarSenhaTelaState extends ConsumerState<RecuperarSenhaTela> {
                       ),
                       if (_erro != null) ...[
                         const SizedBox(height: 12),
-                        Text(_erro!,
-                            style: TextStyle(
-                                color: Theme.of(context).colorScheme.error)),
+                        Text(
+                          _erro!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 24),
                       FilledButton(

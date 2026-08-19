@@ -68,7 +68,8 @@ final _devocionais = <Devocional>[
 const _oracoes = <PedidoOracao>[
   PedidoOracao(
     id: 'p1',
-    texto: 'Peço oração pela saúde da minha mãe, que está internada há '
+    texto:
+        'Peço oração pela saúde da minha mãe, que está internada há '
         'duas semanas aguardando cirurgia.',
     autorNome: 'Maria das Graças Albuquerque',
     urgente: true,
@@ -131,7 +132,10 @@ Widget _tela(Widget corpo, {required AcessoIgreja acesso}) {
       routerConfig: GoRouter(
         initialLocation: '/tela',
         routes: [
-          GoRoute(path: '/tela', builder: (_, _) => Scaffold(body: corpo)),
+          GoRoute(
+            path: '/tela',
+            builder: (_, _) => Scaffold(body: corpo),
+          ),
         ],
       ),
     ),
@@ -162,8 +166,9 @@ Widget _painel({
             routes: [
               GoRoute(path: '/avisos', builder: (_, _) => const AvisosTela()),
               GoRoute(
-                  path: '/dashboard',
-                  builder: (_, _) => const SizedBox.shrink()),
+                path: '/dashboard',
+                builder: (_, _) => const SizedBox.shrink(),
+              ),
             ],
           ),
         ],
@@ -185,8 +190,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('em celular a barra lateral fica recolhida no drawer',
-        (tester) async {
+    testWidgets('em celular a barra lateral fica recolhida no drawer', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(390, 844);
       addTearDown(tester.view.reset);
@@ -206,8 +212,9 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('em desktop a barra lateral fica fixa, sem drawer',
-        (tester) async {
+    testWidgets('em desktop a barra lateral fica fixa, sem drawer', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -219,8 +226,9 @@ void main() {
       expect(find.byTooltip('Open navigation menu'), findsNothing);
     });
 
-    testWidgets('o menu só mostra o que a capacidade do servidor permite',
-        (tester) async {
+    testWidgets('o menu só mostra o que a capacidade do servidor permite', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -259,8 +267,9 @@ void main() {
       expect(find.text('Igrejas'), findsNothing);
     });
 
-    testWidgets('com um unico acesso nao existe seletor de unidade',
-        (tester) async {
+    testWidgets('com um unico acesso nao existe seletor de unidade', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -271,8 +280,9 @@ void main() {
       expect(find.byType(DropdownButton<String>), findsNothing);
     });
 
-    testWidgets('com dois acessos o seletor aparece e lista as duas unidades',
-        (tester) async {
+    testWidgets('com dois acessos o seletor aparece e lista as duas unidades', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1.0;
       tester.view.physicalSize = const Size(1440, 900);
       addTearDown(tester.view.reset);
@@ -303,6 +313,46 @@ void main() {
       // O seletor apenas alterna entre unidades JA autorizadas pelo servidor.
       expect(find.byType(DropdownButton<String>), findsOneWidget);
     });
+
+    testWidgets('em 320px dois acessos usam seletor compacto sem overflow', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+
+      final petrolina = AcessoIgreja(
+        igrejaId: _petrolina,
+        nome: 'Comunidade Nova Aliança — Petrolina com nome extenso',
+        ativa: false,
+        perfil: PerfilComunitario.pastor,
+        status: 'aprovado',
+        funcoesAdmin: const {},
+        acessarPainel: true,
+        lerFinancas: true,
+        gerenciarConteudo: true,
+        moderarOracao: true,
+        aprovarMembro: true,
+        gerenciarLideranca: true,
+      );
+
+      await tester.pumpWidget(
+        _painel(
+          acesso: acessoCompleto(),
+          acessos: [acessoCompleto(), petrolina],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byTooltip('Trocar unidade'), findsOneWidget);
+      expect(find.byType(DropdownButton<String>), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byTooltip('Trocar unidade'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Petrolina com nome extenso'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('Telas restantes do painel', () {
@@ -316,7 +366,11 @@ void main() {
     };
 
     for (final caso in casos.entries) {
-      paraCadaTamanho('${caso.key} não estoura', (tester, tamanho, escala) async {
+      paraCadaTamanho('${caso.key} não estoura', (
+        tester,
+        tamanho,
+        escala,
+      ) async {
         await esperarSemOverflow(
           tester,
           _tela(caso.value, acesso: acessoCompleto()),
