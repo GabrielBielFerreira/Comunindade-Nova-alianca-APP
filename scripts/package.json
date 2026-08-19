@@ -1,0 +1,14 @@
+{
+  "name": "nova-alianca-production-scripts",
+  "description": "Ferramentas versionadas e testadas para auditoria e migração de produção.",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

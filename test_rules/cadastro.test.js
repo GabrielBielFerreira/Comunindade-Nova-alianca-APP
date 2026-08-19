@@ -31,10 +31,26 @@ beforeEach(async () => {
     await fs.collection("igrejas").doc(OLINDA).set({
       nome: "Nova Aliança Olinda",
       ativa: true,
+      criado_por: "uid_privado_olinda",
     });
     await fs.collection("igrejas").doc(PETROLINA).set({
       nome: "Comunidade Nova Aliança Petrolina",
       ativa: true,
+      criado_por: "uid_privado_petrolina",
+    });
+    await fs.collection("catalogo_igrejas").doc(OLINDA).set({
+      nome: "Nova Aliança Olinda",
+      ativa: true,
+      configurada: true,
+      endereco: "Av. Leopoldino Canuto de Melo, 846, Caixa D'Água",
+      cidade_estado: "Olinda — PE",
+    });
+    await fs.collection("catalogo_igrejas").doc(PETROLINA).set({
+      nome: "Comunidade Nova Aliança Petrolina",
+      ativa: true,
+      configurada: false,
+      endereco: "Rua 47, número 180 — São Gonçalo",
+      cidade_estado: "Petrolina — PE",
     });
   });
 });
@@ -165,7 +181,10 @@ describe("cadastro do aplicativo", () => {
     // A seleção de igreja acontece antes de existir conta; sem esta leitura a
     // primeira tela do onboarding ficaria vazia.
     const anon = testEnv.unauthenticatedContext().firestore();
-    await assertSucceeds(anon.collection("igrejas").get());
+    const snap = await assertSucceeds(
+      anon.collection("catalogo_igrejas").where("ativa", "==", true).get()
+    );
+    expect(snap.docs.map((doc) => doc.id).sort()).toEqual([OLINDA, PETROLINA]);
   });
 
   test("o cliente não muda a própria igreja principal depois", async () => {

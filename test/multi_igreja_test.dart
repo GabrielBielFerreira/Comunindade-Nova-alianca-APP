@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nova_alianca_app/features/auth/data/usuario_model.dart';
@@ -248,6 +250,40 @@ void main() {
       ),
     };
 
+    Future<IgrejaModel?> esperarDados(
+      ProviderContainer container, {
+      required bool principal,
+      bool Function(IgrejaModel?) aceitar = _qualquerIgreja,
+    }) async {
+      final completer = Completer<IgrejaModel?>();
+      final provider = principal
+          ? igrejaPrincipalDadosProvider
+          : igrejaAtualDadosProvider;
+      final assinatura = container.listen<AsyncValue<IgrejaModel?>>(provider, (
+        _,
+        proximo,
+      ) {
+        proximo.when(
+          data: (valor) {
+            if (!completer.isCompleted && aceitar(valor)) {
+              completer.complete(valor);
+            }
+          },
+          error: (erro, stack) {
+            if (!completer.isCompleted) {
+              completer.completeError(erro, stack);
+            }
+          },
+          loading: () {},
+        );
+      }, fireImmediately: true);
+      try {
+        return await completer.future.timeout(const Duration(seconds: 5));
+      } finally {
+        assinatura.close();
+      }
+    }
+
     /// Container com o catalogo em memoria e a preferencia local ja gravada.
     /// O notifier de unidade visualizada e o REAL: e ele que le o disco.
     Future<ProviderContainer> containerCom({
@@ -261,7 +297,7 @@ void main() {
       final c = ProviderContainer(
         overrides: [
           igrejasRepositoryProvider.overrideWithValue(
-            _RepositorioIgrejasFalso(unidades),
+            _RepositorioIgrejasFalso(unidades, vinculosAprovados: {?principal}),
           ),
           usuarioAtualProvider.overrideWith(
             (ref) => Stream.value(
@@ -297,8 +333,8 @@ void main() {
       expect(c.read(igrejaPrincipalProvider), olinda);
       expect(c.read(igrejaAtualProvider), petrolina);
 
-      await c.read(igrejaPrincipalDadosProvider.future);
-      await c.read(igrejaAtualDadosProvider.future);
+      await esperarDados(c, principal: true);
+      await esperarDados(c, principal: false);
 
       // O campo da ficha cadastral segue o VINCULO.
       expect(
@@ -310,13 +346,20 @@ void main() {
         c.read(nomeIgrejaEmFocoProvider),
         'Comunidade Nova Alianca Petrolina',
       );
+      // A própria igreja usa o documento operacional autorizado; a unidade
+      // apenas visitada permanece no catálogo público mínimo.
+      expect(
+        c.read(igrejaPrincipalDadosProvider).valueOrNull?.pixChave,
+        'pix-operacional-olinda',
+      );
+      expect(c.read(igrejaAtualDadosProvider).valueOrNull?.pixChave, isNull);
     });
 
     test('sem visitar ninguem, os dois coincidem', () async {
       final c = await containerCom(principal: 'olinda', visualizada: null);
 
-      await c.read(igrejaPrincipalDadosProvider.future);
-      await c.read(igrejaAtualDadosProvider.future);
+      await esperarDados(c, principal: true);
+      await esperarDados(c, principal: false);
 
       expect(
         c.read(nomeIgrejaPrincipalProvider),
@@ -327,23 +370,280 @@ void main() {
     test('sem vinculo, o campo fica nulo em vez de inventar unidade', () async {
       final c = await containerCom(principal: null, visualizada: petrolina);
 
-      await c.read(igrejaPrincipalDadosProvider.future);
+      await esperarDados(c, principal: true);
 
       expect(c.read(igrejaPrincipalProvider), isNull);
       expect(c.read(nomeIgrejaPrincipalProvider), isNull);
     });
+
+    for (final principal in [false, true]) {
+      test(
+        'vínculo não fechado troca fontes em '
+        '${principal ? 'igrejaPrincipalDadosProvider' : 'igrejaAtualDadosProvider'}',
+        () async {
+          SharedPreferences.setMockInitialValues(const {});
+          final repositorio = _RepositorioIgrejasDinamico(olinda);
+          addTearDown(repositorio.dispose);
+
+          final c = ProviderContainer(
+            overrides: [
+              igrejasRepositoryProvider.overrideWithValue(repositorio),
+              usuarioAtualProvider.overrideWith(
+                (ref) => Stream.value(
+                  UsuarioModel(
+                    uid: 'uid-ana',
+                    nome: 'Ana',
+                    email: 'ana@exemplo.test',
+                    telefone: '',
+                    dataCadastro: DateTime(2026, 8, 1),
+                    perfil: PerfilUsuario.membro,
+                    status: StatusUsuario.aprovado,
+                    igrejaPrincipalId: olinda.valor,
+                  ),
+                ),
+              ),
+            ],
+          );
+          addTearDown(c.dispose);
+
+          while (!c.read(igrejaVisualizadaProvider).carregado) {
+            await Future<void>.delayed(Duration.zero);
+          }
+          await c.read(usuarioAtualProvider.future);
+
+          final publicoInicial = esperarDados(
+            c,
+            principal: principal,
+            aceitar: (igreja) => igreja?.nome == 'Catálogo inicial',
+          );
+          await repositorio.esperarVinculo();
+          repositorio.vinculos.add(
+            VinculoIgreja(
+              uid: 'uid-ana',
+              igrejaId: olinda,
+              status: StatusVinculo.pendente,
+              perfil: PerfilComunitario.membro,
+            ),
+          );
+          await repositorio.esperarCatalogo();
+          repositorio.catalogo.add(
+            IgrejaModel(id: olinda, nome: 'Catálogo inicial', ativa: true),
+          );
+          expect((await publicoInicial)?.pixChave, isNull);
+
+          final privado = esperarDados(
+            c,
+            principal: principal,
+            aceitar: (igreja) => igreja?.pixChave == 'pix-privado',
+          );
+          repositorio.vinculos.add(
+            VinculoIgreja(
+              uid: 'uid-ana',
+              igrejaId: olinda,
+              status: StatusVinculo.aprovado,
+              perfil: PerfilComunitario.membro,
+            ),
+          );
+          await repositorio.esperarPrivada();
+          repositorio.privada.add(
+            IgrejaModel(
+              id: olinda,
+              nome: 'Documento privado',
+              ativa: true,
+              pixChave: 'pix-privado',
+            ),
+          );
+          expect((await privado)?.pixChave, 'pix-privado');
+          expect(repositorio.cancelamentosCatalogo, greaterThanOrEqualTo(1));
+
+          final publicoFinal = esperarDados(
+            c,
+            principal: principal,
+            aceitar: (igreja) => igreja?.nome == 'Catálogo final',
+          );
+          repositorio.vinculos.add(
+            VinculoIgreja(
+              uid: 'uid-ana',
+              igrejaId: olinda,
+              status: StatusVinculo.inativo,
+              perfil: PerfilComunitario.membro,
+            ),
+          );
+          await repositorio.esperarCatalogo();
+          repositorio.catalogo.add(
+            IgrejaModel(id: olinda, nome: 'Catálogo final', ativa: true),
+          );
+          expect((await publicoFinal)?.pixChave, isNull);
+          expect(repositorio.cancelamentosPrivada, greaterThanOrEqualTo(1));
+        },
+      );
+    }
+
+    test(
+      'vínculo aprovado de outra unidade nunca abre a fonte privada',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'igreja_visualizada_id': petrolina.valor,
+        });
+        final repositorio = _RepositorioIgrejasDinamico(petrolina);
+        addTearDown(repositorio.dispose);
+
+        final c = ProviderContainer(
+          overrides: [
+            igrejasRepositoryProvider.overrideWithValue(repositorio),
+            usuarioAtualProvider.overrideWith(
+              (ref) => Stream.value(
+                UsuarioModel(
+                  uid: 'uid-ana',
+                  nome: 'Ana',
+                  email: 'ana@exemplo.test',
+                  telefone: '',
+                  dataCadastro: DateTime(2026, 8, 1),
+                  perfil: PerfilUsuario.membro,
+                  status: StatusUsuario.aprovado,
+                  igrejaPrincipalId: olinda.valor,
+                ),
+              ),
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+
+        while (!c.read(igrejaVisualizadaProvider).carregado) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        await c.read(usuarioAtualProvider.future);
+        expect(c.read(igrejaAtualProvider), petrolina);
+
+        final dadosPublicos = esperarDados(
+          c,
+          principal: false,
+          aceitar: (igreja) => igreja?.nome == 'Catálogo Petrolina',
+        );
+        await repositorio.esperarVinculo();
+        repositorio.vinculos.add(
+          VinculoIgreja(
+            uid: 'uid-ana',
+            igrejaId: olinda,
+            status: StatusVinculo.aprovado,
+            perfil: PerfilComunitario.membro,
+            ministerioIds: const ['louvor-olinda'],
+          ),
+        );
+        await repositorio.esperarCatalogo();
+        repositorio.catalogo.add(
+          IgrejaModel(id: petrolina, nome: 'Catálogo Petrolina', ativa: true),
+        );
+
+        expect((await dadosPublicos)?.nome, 'Catálogo Petrolina');
+        expect(c.read(isMembroAprovadoAtualProvider), isFalse);
+        expect(repositorio.privadaTemAssinatura, isFalse);
+      },
+    );
   });
 }
 
+bool _qualquerIgreja(IgrejaModel? _) => true;
+
 /// Catalogo de unidades em memoria.
 class _RepositorioIgrejasFalso implements IgrejasRepository {
-  _RepositorioIgrejasFalso(this.unidades);
+  _RepositorioIgrejasFalso(
+    this.unidades, {
+    this.vinculosAprovados = const <String>{},
+  });
 
   final Map<String, IgrejaModel> unidades;
+  final Set<String> vinculosAprovados;
 
   @override
   Stream<IgrejaModel?> streamIgreja(IgrejaId id) =>
       Stream.value(unidades[id.valor]);
+
+  @override
+  Stream<IgrejaModel?> streamIgrejaPrivada(IgrejaId id) {
+    final publica = unidades[id.valor];
+    if (publica == null) return Stream.value(null);
+    return Stream.value(
+      IgrejaModel(
+        id: publica.id,
+        nome: publica.nome,
+        ativa: publica.ativa,
+        pixChave: 'pix-operacional-${id.valor}',
+      ),
+    );
+  }
+
+  @override
+  Stream<VinculoIgreja?> streamVinculo(IgrejaId igrejaId, String uid) {
+    if (!vinculosAprovados.contains(igrejaId.valor)) {
+      return Stream.value(null);
+    }
+    return Stream.value(
+      VinculoIgreja(
+        uid: uid,
+        igrejaId: igrejaId,
+        status: StatusVinculo.aprovado,
+        perfil: PerfilComunitario.membro,
+      ),
+    );
+  }
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RepositorioIgrejasDinamico implements IgrejasRepository {
+  _RepositorioIgrejasDinamico(this.id) {
+    catalogo = StreamController<IgrejaModel?>.broadcast(
+      sync: true,
+      onCancel: () => cancelamentosCatalogo++,
+    );
+    privada = StreamController<IgrejaModel?>.broadcast(
+      sync: true,
+      onCancel: () => cancelamentosPrivada++,
+    );
+  }
+
+  final IgrejaId id;
+  final vinculos = StreamController<VinculoIgreja?>.broadcast(sync: true);
+  late final StreamController<IgrejaModel?> catalogo;
+  late final StreamController<IgrejaModel?> privada;
+  int cancelamentosCatalogo = 0;
+  int cancelamentosPrivada = 0;
+  bool get privadaTemAssinatura => privada.hasListener;
+
+  Future<void> esperarVinculo() => _esperarAssinatura(vinculos, 'vínculo');
+
+  Future<void> esperarCatalogo() => _esperarAssinatura(catalogo, 'catálogo');
+
+  Future<void> esperarPrivada() => _esperarAssinatura(privada, 'privada');
+
+  Future<void> _esperarAssinatura(
+    StreamController<Object?> controller,
+    String nome,
+  ) async {
+    for (var tentativa = 0; tentativa < 100; tentativa++) {
+      if (controller.hasListener) return;
+      await Future<void>.delayed(Duration.zero);
+    }
+    throw StateError('O stream de $nome não recebeu assinatura.');
+  }
+
+  @override
+  Stream<IgrejaModel?> streamIgreja(IgrejaId id) => catalogo.stream;
+
+  @override
+  Stream<IgrejaModel?> streamIgrejaPrivada(IgrejaId id) => privada.stream;
+
+  @override
+  Stream<VinculoIgreja?> streamVinculo(IgrejaId igrejaId, String uid) =>
+      vinculos.stream;
+
+  Future<void> dispose() async {
+    await vinculos.close();
+    await catalogo.close();
+    await privada.close();
+  }
 
   @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

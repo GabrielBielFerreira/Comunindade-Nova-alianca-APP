@@ -170,7 +170,7 @@ final proximosEventosProvider = StreamProvider<List<Evento>>((ref) =>
 
 // ── Unidade em foco: configuração e status Mercado Pago ───────────────
 
-/// Documento `/igrejas/{id}` da unidade em foco. Leitura pública nas Rules.
+/// Documento operacional privado `/igrejas/{id}` da unidade autorizada.
 final igrejaAtualProvider = StreamProvider<IgrejaModel?>((ref) {
   final acesso = ref.watch(acessoAtualProvider);
   if (acesso == null) return Stream.value(null);

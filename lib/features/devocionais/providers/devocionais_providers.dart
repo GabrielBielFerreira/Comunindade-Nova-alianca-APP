@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../../../core/data/igreja_scope.dart';
 import '../../igrejas/providers/igreja_providers.dart';
@@ -15,8 +14,10 @@ final devocionaisRepositoryProvider = Provider<DevocionaisRepository>((ref) {
 final devocionaisStreamProvider =
     StreamProvider.autoDispose<List<DevocionalModel>>((ref) {
       if (ref.watch(igrejaScopeProvider) == null) return Stream.value(const []);
-      final vinculo = ref.watch(vinculoAtualProvider).valueOrNull;
-      final aprovado = vinculo?.status == StatusVinculo.aprovado;
+      // A autorização valida também o IgrejaId. Durante uma troca de unidade,
+      // Riverpod pode preservar por um instante o valor anterior do stream;
+      // o vínculo de Olinda nunca pode liberar a consulta privada de Petrolina.
+      final aprovado = ref.watch(isMembroAprovadoAtualProvider);
       final repo = ref.watch(devocionaisRepositoryProvider);
       return aprovado ? repo.stream() : repo.streamPublicos();
     });

@@ -21,6 +21,43 @@ const U = {
   visitante: "uid_visitante_anonimo",
 };
 
+const SEGREDO_CANARIO = "SEGREDO-CANARIO-NAO-PODE-VAZAR";
+
+const CATALOGO_IGREJAS = {
+  [OLINDA]: {
+    nome: "Nova Aliança Olinda",
+    ativa: true,
+    configurada: true,
+    endereco: "Av. Leopoldino Canuto de Melo, 846, Caixa D'Água",
+    cidade_estado: "Olinda — PE",
+    endereco_secundario: null,
+    slogan: "Uma família para pertencer",
+    cultos_recorrentes: ["Domingo às 18h"],
+    instagram: "@novaaliancaolinda",
+    youtube_url: null,
+    pastores_publicos: ["Pastor Público de Teste"],
+  },
+  [PETROLINA]: {
+    nome: "Nova Aliança Petrolina",
+    ativa: false,
+    configurada: false,
+    endereco: "Rua 47, número 180 — São Gonçalo",
+    cidade_estado: "Petrolina — PE",
+    endereco_secundario: "Rua Tomaz Maia, número 255",
+    slogan: "Uma família para pertencer",
+    cultos_recorrentes: ["Quinta-feira às 19h30", "Domingo às 18h"],
+    instagram: "@cna.petrolina_",
+    youtube_url: "https://www.youtube.com/@comunidadenovaalianca547",
+    pastores_publicos: [],
+  },
+};
+
+function institucionaisDoCatalogo(catalogo) {
+  const { nome: _nome, ativa: _ativa, configurada: _configurada, ...dados } =
+    catalogo;
+  return dados;
+}
+
 function vinculo(perfil, status = "aprovado", funcoes = []) {
   return {
     perfil,
@@ -33,19 +70,41 @@ function vinculo(perfil, status = "aprovado", funcoes = []) {
 }
 
 /**
- * Semeia igrejas, vínculos, conteúdo, transações e auditoria nas duas
- * unidades. Executado com as Rules desabilitadas.
+ * Semeia o catálogo público sanitizado, documentos institucionais privados,
+ * vínculos, conteúdo, transações e auditoria nas duas unidades. Executado com
+ * as Rules desabilitadas.
  */
 async function semearBase(fs) {
+  for (const [igrejaId, catalogo] of Object.entries(CATALOGO_IGREJAS)) {
+    // `set` sem merge mantém a projeção pública com EXATAMENTE 11 campos.
+    await fs.doc(`catalogo_igrejas/${igrejaId}`).set(catalogo);
+  }
+
   await fs.doc(`igrejas/${OLINDA}`).set({
     nome: "Nova Aliança Olinda",
     ativa: true,
     configurada: true,
+    criado_por: SEGREDO_CANARIO,
+    mercado_pago_status: "configurado",
+    dados_institucionais: {
+      ...institucionaisDoCatalogo(CATALOGO_IGREJAS[OLINDA]),
+      pix_chave: SEGREDO_CANARIO,
+      telefone: SEGREDO_CANARIO,
+      responsavel_administrativo_uid: U.pastorOlinda,
+    },
   });
   await fs.doc(`igrejas/${PETROLINA}`).set({
     nome: "Nova Aliança Petrolina",
     ativa: false,
     configurada: false,
+    criado_por: SEGREDO_CANARIO,
+    mercado_pago_status: "nao_configurado",
+    dados_institucionais: {
+      ...institucionaisDoCatalogo(CATALOGO_IGREJAS[PETROLINA]),
+      pix_chave: SEGREDO_CANARIO,
+      telefone: SEGREDO_CANARIO,
+      responsavel_administrativo_uid: U.pastorPetrolina,
+    },
   });
 
   const membrosOlinda = {
@@ -135,4 +194,12 @@ async function semearBase(fs) {
   });
 }
 
-module.exports = { OLINDA, PETROLINA, U, vinculo, semearBase };
+module.exports = {
+  OLINDA,
+  PETROLINA,
+  U,
+  SEGREDO_CANARIO,
+  CATALOGO_IGREJAS,
+  vinculo,
+  semearBase,
+};

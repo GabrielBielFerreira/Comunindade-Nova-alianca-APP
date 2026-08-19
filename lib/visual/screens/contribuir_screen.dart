@@ -129,11 +129,12 @@ class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
   }
 
   Future<void> _openCampaign(ContribuicaoCampaignData campaign) async {
-    final escolhida = await Navigator.of(context).push<ContribuicaoCampaignData>(
-      MaterialPageRoute<ContribuicaoCampaignData>(
-        builder: (_) => CampanhaDetalhesScreen(campaign: campaign),
-      ),
-    );
+    final escolhida = await Navigator.of(context)
+        .push<ContribuicaoCampaignData>(
+          MaterialPageRoute<ContribuicaoCampaignData>(
+            builder: (_) => CampanhaDetalhesScreen(campaign: campaign),
+          ),
+        );
     if (escolhida != null && mounted) {
       setState(() => _selectedCampaign = escolhida);
       _showMessage('Contribuindo para a campanha: ${escolhida.title}');
@@ -162,6 +163,10 @@ class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isVisitor) {
+      return const _ContribuicaoVisitanteBloqueada();
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -283,6 +288,150 @@ class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContribuicaoVisitanteBloqueada extends StatelessWidget {
+  const _ContribuicaoVisitanteBloqueada();
+
+  @override
+  Widget build(BuildContext context) {
+    final scale =
+        (MediaQuery.sizeOf(context).width / _ContribuirScreenState._designWidth)
+            .clamp(escalaMinima, 1.0)
+            .toDouble();
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        key: const Key('contribuicao_visitante_bloqueada'),
+        backgroundColor: _ContribuirScreenState._background,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                height: 64 * scale,
+                alignment: Alignment.centerLeft,
+                padding: EdgeInsets.symmetric(horizontal: 20 * scale),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: _ContribuirScreenState._line),
+                  ),
+                ),
+                child: Text(
+                  'Contribuir',
+                  style: GoogleFonts.montserrat(
+                    fontSize: 20 * scale,
+                    fontWeight: FontWeight.w700,
+                    color: _ContribuirScreenState._primaryDark,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 28 * scale,
+                      vertical: 32 * scale,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72 * scale,
+                          height: 72 * scale,
+                          decoration: const BoxDecoration(
+                            color: _ContribuirScreenState._soft,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.lock_outline_rounded,
+                            size: 34 * scale,
+                            color: _ContribuirScreenState._primary,
+                          ),
+                        ),
+                        SizedBox(height: 24 * scale),
+                        Text(
+                          'Contribuição protegida',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.montserrat(
+                            fontSize: 22 * scale,
+                            fontWeight: FontWeight.w700,
+                            color: _ContribuirScreenState._title,
+                          ),
+                        ),
+                        SizedBox(height: 12 * scale),
+                        Text(
+                          'Contribuições pelo aplicativo estão disponíveis '
+                          'após entrar e ter o vínculo com a igreja aprovado.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 15 * scale,
+                            height: 1.5,
+                            color: _ContribuirScreenState._body,
+                          ),
+                        ),
+                        SizedBox(height: 8 * scale),
+                        Text(
+                          'Por segurança, os dados de pagamento não ficam no '
+                          'catálogo público.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 14 * scale,
+                            height: 1.45,
+                            color: _ContribuirScreenState._body,
+                          ),
+                        ),
+                        SizedBox(height: 24 * scale),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50 * scale,
+                          child: FilledButton(
+                            key: const Key('entrar_para_contribuir'),
+                            onPressed: () => Navigator.pushNamed(
+                              context,
+                              VisualRoutes.entraconta,
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _ContribuirScreenState._primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12 * scale),
+                              ),
+                            ),
+                            child: Text(
+                              'Entrar para contribuir',
+                              style: GoogleFonts.inter(
+                                fontSize: 15 * scale,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: VisitorBottomNavigation(
+          activeItem: VisitorNavItem.contribute,
+          scale: scale,
+          bottomPadding: bottomPadding,
         ),
       ),
     );
@@ -1196,22 +1345,19 @@ class _TypePill extends StatelessWidget {
 }
 
 class _CampaignsSection extends ConsumerWidget {
-  const _CampaignsSection({
-    required this.scale,
-    required this.onSupport,
-  });
+  const _CampaignsSection({required this.scale, required this.onSupport});
 
   final double scale;
   final ValueChanged<ContribuicaoCampaignData> onSupport;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final campanhas = ref.watch(campanhasAtivasProvider).valueOrNull ?? const [];
+    final campanhas =
+        ref.watch(campanhasAtivasProvider).valueOrNull ?? const [];
     // Sem campanhas publicadas, a seção simplesmente não aparece (honesto).
     if (campanhas.isEmpty) return const SizedBox.shrink();
 
-    final cards =
-        campanhas.map(ContribuicaoCampaignData.fromCampanha).toList();
+    final cards = campanhas.map(ContribuicaoCampaignData.fromCampanha).toList();
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16 * scale),
@@ -1268,7 +1414,10 @@ class _SelectedCampaignBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14 * scale, vertical: 12 * scale),
+      padding: EdgeInsets.symmetric(
+        horizontal: 14 * scale,
+        vertical: 12 * scale,
+      ),
       decoration: BoxDecoration(
         color: _ContribuirScreenState._soft,
         borderRadius: BorderRadius.circular(12 * scale),
@@ -1816,8 +1965,7 @@ class _ContribuirNavigationItem extends StatelessWidget {
           return;
         }
 
-        if (item.label == 'Contribuir' ||
-            item.asset == HomeAssets.contribute) {
+        if (item.label == 'Contribuir' || item.asset == HomeAssets.contribute) {
           Navigator.pushNamed(context, VisualRoutes.contribuir);
           return;
         }

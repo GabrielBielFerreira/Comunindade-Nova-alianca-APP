@@ -33,9 +33,9 @@ class IgrejasRepository {
     });
   }
 
-  /// Uma unidade. `/igrejas/{id}` tem leitura pública nas Rules (o aplicativo
-  /// precisa listar unidades antes do login), então qualquer usuário do painel
-  /// consegue ler a configuração da unidade que administra.
+  /// Uma unidade operacional. `/igrejas/{id}` é privado nas Rules: o painel
+  /// só chega aqui depois de `meusAcessos`, e um vínculo aprovado lê apenas a
+  /// própria unidade. O primeiro acesso do app usa `catalogo_igrejas`.
   Stream<IgrejaModel?> observarUma(IgrejaId igrejaId) {
     return _db.doc('igrejas/${igrejaId.valor}').snapshots().map((d) {
       final dados = d.data();

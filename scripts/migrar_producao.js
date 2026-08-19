@@ -1,70 +1,43 @@
 /**
  * Migração das coleções globais para a estrutura multi-igreja.
  *
- * NÃO É O SEED. Este script não cria usuários, senhas nem conteúdo de
- * demonstração — apenas move o que já existe para dentro de `igrejas/olinda`.
+ * Segurança:
+ *  - exige o projeto oficial explicitamente;
+ *  - `--dry-run` é o padrão e `--apply` é sempre explícito;
+ *  - audita contagens e NOMES de campos, nunca valores;
+ *  - valida todos os destinos existentes antes de qualquer escrita;
+ *  - cria um catálogo público por allowlist, separado dos metadados internos;
+ *  - aplica no máximo 450 operações em uma única transação atômica;
+ *  - relê e trava origens/destinos na transação antes de qualquer escrita;
+ *  - verifica depois do commit que um novo planejamento produz zero operações;
+ *  - usa `create()` nos destinos ausentes, sem sobrescrever corridas;
+ *  - nunca apaga coleções legadas.
  *
- * Segurança embutida:
- *  - exige `--project=<id>` e confirma que é o esperado;
- *  - `--dry-run` é o PADRÃO; gravar exige `--apply` explícito;
- *  - idempotente: reexecutar não duplica nada;
- *  - preserva IDs e timestamps originais;
- *  - NUNCA apaga: as coleções antigas permanecem intactas;
- *  - relatório de contagem no fim.
+ * Preparação:
+ *   npm --prefix scripts ci
+ *   gcloud auth application-default login
+ *   gcloud config set project nova-alianca-app
  *
  * Uso:
  *   node scripts/migrar_producao.js --project=nova-alianca-app --dry-run
  *   node scripts/migrar_producao.js --project=nova-alianca-app --apply
- *
- * Credencial: GOOGLE_APPLICATION_CREDENTIALS apontando para a service
- * account do projeto, ou `gcloud auth application-default login`.
  */
-const admin = require("firebase-admin");
+"use strict";
 
-// ── Argumentos ────────────────────────────────────────────────────────
-function arg(nome) {
-  const item = process.argv.find((a) => a.startsWith(`--${nome}=`));
-  return item ? item.split("=").slice(1).join("=") : undefined;
-}
-const temFlag = (nome) => process.argv.includes(`--${nome}`);
+const {
+  compararCatalogo,
+  inventariarCampos,
+  projetarCatalogoPublico,
+  validarUnidadeConhecida,
+} = require("./catalogo_igrejas");
 
 const PROJETO_ESPERADO = "nova-alianca-app";
 const OLINDA = "olinda";
 const PETROLINA = "petrolina";
+const LIMITE_OPERACOES_TRANSACAO = 450;
+// Alias preservado para consumidores dos helpers puros anteriores.
+const LIMITE_OPERACOES_BATCH = LIMITE_OPERACOES_TRANSACAO;
 
-const projeto = arg("project");
-const aplicar = temFlag("apply");
-const dryRun = !aplicar;
-
-if (!projeto) {
-  console.error(
-    "\n[ABORTADO] Informe o projeto explicitamente:\n" +
-      `  node scripts/migrar_producao.js --project=${PROJETO_ESPERADO} --dry-run\n`
-  );
-  process.exit(1);
-}
-
-if (projeto !== PROJETO_ESPERADO) {
-  console.error(
-    `\n[ABORTADO] Projeto '${projeto}' != '${PROJETO_ESPERADO}'.\n` +
-      "Este script só opera no projeto oficial da rede.\n"
-  );
-  process.exit(1);
-}
-
-if (process.env.FIRESTORE_EMULATOR_HOST) {
-  console.error(
-    "\n[ABORTADO] FIRESTORE_EMULATOR_HOST está definida.\n" +
-      "Este script é para o Firebase REAL. Para testar no emulador, rode-o\n" +
-      "em outro terminal sem essa variável, ou use o seed do emulador.\n"
-  );
-  process.exit(1);
-}
-
-admin.initializeApp({ projectId: projeto });
-const db = admin.firestore();
-
-/** Coleções globais → subcoleção da unidade. */
 const COLECOES = [
   "avisos",
   "eventos",
@@ -76,54 +49,173 @@ const COLECOES = [
   "auditoria",
 ];
 
-const relatorio = [];
+const COLECOES_AUDITADAS = [
+  "igrejas",
+  "catalogo_igrejas",
+  "igreja",
+  "usuarios",
+  ...COLECOES,
+  "transacoes",
+  "notificacoes",
+  "tokens_dispositivo",
+  "configuracoes",
+];
 
-function registrar(item, lidos, migrados, ignorados, extra = "") {
-  relatorio.push({ item, lidos, migrados, ignorados, extra });
-  console.log(
-    `  ${item.padEnd(24)} lidos=${String(lidos).padStart(5)} ` +
-      `migrados=${String(migrados).padStart(5)} ` +
-      `ja_existiam=${String(ignorados).padStart(5)} ${extra}`
-  );
+const UNIDADES_BASE = [
+  {
+    id: OLINDA,
+    dados: {
+      nome: "Nova Aliança Olinda",
+      slug: OLINDA,
+      ativa: true,
+      // Derivado mais adiante somente de dados institucionais allowlisted.
+      configurada: false,
+      mercado_pago_status: "nao_configurado",
+    },
+  },
+  {
+    id: PETROLINA,
+    dados: {
+      nome: "Nova Aliança Petrolina",
+      slug: PETROLINA,
+      ativa: false,
+      configurada: false,
+      dados_institucionais: {},
+      mercado_pago_status: "nao_configurado",
+    },
+  },
+];
+
+const CAMPOS_INSTITUCIONAIS_LEGADOS = [
+  "pastor_responsavel",
+  "pastores_publicos",
+  "responsavel_administrativo_uid",
+  "slogan",
+  "endereco",
+  "endereco_secundario",
+  "youtube_url",
+  "cultos_recorrentes",
+  "cidade_estado",
+  "cep",
+  "telefone",
+  "instagram",
+  "pix_chave",
+  "pix_tipo",
+];
+
+const CAMPOS_LISTA = new Set(["pastores_publicos", "cultos_recorrentes"]);
+
+function argumento(nome, argv) {
+  const prefixo = `--${nome}=`;
+  const item = argv.find((valor) => valor.startsWith(prefixo));
+  return item ? item.slice(prefixo.length) : undefined;
 }
 
-/**
- * Copia preservando ID e todos os campos originais (inclusive timestamps).
- * Se o destino já existe, não sobrescreve — é o que torna a reexecução segura.
- */
-async function migrarColecao(nome) {
-  const origem = await db.collection(nome).get();
-  let migrados = 0;
-  let ignorados = 0;
+function analisarArgumentos(argv = process.argv.slice(2)) {
+  const projeto = argumento("project", argv);
+  const aplicar = argv.includes("--apply");
+  const dryRunExplicito = argv.includes("--dry-run");
 
-  for (const doc of origem.docs) {
-    const destino = db.doc(`igrejas/${OLINDA}/${nome}/${doc.id}`);
-    const jaExiste = (await destino.get()).exists;
-
-    if (jaExiste) {
-      ignorados++;
-      continue;
-    }
-    if (!dryRun) {
-      await destino.set({
-        ...normalizarContratoConteudo(nome, doc.data() ?? {}),
-        migrado_de: `${nome}/${doc.id}`,
-        migrado_em: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-    migrados++;
+  if (!projeto) {
+    throw new Error(
+      `Informe --project=${PROJETO_ESPERADO} explicitamente (o padrão é --dry-run).`
+    );
+  }
+  if (projeto !== PROJETO_ESPERADO) {
+    throw new Error(`Projeto recusado; este script só opera em ${PROJETO_ESPERADO}.`);
+  }
+  if (aplicar && dryRunExplicito) {
+    throw new Error("Use somente um modo: --dry-run ou --apply.");
   }
 
-  registrar(nome, origem.size, migrados, ignorados);
+  return { projeto, aplicar, dryRun: !aplicar };
 }
 
-/**
- * Alinha documentos legados ao contrato que painel e aplicativo compartilham.
- *
- * A ausência de `publico` vira `false`: conteúdo antigo sem decisão explícita
- * não deve ser exposto a visitantes durante a migração. A liderança pode
- * publicá-lo depois pelo painel.
- */
+function validarOpcoesExecucao({ projeto, dryRun } = {}) {
+  if (projeto !== PROJETO_ESPERADO) {
+    throw new Error(`Projeto recusado; este script só opera em ${PROJETO_ESPERADO}.`);
+  }
+  if (typeof dryRun !== "boolean") {
+    throw new Error("dryRun deve ser informado explicitamente como boolean.");
+  }
+  return { projeto, dryRun };
+}
+
+function validarProjetoRuntime({ admin, db, projeto }) {
+  const projetosDetectados = [];
+  const adicionar = (valor) => {
+    if (typeof valor === "string" && valor.trim().length > 0) {
+      projetosDetectados.push(valor.trim());
+    }
+  };
+
+  adicionar(db?.projectId);
+  try {
+    adicionar(admin?.app?.().options?.projectId);
+  } catch {
+    // Um runtime sem app padrão ainda será recusado abaixo se o Firestore
+    // também não expuser de forma verificável o projeto ao qual está ligado.
+  }
+
+  if (projetosDetectados.length === 0) {
+    throw new Error("Runtime recusado: projeto do Firestore não verificável.");
+  }
+  if (projetosDetectados.some((item) => item !== projeto)) {
+    throw new Error("Runtime recusado: Firestore ligado a outro projeto.");
+  }
+
+  return projeto;
+}
+
+function objetoSimples(valor) {
+  return valor !== null && typeof valor === "object" && !Array.isArray(valor);
+}
+
+function extrairDadosInstitucionaisLegados(bruto) {
+  if (!objetoSimples(bruto)) return {};
+  const saida = {};
+
+  for (const campo of CAMPOS_INSTITUCIONAIS_LEGADOS) {
+    if (!Object.prototype.hasOwnProperty.call(bruto, campo)) continue;
+    const valor = bruto[campo];
+
+    if (CAMPOS_LISTA.has(campo)) {
+      if (!Array.isArray(valor)) continue;
+      saida[campo] = valor
+        .filter((item) => typeof item === "string")
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
+      continue;
+    }
+
+    if (valor === null) {
+      saida[campo] = null;
+      continue;
+    }
+    if (typeof valor !== "string") continue;
+    const texto = valor.trim();
+    saida[campo] = texto.length > 0 ? texto : null;
+  }
+
+  return saida;
+}
+
+function temDadosInstitucionais(institucionais) {
+  if (!objetoSimples(institucionais)) return false;
+  return Object.values(institucionais).some((valor) => {
+    if (Array.isArray(valor)) return valor.length > 0;
+    return typeof valor === "string" && valor.trim().length > 0;
+  });
+}
+
+function normalizarTexto(valor) {
+  return String(valor ?? "").toLowerCase().trim();
+}
+
+function normalizarSemAcentos(valor) {
+  return normalizarTexto(valor).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 function normalizarContratoConteudo(nome, dados) {
   const d = { ...dados };
 
@@ -156,132 +248,756 @@ function normalizarContratoConteudo(nome, dados) {
   return d;
 }
 
-/** Cria as unidades. Petrolina entra INATIVA e sem dados inventados. */
-async function criarUnidades() {
-  const unidades = [
-    {
-      id: OLINDA,
-      dados: {
-        nome: "Nova Aliança Olinda",
-        slug: OLINDA,
-        ativa: true,
-        configurada: true,
-        mercado_pago_status: "nao_configurado",
-      },
-    },
-    {
-      id: PETROLINA,
-      dados: {
-        nome: "Nova Aliança Petrolina",
-        slug: PETROLINA,
-        // Sem dados oficiais confirmados: entra inativa e não configurada.
-        ativa: false,
-        configurada: false,
-        dados_institucionais: {},
-        mercado_pago_status: "nao_configurado",
-      },
-    },
-  ];
+function valoresIguais(atual, esperado) {
+  if (Object.is(atual, esperado)) return true;
 
-  let criadas = 0;
-  let existentes = 0;
-
-  for (const u of unidades) {
-    const ref = db.doc(`igrejas/${u.id}`);
-    if ((await ref.get()).exists) {
-      existentes++;
-      continue;
+  if (atual && typeof atual.isEqual === "function") {
+    try {
+      return atual.isEqual(esperado);
+    } catch {
+      return false;
     }
-    if (!dryRun) {
-      await ref.set({
-        ...u.dados,
-        criado_em: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    }
-    criadas++;
   }
-
-  registrar("igrejas", unidades.length, criadas, existentes);
+  if (esperado && typeof esperado.isEqual === "function") {
+    try {
+      return esperado.isEqual(atual);
+    } catch {
+      return false;
+    }
+  }
+  if (atual instanceof Date || esperado instanceof Date) {
+    return (
+      atual instanceof Date &&
+      esperado instanceof Date &&
+      atual.getTime() === esperado.getTime()
+    );
+  }
+  if (Buffer.isBuffer(atual) || Buffer.isBuffer(esperado)) {
+    return Buffer.isBuffer(atual) && Buffer.isBuffer(esperado) && atual.equals(esperado);
+  }
+  if (Array.isArray(atual) || Array.isArray(esperado)) {
+    return (
+      Array.isArray(atual) &&
+      Array.isArray(esperado) &&
+      atual.length === esperado.length &&
+      atual.every((valor, indice) => valoresIguais(valor, esperado[indice]))
+    );
+  }
+  if (objetoSimples(atual) || objetoSimples(esperado)) {
+    if (!objetoSimples(atual) || !objetoSimples(esperado)) return false;
+    const chavesAtuais = Object.keys(atual).sort();
+    const chavesEsperadas = Object.keys(esperado).sort();
+    return (
+      chavesAtuais.length === chavesEsperadas.length &&
+      chavesAtuais.every((chave, indice) => chave === chavesEsperadas[indice]) &&
+      chavesAtuais.every((chave) => valoresIguais(atual[chave], esperado[chave]))
+    );
+  }
+  return false;
 }
 
-/**
- * Cada `usuarios/{uid}` vira um vínculo em Olinda, preservando perfil e
- * status atuais. Liderança NÃO é convertida em tesoureiro — o acesso
- * financeiro vem do próprio perfil.
- */
-async function migrarVinculos() {
-  const usuarios = await db.collection("usuarios").get();
+function representarValorParaGuarda(valor, vistos = new WeakSet()) {
+  if (valor === null) return ["null"];
+
+  const tipo = typeof valor;
+  if (tipo === "undefined") return ["undefined"];
+  if (tipo === "string" || tipo === "boolean") return [tipo, valor];
+  if (tipo === "number") {
+    if (Number.isNaN(valor)) return ["number", "NaN"];
+    if (valor === Infinity) return ["number", "Infinity"];
+    if (valor === -Infinity) return ["number", "-Infinity"];
+    if (Object.is(valor, -0)) return ["number", "-0"];
+    return ["number", valor];
+  }
+  if (tipo === "bigint") return ["bigint", valor.toString()];
+  if (tipo !== "object") return [tipo];
+
+  if (valor instanceof Date) return ["date", valor.getTime()];
+  if (Buffer.isBuffer(valor)) return ["bytes", valor.toString("base64")];
+  if (valor instanceof Uint8Array) {
+    return ["bytes", Buffer.from(valor).toString("base64")];
+  }
+  if (typeof valor.toMillis === "function") {
+    try {
+      return [
+        "timestamp",
+        valor.toMillis(),
+        typeof valor.nanoseconds === "number" ? valor.nanoseconds : null,
+      ];
+    } catch {
+      // Continua para a representação estrutural abaixo.
+    }
+  }
+  if (
+    typeof valor.latitude === "number" &&
+    typeof valor.longitude === "number"
+  ) {
+    return ["geopoint", valor.latitude, valor.longitude];
+  }
+  if (typeof valor.path === "string" && typeof valor.isEqual === "function") {
+    return ["reference", valor.path];
+  }
+
+  if (vistos.has(valor)) {
+    throw new Error("Plano recusado: leitura contém referência circular.");
+  }
+  vistos.add(valor);
+
+  let representacao;
+  if (Array.isArray(valor)) {
+    representacao = [
+      "array",
+      valor.map((item) => representarValorParaGuarda(item, vistos)),
+    ];
+  } else {
+    representacao = [
+      "object",
+      Object.keys(valor)
+        .sort()
+        .map((chave) => [
+          chave,
+          representarValorParaGuarda(valor[chave], vistos),
+        ]),
+    ];
+  }
+
+  vistos.delete(valor);
+  return representacao;
+}
+
+function assinaturaValor(valor) {
+  return JSON.stringify(representarValorParaGuarda(valor));
+}
+
+function assinaturaDocumento(snapshot) {
+  return assinaturaValor({
+    existe: snapshot?.exists === true,
+    dados: snapshot?.exists === true ? snapshot.data?.() ?? {} : null,
+    atualizado_em: snapshot?.updateTime ?? null,
+  });
+}
+
+function assinaturaColecao(snapshot) {
+  const documentos = [...(snapshot?.docs ?? [])]
+    .map((doc) => ({
+      id: doc.id,
+      dados: doc.data?.() ?? {},
+      atualizado_em: doc.updateTime ?? null,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return assinaturaValor(documentos);
+}
+
+function validarLeiturasInalteradas(iniciais, transacionais) {
+  if (!(iniciais instanceof Map) || !(transacionais instanceof Map)) {
+    throw new Error("Drift concorrente: conjunto de leituras inválido.");
+  }
+
+  const chavesIniciais = [...iniciais.keys()].sort();
+  const chavesTransacionais = [...transacionais.keys()].sort();
+  if (
+    chavesIniciais.length !== chavesTransacionais.length ||
+    chavesIniciais.some(
+      (chave, indice) => chave !== chavesTransacionais[indice]
+    ) ||
+    chavesIniciais.some(
+      (chave) => iniciais.get(chave) !== transacionais.get(chave)
+    )
+  ) {
+    throw new Error(
+      "Drift concorrente detectado; nenhuma escrita foi aplicada. Rode o dry-run novamente."
+    );
+  }
+
+  return { leiturasValidadas: chavesIniciais.length };
+}
+
+function validarPlanosEquivalentes(inicial, transacional) {
+  const resumir = (plano) =>
+    assinaturaValor(
+      (plano?.operacoes ?? []).map((operacao) => ({
+        tipo: operacao.tipo,
+        caminho: operacao.caminho,
+        caminhoSeguro: operacao.caminhoSeguro,
+        dados: operacao.dados,
+        precondicao: operacao.precondicao ?? null,
+      }))
+    );
+
+  if (resumir(inicial) !== resumir(transacional)) {
+    throw new Error(
+      "Drift concorrente detectado; o plano transacional divergiu do preflight."
+    );
+  }
+}
+
+function timestampMigracaoValido(valor) {
+  if (valor instanceof Date) return !Number.isNaN(valor.getTime());
+  if (!valor || typeof valor.toDate !== "function") return false;
+
+  try {
+    const data = valor.toDate();
+    return data instanceof Date && !Number.isNaN(data.getTime());
+  } catch {
+    return false;
+  }
+}
+
+function compararDocumentoPlanejado(
+  atual,
+  esperado,
+  { camposVolateis = ["migrado_em"] } = {}
+) {
+  if (!objetoSimples(atual) || !objetoSimples(esperado)) {
+    return { compativel: false, camposDivergentes: ["documento"] };
+  }
+
+  const volateis = new Set(camposVolateis);
+  const chavesAtuais = Object.keys(atual);
+  const chavesEsperadas = Object.keys(esperado);
+  const esperadas = new Set(chavesEsperadas);
+  const divergentes = new Set();
+
+  if (chavesAtuais.some((chave) => !esperadas.has(chave))) {
+    // Não ecoa o nome de um campo inesperado: ele pode ter sido criado a
+    // partir de um identificador ou outro valor sensível.
+    divergentes.add("campos_extras");
+  }
+
+  for (const chave of chavesEsperadas) {
+    if (!Object.prototype.hasOwnProperty.call(atual, chave)) {
+      divergentes.add(chave);
+      continue;
+    }
+    if (volateis.has(chave)) {
+      if (
+        chave === "migrado_em"
+          ? !timestampMigracaoValido(atual[chave])
+          : atual[chave] === null || atual[chave] === undefined
+      ) {
+        divergentes.add(chave);
+      }
+      continue;
+    }
+    if (!valoresIguais(atual[chave], esperado[chave])) {
+      divergentes.add(chave);
+    }
+  }
+
+  return {
+    compativel: divergentes.size === 0,
+    camposDivergentes: [...divergentes].sort(),
+  };
+}
+
+function criarPlanoAtomico() {
+  return { operacoes: [], conflitos: [] };
+}
+
+function registrarConflito(plano, caminhoSeguro, campos) {
+  const nomes = [...new Set(campos.length > 0 ? campos : ["documento"])].sort();
+  plano.conflitos.push(`${caminhoSeguro}[${nomes.join(",")}]`);
+}
+
+function planejarCriacaoDocumento(
+  plano,
+  {
+    caminho,
+    caminhoSeguro,
+    dados,
+    atual,
+    camposVolateis = ["migrado_em"],
+  }
+) {
+  if (atual === undefined) {
+    plano.operacoes.push({
+      tipo: "create",
+      caminho,
+      caminhoSeguro,
+      dados,
+    });
+    return "criar";
+  }
+
+  const comparacao = compararDocumentoPlanejado(atual, dados, {
+    camposVolateis,
+  });
+  if (!comparacao.compativel) {
+    registrarConflito(plano, caminhoSeguro, comparacao.camposDivergentes);
+    return "conflito";
+  }
+  return "inalterado";
+}
+
+function uidDestinoValido(valor) {
+  return (
+    typeof valor === "string" &&
+    valor.length >= 1 &&
+    valor.length <= 128 &&
+    valor === valor.trim() &&
+    !valor.includes("/")
+  );
+}
+
+function planejarIgrejaPrincipal(
+  plano,
+  { caminho, caminhoSeguro, dadosAtuais, precondicao }
+) {
+  const possuiCampo = Object.prototype.hasOwnProperty.call(
+    dadosAtuais,
+    "igreja_principal_id"
+  );
+  const atual = dadosAtuais.igreja_principal_id;
+
+  if (!possuiCampo || atual === null) {
+    plano.operacoes.push({
+      tipo: "update",
+      caminho,
+      caminhoSeguro,
+      dados: { igreja_principal_id: OLINDA },
+      ...(precondicao ? { precondicao } : {}),
+    });
+    return "atualizar";
+  }
+  // Todo usuário legado recebe vínculo somente em Olinda. Preservar outro ID
+  // deixaria a igreja principal apontando para uma unidade sem vínculo; isso
+  // precisa ser resolvido explicitamente antes de qualquer escrita.
+  if (atual === OLINDA) return "inalterado";
+
+  registrarConflito(plano, caminhoSeguro, ["igreja_principal_id"]);
+  return "conflito";
+}
+
+function validarPlanoAtomico(plano, limite = LIMITE_OPERACOES_TRANSACAO) {
+  if (!plano || !Array.isArray(plano.operacoes) || !Array.isArray(plano.conflitos)) {
+    throw new Error("Plano atômico inválido.");
+  }
+  if (plano.conflitos.length > 0) {
+    throw new Error(
+      "Preflight bloqueou a migração. Revise apenas estes caminhos/campos: " +
+        [...new Set(plano.conflitos)].sort().join("; ")
+    );
+  }
+  if (plano.operacoes.length > limite) {
+    throw new Error(
+      `Plano recusado: ${plano.operacoes.length} operações excedem o limite seguro de ${limite}.`
+    );
+  }
+
+  const caminhos = new Set();
+  for (const operacao of plano.operacoes) {
+    if (!operacao || !["create", "update"].includes(operacao.tipo)) {
+      throw new Error("Plano recusado: somente create e update são permitidos.");
+    }
+    if (caminhos.has(operacao.caminho)) {
+      throw new Error(
+        `Plano recusado: destino duplicado em ${operacao.caminhoSeguro ?? "{documento}"}.`
+      );
+    }
+    caminhos.add(operacao.caminho);
+  }
+
+  return { totalOperacoes: plano.operacoes.length, limite };
+}
+
+async function carregarRuntime(projeto) {
+  let admin;
+  try {
+    // Carregado somente no CLI: importar funções puras não exige Admin SDK.
+    admin = require("firebase-admin");
+  } catch {
+    throw new Error("Dependência ausente. Rode: npm --prefix scripts ci");
+  }
+
+  admin.initializeApp({ projectId: projeto });
+  return { admin, db: admin.firestore() };
+}
+
+function criarContexto({
+  admin,
+  db,
+  dryRun,
+  transacao = null,
+  silencioso = false,
+}) {
+  const cacheColecoes = new Map();
+  const cacheDocumentos = new Map();
+  const leituras = new Map();
+  const relatorio = [];
+
+  async function obterColecao(nome) {
+    if (!cacheColecoes.has(nome)) {
+      const consulta = db.collection(nome);
+      cacheColecoes.set(
+        nome,
+        transacao ? transacao.get(consulta) : consulta.get()
+      );
+    }
+    const snapshot = await cacheColecoes.get(nome);
+    leituras.set(`colecao:${nome}`, assinaturaColecao(snapshot));
+    return snapshot;
+  }
+
+  async function obterDocumento(caminho) {
+    if (!cacheDocumentos.has(caminho)) {
+      const referencia = db.doc(caminho);
+      cacheDocumentos.set(
+        caminho,
+        transacao ? transacao.get(referencia) : referencia.get()
+      );
+    }
+    const snapshot = await cacheDocumentos.get(caminho);
+    leituras.set(`documento:${caminho}`, assinaturaDocumento(snapshot));
+    return snapshot;
+  }
+
+  function registrar(item, lidos, migrados, ignorados, extra = "") {
+    relatorio.push({ item, lidos, migrados, ignorados, extra });
+    if (!silencioso) {
+      console.log(
+        `  ${item.padEnd(24)} lidos=${String(lidos).padStart(5)} ` +
+          `migrados=${String(migrados).padStart(5)} ` +
+          `inalterados=${String(ignorados).padStart(5)} ${extra}`
+      );
+    }
+  }
+
+  return {
+    admin,
+    db,
+    dryRun,
+    leituras,
+    obterColecao,
+    obterDocumento,
+    registrar,
+    relatorio,
+    silencioso,
+    transacao,
+  };
+}
+
+async function auditarEstrutura(ctx) {
+  console.log("=== AUDITORIA SOMENTE DE ESTRUTURA ===");
+  for (const nome of COLECOES_AUDITADAS) {
+    const snap = await ctx.obterColecao(nome);
+    const campos = inventariarCampos(snap.docs.map((doc) => doc.data() ?? {}));
+    console.log(
+      `  ${nome.padEnd(24)} documentos=${String(snap.size).padStart(5)} ` +
+        `campos=${campos.length > 0 ? campos.join(",") : "(nenhum)"}`
+    );
+  }
+  console.log("Nenhum valor, e-mail, token ou UID foi impresso.\n");
+}
+
+function erroCampo(erro) {
+  const mensagem = String(erro?.message ?? erro);
+  const separador = mensagem.lastIndexOf(":");
+  return separador >= 0 ? mensagem.slice(separador + 1) : "documento";
+}
+
+function construirUnidadesEsperadas(raizesAtuais, legadoDados) {
+  const institucionaisOlinda = extrairDadosInstitucionaisLegados(
+    legadoDados
+  );
+  const configuradaOlinda = temDadosInstitucionais(institucionaisOlinda);
+
+  return UNIDADES_BASE.map((unidade) => {
+    const dados = {
+      ...unidade.dados,
+      migrado_de:
+        unidade.id === OLINDA && configuradaOlinda
+          ? "igreja/principal"
+          : "bootstrap_multi_igreja",
+    };
+    if (unidade.id === OLINDA) {
+      dados.configurada = configuradaOlinda;
+      if (configuradaOlinda) {
+        dados.dados_institucionais = institucionaisOlinda;
+      }
+    }
+    return { id: unidade.id, dados };
+  });
+}
+
+function caminhoSeguroUnidade(colecao, id) {
+  return id === OLINDA || id === PETROLINA
+    ? `${colecao}/${id}`
+    : `${colecao}/{igrejaId}`;
+}
+
+function dadosInstitucionaisDaRaiz(dados) {
+  if (!objetoSimples(dados?.dados_institucionais)) return {};
+  return extrairDadosInstitucionaisLegados(dados.dados_institucionais);
+}
+
+function planejarUnidades({
+  raizesAtuais,
+  catalogosAtuais,
+  legadoDados = null,
+}) {
+  const unidadesEsperadas = construirUnidadesEsperadas(
+    raizesAtuais,
+    legadoDados
+  );
+  const idsEsperados = new Set(unidadesEsperadas.map((unidade) => unidade.id));
+  const raizesPlanejadas = new Map();
+  const criarRaizes = [];
+  const conflitos = [];
+
+  for (const id of raizesAtuais.keys()) {
+    if (!idsEsperados.has(id)) {
+      conflitos.push(
+        `${caminhoSeguroUnidade("igrejas", id)}[unidade_desconhecida]`
+      );
+    }
+  }
+
+  for (const unidade of unidadesEsperadas) {
+    const atual = raizesAtuais.get(unidade.id);
+    const validacao = validarUnidadeConhecida(atual, unidade.dados);
+
+    if (validacao.estado === "ausente") {
+      const dados = { ...unidade.dados };
+      criarRaizes.push({ id: unidade.id, dados });
+      raizesPlanejadas.set(unidade.id, dados);
+      continue;
+    }
+
+    if (validacao.estado !== "compativel") {
+      conflitos.push(
+        `${caminhoSeguroUnidade("igrejas", unidade.id)}[` +
+          `${validacao.camposDivergentes.join(",")}]`
+      );
+      continue;
+    }
+
+    if (
+      unidade.id === OLINDA &&
+      unidade.dados.configurada === true &&
+      !valoresIguais(
+        dadosInstitucionaisDaRaiz(atual),
+        unidade.dados.dados_institucionais
+      )
+    ) {
+      conflitos.push("igrejas/olinda[dados_institucionais]");
+      continue;
+    }
+
+    raizesPlanejadas.set(unidade.id, atual);
+  }
+
+  const catalogosEsperados = new Map();
+  for (const [id, dados] of raizesPlanejadas) {
+    try {
+      catalogosEsperados.set(id, projetarCatalogoPublico(dados));
+    } catch (erro) {
+      conflitos.push(
+        `${caminhoSeguroUnidade("igrejas", id)}[${erroCampo(erro)}]`
+      );
+    }
+  }
+
+  const criarCatalogos = [];
+  for (const [id, esperado] of catalogosEsperados) {
+    const atual = catalogosAtuais.get(id);
+    if (atual === undefined) {
+      criarCatalogos.push({ id, dados: esperado });
+      continue;
+    }
+    const comparacao = compararCatalogo(atual, esperado);
+    if (!comparacao.compativel) {
+      conflitos.push(
+        `${caminhoSeguroUnidade("catalogo_igrejas", id)}[` +
+          `${comparacao.camposDivergentes.join(",")}]`
+      );
+    }
+  }
+
+  for (const id of catalogosAtuais.keys()) {
+    if (!catalogosEsperados.has(id)) {
+      conflitos.push(
+        `${caminhoSeguroUnidade("catalogo_igrejas", id)}[` +
+          "sem_raiz_operacional]"
+      );
+    }
+  }
+
+  return { criarRaizes, criarCatalogos, conflitos };
+}
+
+async function prepararPlanoUnidades(ctx, planoAtomico) {
+  const [igrejasSnap, catalogoSnap, legadoSnap] = await Promise.all([
+    ctx.obterColecao("igrejas"),
+    ctx.obterColecao("catalogo_igrejas"),
+    ctx.obterDocumento("igreja/principal"),
+  ]);
+
+  const raizesAtuais = new Map(
+    igrejasSnap.docs.map((doc) => [doc.id, doc.data() ?? {}])
+  );
+  const catalogosAtuais = new Map(
+    catalogoSnap.docs.map((doc) => [doc.id, doc.data() ?? {}])
+  );
+  const plano = planejarUnidades({
+    raizesAtuais,
+    catalogosAtuais,
+    legadoDados: legadoSnap.exists ? legadoSnap.data() ?? {} : null,
+  });
+
+  planoAtomico.conflitos.push(...plano.conflitos);
+  for (const unidade of plano.criarRaizes) {
+    planoAtomico.operacoes.push({
+      tipo: "create",
+      caminho: `igrejas/${unidade.id}`,
+      caminhoSeguro: `igrejas/${unidade.id}`,
+      dados: {
+        ...unidade.dados,
+        criado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
+      },
+    });
+  }
+  for (const unidade of plano.criarCatalogos) {
+    planoAtomico.operacoes.push({
+      tipo: "create",
+      caminho: `catalogo_igrejas/${unidade.id}`,
+      caminhoSeguro: `catalogo_igrejas/${unidade.id}`,
+      dados: unidade.dados,
+    });
+  }
+
+  if (!ctx.silencioso) {
+    console.log("=== PREFLIGHT DE UNIDADES ===");
+    console.log(
+      `  raízes: existentes=${raizesAtuais.size} criar=${plano.criarRaizes.length}`
+    );
+    console.log(
+      `  catálogo: existentes=${catalogosAtuais.size} criar=${plano.criarCatalogos.length}`
+    );
+    console.log(`  conflitos=${plano.conflitos.length}\n`);
+  }
+
+  ctx.registrar(
+    "igrejas",
+    UNIDADES_BASE.length,
+    plano.criarRaizes.length,
+    UNIDADES_BASE.length - plano.criarRaizes.length
+  );
+  ctx.registrar(
+    "catalogo_igrejas",
+    catalogosAtuais.size + plano.criarCatalogos.length,
+    plano.criarCatalogos.length,
+    catalogosAtuais.size
+  );
+}
+
+async function planejarColecao(ctx, plano, nome) {
+  const origem = await ctx.obterColecao(nome);
+  let criar = 0;
+  let inalterados = 0;
+  let conflitos = 0;
+
+  for (const doc of origem.docs) {
+    const caminho = `igrejas/${OLINDA}/${nome}/${doc.id}`;
+    const snap = await ctx.obterDocumento(caminho);
+    const resultado = planejarCriacaoDocumento(plano, {
+      caminho,
+      caminhoSeguro: `igrejas/${OLINDA}/${nome}/{id}`,
+      dados: {
+        ...normalizarContratoConteudo(nome, doc.data() ?? {}),
+        migrado_de: `${nome}/${doc.id}`,
+        migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
+      },
+      atual: snap.exists ? snap.data() ?? {} : undefined,
+    });
+    if (resultado === "criar") criar++;
+    if (resultado === "inalterado") inalterados++;
+    if (resultado === "conflito") conflitos++;
+  }
+
+  ctx.registrar(
+    nome,
+    origem.size,
+    criar,
+    inalterados,
+    conflitos > 0 ? `conflitos=${conflitos}` : ""
+  );
+}
+
+async function planejarVinculos(ctx, plano) {
+  const usuarios = await ctx.obterColecao("usuarios");
   let criados = 0;
   let existentes = 0;
   let principalDefinida = 0;
-
-  const normalizar = (v) =>
-    String(v ?? "")
-      .toLowerCase()
-      .trim()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "");
+  let principalExistente = 0;
+  let conflitos = 0;
 
   const PERFIS = ["pastor", "diacono", "evangelista", "lider", "membro"];
   const STATUS = ["pendente", "aprovado", "inativo"];
 
   for (const doc of usuarios.docs) {
     const d = doc.data() ?? {};
-
-    const perfilBruto = normalizar(d.perfil);
+    const perfilBruto = normalizarSemAcentos(d.perfil);
     const perfil = PERFIS.includes(perfilBruto) ? perfilBruto : "membro";
-
-    const statusBruto = normalizar(d.status);
+    const statusBruto = normalizarSemAcentos(d.status);
     const status = STATUS.includes(statusBruto) ? statusBruto : "pendente";
 
-    const vinculoRef = db.doc(`igrejas/${OLINDA}/membros/${doc.id}`);
-    if ((await vinculoRef.get()).exists) {
-      existentes++;
-    } else {
-      if (!dryRun) {
-        await vinculoRef.set({
-          perfil,
-          status,
-          // Pastor recebe a função administrativa correspondente; nenhuma
-          // outra função é inventada na migração.
-          funcoes_admin: perfil === "pastor" ? ["pastor"] : [],
-          ministerio_ids: d.ministerio_id ? [d.ministerio_id] : [],
-          nome: d.nome ?? null,
-          email: d.email ?? null,
-          aprovado_por: d.aprovado_por ?? null,
-          aprovado_em: d.aprovado_em ?? null,
-          migrado_de: `usuarios/${doc.id}`,
-          migrado_em: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      }
-      criados++;
-    }
+    const caminhoVinculo = `igrejas/${OLINDA}/membros/${doc.id}`;
+    const vinculoSnap = await ctx.obterDocumento(caminhoVinculo);
+    const resultadoVinculo = planejarCriacaoDocumento(plano, {
+      caminho: caminhoVinculo,
+      caminhoSeguro: `igrejas/${OLINDA}/membros/{uid}`,
+      dados: {
+        perfil,
+        status,
+        funcoes_admin: perfil === "pastor" ? ["pastor"] : [],
+        ministerio_ids: d.ministerio_id ? [d.ministerio_id] : [],
+        nome: d.nome ?? null,
+        email: d.email ?? null,
+        aprovado_por: d.aprovado_por ?? null,
+        aprovado_em: d.aprovado_em ?? null,
+        migrado_de: `usuarios/${doc.id}`,
+        migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
+      },
+      atual: vinculoSnap.exists ? vinculoSnap.data() ?? {} : undefined,
+    });
+    if (resultadoVinculo === "criar") criados++;
+    if (resultadoVinculo === "inalterado") existentes++;
+    if (resultadoVinculo === "conflito") conflitos++;
 
-    if (!d.igreja_principal_id) {
-      if (!dryRun) {
-        await doc.ref.set({ igreja_principal_id: OLINDA }, { merge: true });
-      }
-      principalDefinida++;
-    }
+    const resultadoPrincipal = planejarIgrejaPrincipal(plano, {
+      caminho: `usuarios/${doc.id}`,
+      caminhoSeguro: "usuarios/{uid}",
+      dadosAtuais: d,
+      precondicao: doc.updateTime
+        ? { lastUpdateTime: doc.updateTime }
+        : undefined,
+    });
+    if (resultadoPrincipal === "atualizar") principalDefinida++;
+    if (resultadoPrincipal === "inalterado") principalExistente++;
+    if (resultadoPrincipal === "conflito") conflitos++;
   }
 
-  registrar("membros (vinculos)", usuarios.size, criados, existentes);
-  registrar(
+  ctx.registrar(
+    "membros (vinculos)",
+    usuarios.size,
+    criados,
+    existentes,
+    conflitos > 0 ? `conflitos=${conflitos}` : ""
+  );
+  ctx.registrar(
     "igreja_principal_id",
     usuarios.size,
     principalDefinida,
-    usuarios.size - principalDefinida
+    principalExistente,
+    conflitos > 0 ? `conflitos=${conflitos}` : ""
   );
 }
 
-/**
- * Normaliza as transações para o contrato canônico:
- * `valor_centavos` inteiro, `metodo`, `status` padronizado.
- */
-async function migrarTransacoes() {
-  const origem = await db.collection("transacoes").get();
-  let migradas = 0;
+async function planejarTransacoes(ctx, plano) {
+  const origem = await ctx.obterColecao("transacoes");
+  let criar = 0;
   let existentes = 0;
+  let conflitos = 0;
   let suspeitas = 0;
 
   const mapaStatus = {
@@ -297,28 +1013,21 @@ async function migrarTransacoes() {
     estornado: "estornado",
     refunded: "estornado",
   };
-
-  const mapaMetodo = { pix: "pix", checkout: "checkout_pro", checkout_pro: "checkout_pro" };
+  const mapaMetodo = {
+    pix: "pix",
+    checkout: "checkout_pro",
+    checkout_pro: "checkout_pro",
+  };
 
   for (const doc of origem.docs) {
     const d = doc.data() ?? {};
-    const destino = db.doc(`igrejas/${OLINDA}/transacoes/${doc.id}`);
 
-    if ((await destino.get()).exists) {
-      existentes++;
-      continue;
-    }
-
-    // O contrato antigo gravava `valor` em REAIS (float) e o modelo Dart lia
-    // centavos. Converte pelo campo de origem, sem adivinhar.
-    let valorCentavos = null;
+    let valorCentavos;
     if (typeof d.valor_centavos === "number") {
       valorCentavos = Math.round(d.valor_centavos);
     } else if (typeof d.valor === "number") {
       valorCentavos = Math.round(d.valor * 100);
     } else {
-      // Sem valor reconhecível: migra com 0 e sinaliza para conferência
-      // manual, em vez de inventar um número.
       valorCentavos = 0;
       suspeitas++;
     }
@@ -337,109 +1046,350 @@ async function migrarTransacoes() {
       atualizado_em: d.atualizado_em ?? null,
       aprovado_em: d.aprovado_em ?? null,
       migrado_de: `transacoes/${doc.id}`,
-      migrado_em: admin.firestore.FieldValue.serverTimestamp(),
-      // Marca os casos que exigem conferência humana.
+      migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
       revisar_valor: valorCentavos === 0 ? true : null,
     };
 
-    if (!dryRun) await destino.set(registro);
-    migradas++;
+    const caminho = `igrejas/${OLINDA}/transacoes/${doc.id}`;
+    const snap = await ctx.obterDocumento(caminho);
+    const resultado = planejarCriacaoDocumento(plano, {
+      caminho,
+      caminhoSeguro: `igrejas/${OLINDA}/transacoes/{id}`,
+      dados: registro,
+      atual: snap.exists ? snap.data() ?? {} : undefined,
+    });
+    if (resultado === "criar") criar++;
+    if (resultado === "inalterado") existentes++;
+    if (resultado === "conflito") conflitos++;
   }
 
-  registrar(
+  ctx.registrar(
     "transacoes",
     origem.size,
-    migradas,
+    criar,
     existentes,
-    suspeitas > 0 ? `⚠ ${suspeitas} sem valor reconhecivel (revisar_valor=true)` : ""
+    [
+      suspeitas > 0 ? `ATENCAO:${suspeitas}_sem_valor` : "",
+      conflitos > 0 ? `conflitos=${conflitos}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
   );
 }
 
-function normalizarTexto(v) {
-  return String(v ?? "").toLowerCase().trim();
-}
-
-/** Notificações globais → subcoleção do destinatário. */
-async function migrarNotificacoes() {
-  const origem = await db.collection("notificacoes").get();
-  let migradas = 0;
-  let ignoradas = 0;
+async function planejarNotificacoes(ctx, plano) {
+  const origem = await ctx.obterColecao("notificacoes");
+  let criar = 0;
+  let inalteradas = 0;
+  let conflitos = 0;
 
   for (const doc of origem.docs) {
     const d = doc.data() ?? {};
     const uid = d.destinatario_id;
-    if (!uid) {
-      ignoradas++;
+    if (!uidDestinoValido(uid)) {
+      registrarConflito(plano, "notificacoes/{id}", ["destinatario_id"]);
+      conflitos++;
       continue;
     }
-    const destino = db.doc(`usuarios/${uid}/notificacoes/${doc.id}`);
-    if ((await destino.get()).exists) {
-      ignoradas++;
-      continue;
-    }
-    if (!dryRun) {
-      await destino.set({ ...d, migrado_de: `notificacoes/${doc.id}` });
-    }
-    migradas++;
-  }
-
-  registrar("notificacoes", origem.size, migradas, ignoradas);
-}
-
-/** Dados institucionais de `igreja/principal` → `igrejas/olinda`. */
-async function migrarDadosInstitucionais() {
-  const snap = await db.doc("igreja/principal").get();
-  if (!snap.exists) {
-    registrar("igreja/principal", 0, 0, 0, "(nao existe)");
-    return;
-  }
-  if (!dryRun) {
-    await db.doc(`igrejas/${OLINDA}`).set(
-      {
-        dados_institucionais: snap.data() ?? {},
-        configurada: true,
-        migrado_de: "igreja/principal",
+    const caminho = `usuarios/${uid}/notificacoes/${doc.id}`;
+    const snap = await ctx.obterDocumento(caminho);
+    const resultado = planejarCriacaoDocumento(plano, {
+      caminho,
+      caminhoSeguro: "usuarios/{uid}/notificacoes/{id}",
+      dados: {
+        ...d,
+        migrado_de: `notificacoes/${doc.id}`,
+        migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
       },
-      { merge: true }
-    );
+      atual: snap.exists ? snap.data() ?? {} : undefined,
+    });
+    if (resultado === "criar") criar++;
+    if (resultado === "inalterado") inalteradas++;
+    if (resultado === "conflito") conflitos++;
   }
-  registrar("igreja/principal", 1, 1, 0);
+
+  ctx.registrar(
+    "notificacoes",
+    origem.size,
+    criar,
+    inalteradas,
+    conflitos > 0 ? `conflitos=${conflitos}` : ""
+  );
 }
 
-// ── Execução ──────────────────────────────────────────────────────────
-(async () => {
+async function planejarTokensDispositivo(ctx, plano) {
+  const origem = await ctx.obterColecao("tokens_dispositivo");
+  let criar = 0;
+  let inalterados = 0;
+  let conflitos = 0;
+
+  for (const doc of origem.docs) {
+    const d = doc.data() ?? {};
+    const uid = d.perfil_id;
+    if (!uidDestinoValido(uid)) {
+      registrarConflito(plano, "tokens_dispositivo/{id}", ["perfil_id"]);
+      conflitos++;
+      continue;
+    }
+
+    const caminho = `usuarios/${uid}/tokens_dispositivo/${doc.id}`;
+    const snap = await ctx.obterDocumento(caminho);
+    const resultado = planejarCriacaoDocumento(plano, {
+      caminho,
+      caminhoSeguro: "usuarios/{uid}/tokens_dispositivo/{id}",
+      dados: {
+        ...d,
+        migrado_de: `tokens_dispositivo/${doc.id}`,
+        migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
+      },
+      atual: snap.exists ? snap.data() ?? {} : undefined,
+    });
+    if (resultado === "criar") criar++;
+    if (resultado === "inalterado") inalterados++;
+    if (resultado === "conflito") conflitos++;
+  }
+
+  ctx.registrar(
+    "tokens_dispositivo",
+    origem.size,
+    criar,
+    inalterados,
+    conflitos > 0 ? `conflitos=${conflitos}` : ""
+  );
+}
+
+async function planejarConfiguracoes(ctx, plano) {
+  const origem = await ctx.obterColecao("configuracoes");
+  if (origem.size > 0) {
+    registrarConflito(plano, "configuracoes/{id}", ["contrato_indefinido"]);
+  }
+  ctx.registrar(
+    "configuracoes",
+    origem.size,
+    0,
+    0,
+    origem.size > 0 ? "conflitos=1" : ""
+  );
+}
+
+async function prepararPlanoCompleto(ctx, { validar = true } = {}) {
+  const plano = criarPlanoAtomico();
+
+  await prepararPlanoUnidades(ctx, plano);
+  await planejarVinculos(ctx, plano);
+  for (const nome of COLECOES) {
+    await planejarColecao(ctx, plano, nome);
+  }
+  await planejarTransacoes(ctx, plano);
+  await planejarNotificacoes(ctx, plano);
+  await planejarTokensDispositivo(ctx, plano);
+  await planejarConfiguracoes(ctx, plano);
+
+  if (validar) validarPlanoAtomico(plano);
+  return plano;
+}
+
+function aplicarOperacoesNaTransacao(transacao, db, plano) {
+  for (const operacao of plano.operacoes) {
+    const referencia = db.doc(operacao.caminho);
+    if (operacao.tipo === "create") {
+      transacao.create(referencia, operacao.dados);
+    } else if (operacao.precondicao) {
+      transacao.update(referencia, operacao.dados, operacao.precondicao);
+    } else {
+      transacao.update(referencia, operacao.dados);
+    }
+  }
+}
+
+async function verificarPosAplicacao({ admin, db }) {
+  // Mantém o modo read-write padrão, embora não enfileire writes: assim as
+  // leituras usam locks pessimistas e não podem vir de um snapshot read-only
+  // potencialmente defasado.
+  return db.runTransaction(async (transacao) => {
+    const ctx = criarContexto({
+      admin,
+      db,
+      dryRun: true,
+      transacao,
+      silencioso: true,
+    });
+    const plano = await prepararPlanoCompleto(ctx, { validar: false });
+
+    if (plano.conflitos.length > 0 || plano.operacoes.length > 0) {
+      throw new Error(
+        "Pós-verificação falhou: um novo planejamento não produziu zero operações."
+      );
+    }
+    validarPlanoAtomico(plano);
+    return { posVerificacao: true, operacoesPendentes: 0 };
+  });
+}
+
+async function aplicarPlanoAtomico({
+  admin,
+  db,
+  plano,
+  leituras,
+  projeto,
+  dryRun,
+} = {}) {
+  validarOpcoesExecucao({ projeto, dryRun });
+  if (dryRun !== false) {
+    throw new Error("Aplicação recusada: dryRun deve ser false explicitamente.");
+  }
+  if (!admin || !db) {
+    throw new Error("Runtime Admin/Firestore não informado.");
+  }
+  validarProjetoRuntime({ admin, db, projeto });
+  validarPlanoAtomico(plano);
+  if (!(leituras instanceof Map)) {
+    throw new Error("Aplicação recusada: guardas do preflight não informadas.");
+  }
+
+  const resultado = await db.runTransaction(async (transacao) => {
+    const ctx = criarContexto({
+      admin,
+      db,
+      dryRun: false,
+      transacao,
+      silencioso: true,
+    });
+    const planoTransacional = await prepararPlanoCompleto(ctx, {
+      validar: false,
+    });
+
+    // A comparação ocorre antes de qualquer chamada create/update. Se uma
+    // consulta ganhou/perdeu documentos (phantom) ou qualquer documento lido
+    // mudou, a tentativa é abortada sem escritas. Em caso de retry automático,
+    // o baseline continua sendo o preflight original e o drift também aborta.
+    const guarda = validarLeiturasInalteradas(leituras, ctx.leituras);
+    validarPlanoAtomico(planoTransacional);
+    validarPlanosEquivalentes(plano, planoTransacional);
+    aplicarOperacoesNaTransacao(transacao, db, planoTransacional);
+
+    return {
+      operacoesAplicadas: planoTransacional.operacoes.length,
+      leiturasValidadas: guarda.leiturasValidadas,
+    };
+  });
+
+  const pos = await verificarPosAplicacao({ admin, db });
+  return { ...resultado, ...pos };
+}
+
+async function executarMigracao(opcoes = {}) {
+  const { admin, db, dryRun, projeto } = opcoes;
+  validarOpcoesExecucao({ projeto, dryRun });
+  if (!admin || !db) {
+    throw new Error("Runtime Admin/Firestore não informado.");
+  }
+  validarProjetoRuntime({ admin, db, projeto });
   console.log("\n=== MIGRAÇÃO MULTI-IGREJA ===");
   console.log(`Projeto: ${projeto}`);
-  console.log(`Modo:    ${dryRun ? "DRY-RUN (nada será gravado)" : "APLICAR (gravação real)"}`);
+  console.log(`Modo:    ${dryRun ? "DRY-RUN (nada será gravado)" : "APLICAR"}`);
   console.log("Nenhuma coleção antiga é apagada.\n");
 
+  const ctxAuditoria = criarContexto({ admin, db, dryRun });
+  await auditarEstrutura(ctxAuditoria);
+
+  // O preflight aplicado é capturado separadamente da auditoria para que a
+  // transação releia exatamente o mesmo conjunto de origens e destinos.
+  const ctx = criarContexto({ admin, db, dryRun });
+  const plano = await prepararPlanoCompleto(ctx);
+
+  // O plano completo e o limite são validados antes da transação de escrita.
   if (!dryRun) {
-    console.log("⚠  Gravação real em 5s. Ctrl+C para cancelar.\n");
-    await new Promise((r) => setTimeout(r, 5000));
+    console.log("ATENÇÃO: gravação real em 5s. Ctrl+C para cancelar.\n");
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    await aplicarPlanoAtomico({
+      admin,
+      db,
+      plano,
+      leituras: ctx.leituras,
+      projeto,
+      dryRun,
+    });
   }
 
-  await criarUnidades();
-  await migrarDadosInstitucionais();
-  await migrarVinculos();
-  for (const nome of COLECOES) {
-    await migrarColecao(nome);
-  }
-  await migrarTransacoes();
-  await migrarNotificacoes();
-
-  const totalMigrado = relatorio.reduce((s, r) => s + r.migrados, 0);
-  console.log(`\n=== RESUMO ===`);
-  console.log(`Documentos ${dryRun ? "que SERIAM migrados" : "migrados"}: ${totalMigrado}`);
+  const totalMigrado = plano.operacoes.length;
+  console.log("\n=== RESUMO ===");
+  console.log(
+    `Documentos ${dryRun ? "que SERIAM migrados" : "migrados"}: ${totalMigrado}`
+  );
   if (dryRun) {
-    console.log("\nNada foi gravado. Para aplicar:");
-    console.log(`  node scripts/migrar_producao.js --project=${projeto} --apply\n`);
+    console.log("Nada foi gravado. --apply continua proibido sem checkpoint explícito.\n");
   } else {
-    console.log("\nMigração concluída. As coleções antigas permanecem intactas.");
-    console.log("Confira as contagens antes de qualquer limpeza.\n");
+    console.log("Migração concluída; as coleções antigas permanecem intactas.\n");
   }
-  process.exit(0);
-})().catch((e) => {
-  console.error("\n[ERRO] Migração interrompida:", e);
-  console.error("Nada além do que já foi gravado até aqui foi alterado.");
-  process.exit(1);
-});
+}
+
+async function main() {
+  const opcoes = analisarArgumentos();
+  if (process.env.FIRESTORE_EMULATOR_HOST) {
+    throw new Error("FIRESTORE_EMULATOR_HOST está definida; produção recusada.");
+  }
+  const runtime = await carregarRuntime(opcoes.projeto);
+  await executarMigracao({ ...runtime, ...opcoes });
+}
+
+function mensagemErroSegura(erro) {
+  const mensagem = String(erro?.message ?? erro);
+  const prefixosPermitidos = [
+    "Informe --project=",
+    "Projeto recusado",
+    "Use somente um modo",
+    "dryRun deve",
+    "Runtime recusado",
+    "Runtime Admin/Firestore",
+    "Runtime Firestore",
+    "Aplicação recusada",
+    "Drift concorrente",
+    "Pós-verificação falhou",
+    "Dependência ausente",
+    "FIRESTORE_EMULATOR_HOST",
+    "Preflight bloqueou",
+    "Plano atômico inválido",
+    "Plano recusado",
+  ];
+
+  return prefixosPermitidos.some((prefixo) => mensagem.startsWith(prefixo))
+    ? mensagem
+    : "Falha na transação atômica; detalhes de documentos foram ocultados.";
+}
+
+if (require.main === module) {
+  main().catch((erro) => {
+    console.error(`\n[ERRO] Migração interrompida: ${mensagemErroSegura(erro)}`);
+    console.error("Nenhuma exclusão é executada por este script.");
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  LIMITE_OPERACOES_BATCH,
+  LIMITE_OPERACOES_TRANSACAO,
+  analisarArgumentos,
+  aplicarPlanoAtomico,
+  assinaturaColecao,
+  assinaturaDocumento,
+  assinaturaValor,
+  compararDocumentoPlanejado,
+  criarContexto,
+  criarPlanoAtomico,
+  executarMigracao,
+  extrairDadosInstitucionaisLegados,
+  mensagemErroSegura,
+  normalizarContratoConteudo,
+  planejarCriacaoDocumento,
+  planejarConfiguracoes,
+  planejarIgrejaPrincipal,
+  planejarTokensDispositivo,
+  planejarUnidades,
+  prepararPlanoCompleto,
+  temDadosInstitucionais,
+  validarLeiturasInalteradas,
+  validarOpcoesExecucao,
+  validarProjetoRuntime,
+  validarPlanoAtomico,
+};

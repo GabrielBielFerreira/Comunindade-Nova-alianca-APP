@@ -15,6 +15,14 @@ final igrejasAtivasProvider = StreamProvider<List<IgrejaModel>>((ref) {
   return ref.watch(igrejasRepositoryProvider).streamAtivas();
 });
 
+/// Catálogo ativo com confirmação de servidor, usado para validar uma
+/// preferência persistida sem confundir cache offline vazio com desativação.
+final catalogoIgrejasAtivasProvider = StreamProvider<CatalogoIgrejasAtivas>((
+  ref,
+) {
+  return ref.watch(igrejasRepositoryProvider).streamAtivasComMetadados();
+});
+
 /// Igreja PRINCIPAL do usuário: onde ele tem vínculo. Vem de
 /// `usuarios/{uid}.igreja_principal_id` e só muda por operação de servidor.
 ///
@@ -57,9 +65,14 @@ class IgrejaVisualizadaNotifier extends StateNotifier<EstadoIgrejaVisualizada> {
   }
 
   static const _chave = 'igreja_visualizada_id';
+  int _versao = 0;
 
   Future<void> _carregar() async {
+    final versao = _versao;
     final prefs = await SharedPreferences.getInstance();
+    // Uma limpeza/troca iniciada enquanto o disco era lido é mais recente.
+    // A leitura antiga nunca pode restaurar a preferência descartada.
+    if (versao != _versao) return;
     state = EstadoIgrejaVisualizada(
       carregado: true,
       id: IgrejaId.tentar(prefs.getString(_chave)),
@@ -67,6 +80,7 @@ class IgrejaVisualizadaNotifier extends StateNotifier<EstadoIgrejaVisualizada> {
   }
 
   Future<void> definir(IgrejaId? id) async {
+    _versao++;
     state = EstadoIgrejaVisualizada(carregado: true, id: id);
     final prefs = await SharedPreferences.getInstance();
     if (id == null) {
@@ -117,11 +131,39 @@ final igrejaScopeProvider = Provider<IgrejaScope?>((ref) {
   return IgrejaScope(igrejaId: id);
 });
 
+final _igrejaCatalogoDadosProvider = StreamProvider.autoDispose
+    .family<IgrejaModel?, IgrejaId>((ref, id) {
+      return ref.watch(igrejasRepositoryProvider).streamIgreja(id);
+    });
+
+final _igrejaPrivadaDadosProvider = StreamProvider.autoDispose
+    .family<IgrejaModel?, IgrejaId>((ref, id) {
+      return ref.watch(igrejasRepositoryProvider).streamIgrejaPrivada(id);
+    });
+
 /// Dados institucionais da unidade em foco.
-final igrejaAtualDadosProvider = StreamProvider<IgrejaModel?>((ref) {
+///
+/// A assinatura pública acompanha o vínculo. Riverpod deixa de observar a
+/// fonte anterior e cancela o stream Firestore `autoDispose` quando o vínculo
+/// alterna entre aprovado e pendente/inativo; nenhum stream infinito bloqueia
+/// a troca catálogo ↔ documento operacional.
+final igrejaAtualDadosProvider = Provider<AsyncValue<IgrejaModel?>>((ref) {
   final id = ref.watch(igrejaAtualProvider);
-  if (id == null) return Stream.value(null);
-  return ref.watch(igrejasRepositoryProvider).streamIgreja(id);
+  if (id == null) return const AsyncData(null);
+  final usuario = ref.watch(usuarioAtualProvider).valueOrNull;
+  if (usuario == null) return ref.watch(_igrejaCatalogoDadosProvider(id));
+
+  return ref
+      .watch(vinculoAtualProvider)
+      .when(
+        data: (vinculo) => ref.watch(
+          vinculo?.isAtivo == true && vinculo?.igrejaId == id
+              ? _igrejaPrivadaDadosProvider(id)
+              : _igrejaCatalogoDadosProvider(id),
+        ),
+        error: AsyncError.new,
+        loading: () => const AsyncLoading(),
+      );
 });
 
 /// Vínculo do usuário NA UNIDADE EM FOCO.
@@ -195,10 +237,23 @@ final nomeIgrejaEmFocoProvider = Provider<String>((ref) {
 });
 
 /// Dados institucionais da igreja PRINCIPAL — não muda ao visitar outra.
-final igrejaPrincipalDadosProvider = StreamProvider<IgrejaModel?>((ref) {
+final igrejaPrincipalDadosProvider = Provider<AsyncValue<IgrejaModel?>>((ref) {
   final id = ref.watch(igrejaPrincipalProvider);
-  if (id == null) return Stream.value(null);
-  return ref.watch(igrejasRepositoryProvider).streamIgreja(id);
+  if (id == null) return const AsyncData(null);
+  final usuario = ref.watch(usuarioAtualProvider).valueOrNull;
+  if (usuario == null) return ref.watch(_igrejaCatalogoDadosProvider(id));
+
+  return ref
+      .watch(vinculoPrincipalProvider)
+      .when(
+        data: (vinculo) => ref.watch(
+          vinculo?.isAtivo == true && vinculo?.igrejaId == id
+              ? _igrejaPrivadaDadosProvider(id)
+              : _igrejaCatalogoDadosProvider(id),
+        ),
+        error: AsyncError.new,
+        loading: () => const AsyncLoading(),
+      );
 });
 
 /// Nome da igreja do VÍNCULO OFICIAL.

@@ -376,6 +376,33 @@ async function criarConteudo(igrejaId) {
 
   for (const igreja of IGREJAS) {
     const { id, ...dados } = igreja;
+    const institucionais = dados.dados_institucionais;
+    const pastoresPublicos = Array.isArray(institucionais.pastores_publicos)
+      ? institucionais.pastores_publicos
+      : typeof institucionais.pastor_responsavel === "string" &&
+          institucionais.pastor_responsavel.trim()
+        ? [institucionais.pastor_responsavel.trim()]
+        : [];
+    // Projeção pública sanitizada. `set` sem merge também remove qualquer
+    // campo extra deixado por uma execução antiga do seed.
+    await db.doc(`catalogo_igrejas/${id}`).set({
+      nome: dados.nome,
+      ativa: dados.ativa,
+      configurada: dados.configurada,
+      endereco: institucionais.endereco ?? null,
+      cidade_estado: institucionais.cidade_estado ?? null,
+      endereco_secundario: institucionais.endereco_secundario ?? null,
+      slogan: institucionais.slogan ?? null,
+      cultos_recorrentes: Array.isArray(institucionais.cultos_recorrentes)
+        ? institucionais.cultos_recorrentes
+        : [],
+      instagram: institucionais.instagram ?? null,
+      youtube_url: institucionais.youtube_url ?? null,
+      pastores_publicos: pastoresPublicos,
+    });
+
+    // O documento raiz permanece privado e conserva todos os metadados
+    // institucionais/administrativos necessários ao servidor e ao painel.
     await db.doc(`igrejas/${id}`).set(
       {
         ...dados,
@@ -387,7 +414,7 @@ async function criarConteudo(igrejaId) {
       { merge: true }
     );
     console.log(
-      `igreja  ${id.padEnd(12)} ativa=${dados.ativa} configurada=${dados.configurada}`
+      `igreja  ${id.padEnd(12)} catalogo=11 campos ativa=${dados.ativa} configurada=${dados.configurada}`
     );
   }
 
