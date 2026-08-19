@@ -11,8 +11,9 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "npm run build && node test/comEmulador.js",
-    "test:sem-emulador": "npm run build && node --test test/transferencia.test.js"
+    "test": "npm run build && node --test test/limites_custo.test.js && node test/comEmulador.js",
+    "test:limites": "npm run build && node --test test/limites_custo.test.js",
+    "test:comEmuladorNoAr": "npm run build && node --test test/transferencia.test.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",
