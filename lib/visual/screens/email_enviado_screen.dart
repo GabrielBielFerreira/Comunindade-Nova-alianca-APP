@@ -143,9 +143,13 @@ class _EmailSentCard extends StatelessWidget {
               VisualRoutes.recuperarSenha,
               (route) => route.settings.name == VisualRoutes.entraconta,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
+            // Wrap, e nao Row: as duas frases nao cabem numa linha so em 320 px
+            // com a fonte do sistema ampliada, e o link "Tentar novamente"
+            // ficava cortado — justo o que a pessoa precisa tocar.
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 4,
               children: [
                 Text(
                   EmailEnviadoMockData.notReceived,
@@ -156,7 +160,6 @@ class _EmailSentCard extends StatelessWidget {
                     color: AuthColors.mutedAlt,
                   ),
                 ),
-                SizedBox(width: 4 * scale),
                 Text(
                   EmailEnviadoMockData.tryAgain,
                   style: GoogleFonts.inter(

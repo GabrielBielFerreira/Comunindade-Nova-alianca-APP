@@ -118,9 +118,9 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
     try {
       // No PRIMEIRO acesso o cadastro precisa de uma unidade; nos seguintes o
       // valor e ignorado pelo servico.
-      final ok = await ref.read(authActionsProvider).entrarComGoogle(
-            igrejaId: ref.read(igrejaEscolhidaCadastroProvider),
-          );
+      final ok = await ref
+          .read(authActionsProvider)
+          .entrarComGoogle(igrejaId: ref.read(igrejaEscolhidaCadastroProvider));
       // Sucesso: o RootGate reage à sessão; voltamos à raiz. Cancelamento
       // (ok == false) não faz nada.
       if (ok && mounted) {
@@ -174,14 +174,20 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    SizedBox(
-                      height: headerHeight + cardHeight,
+                    // ConstrainedBox, e nao SizedBox de altura fixa: a altura
+                    // do cartao vinha de uma conta baseada no desenho (534 px
+                    // do Figma). Com a fonte do sistema ampliada, ou numa tela
+                    // baixa e larga como 1024x768, o conteudo real passa dessa
+                    // conta e o Column cortava ate 52 px. Como minimo, a conta
+                    // continua valendo — o cartao segue preenchendo a tela em
+                    // aparelho alto —, mas agora ele pode crescer e rolar.
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: headerHeight + cardHeight,
+                      ),
                       child: Column(
                         children: [
-                          _Header(
-                            height: headerHeight,
-                            scale: scale,
-                          ),
+                          _Header(height: headerHeight, scale: scale),
                           _LoginCard(
                             scale: scale,
                             minHeight: cardHeight,
@@ -210,10 +216,7 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.height,
-    required this.scale,
-  });
+  const _Header({required this.height, required this.scale});
 
   final double height;
   final double scale;
