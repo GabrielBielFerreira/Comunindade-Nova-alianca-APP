@@ -9,6 +9,7 @@ class DevocionalModel {
   final DateTime data;
   final String? referencia; // referência bíblica opcional
   final bool destaque;
+  final bool publico;
 
   /// Inativar substitui a exclusão física: o devocional some das listas
   /// públicas mas o histórico da unidade permanece.
@@ -23,12 +24,17 @@ class DevocionalModel {
     this.referencia,
     this.destaque = false,
     this.ativo = true,
+    this.publico = true,
   });
 
   factory DevocionalModel.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
+    return DevocionalModel.fromMap(doc.id, d);
+  }
+
+  factory DevocionalModel.fromMap(String id, Map<String, dynamic> d) {
     return DevocionalModel(
-      id: doc.id,
+      id: id,
       titulo: d['titulo'] as String? ?? '',
       corpo: d['corpo'] as String? ?? '',
       autor: d['autor'] as String? ?? '',
@@ -36,16 +42,18 @@ class DevocionalModel {
       referencia: d['referencia'] as String?,
       destaque: d['destaque'] as bool? ?? false,
       ativo: d['ativo'] as bool? ?? true,
+      publico: d['publico'] as bool? ?? true,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'titulo': titulo,
-        'corpo': corpo,
-        'autor': autor,
-        'data': Timestamp.fromDate(data),
-        'referencia': referencia,
-        'destaque': destaque,
-        'ativo': ativo,
-      };
+    'titulo': titulo,
+    'corpo': corpo,
+    'autor': autor,
+    'data': Timestamp.fromDate(data),
+    'referencia': referencia,
+    'destaque': destaque,
+    'ativo': ativo,
+    'publico': publico,
+  };
 }

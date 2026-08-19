@@ -16,6 +16,14 @@ class DevocionaisRepository {
     return _col.where('ativo', isEqualTo: true).snapshots().map(_ordenar);
   }
 
+  Stream<List<DevocionalModel>> streamPublicos() {
+    return _col
+        .where('publico', isEqualTo: true)
+        .where('ativo', isEqualTo: true)
+        .snapshots()
+        .map(_ordenar);
+  }
+
   /// Visão de gestão: inclui inativos, para reeditar ou reativar.
   Stream<List<DevocionalModel>> streamGerenciar() {
     return _col.snapshots().map(_ordenar);

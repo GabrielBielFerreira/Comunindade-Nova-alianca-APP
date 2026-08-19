@@ -94,6 +94,25 @@ describe("CONTEÚDO — quem pode gerenciar", () => {
   }
 });
 
+describe("CONTEÚDO — consultas públicas exigem filtro", () => {
+  for (const col of COLECOES) {
+    test(`visitante consulta ${col} com publico == true`, async () => {
+      await assertSucceeds(
+        db(U.visitante)
+          .collection(`igrejas/${OLINDA}/${col}`)
+          .where("publico", "==", true)
+          .get()
+      );
+    });
+
+    test(`visitante NAO consulta ${col} sem filtro publico`, async () => {
+      await assertFails(
+        db(U.visitante).collection(`igrejas/${OLINDA}/${col}`).get()
+      );
+    });
+  }
+});
+
 describe("CONTEÚDO — inativar em vez de apagar", () => {
   test("editor inativa aviso (update), sem apagar", async () => {
     await assertSucceeds(

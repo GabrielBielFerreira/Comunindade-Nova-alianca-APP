@@ -22,26 +22,38 @@ class GerenciarEventosScreen extends ConsumerWidget {
   }
 
   Future<void> _abrirForm(BuildContext context, {EventoModel? evento}) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => EventoFormScreen(evento: evento)),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => EventoFormScreen(evento: evento)));
   }
 
-  Future<void> _confirmarExcluir(
-      BuildContext context, WidgetRef ref, EventoModel e) async {
+  Future<void> _confirmarCancelamento(
+    BuildContext context,
+    WidgetRef ref,
+    EventoModel e,
+  ) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('Excluir evento'),
-        content: Text('Remover "${e.titulo}" da programação?'),
+        title: Text(e.cancelado ? 'Reativar evento' : 'Cancelar evento'),
+        content: Text(
+          e.cancelado
+              ? 'Recolocar "${e.titulo}" na programação pública?'
+              : 'Cancelar "${e.titulo}" e preservá-lo no histórico?',
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(d).pop(false),
-              child: const Text('Cancelar')),
+            onPressed: () => Navigator.of(d).pop(false),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             onPressed: () => Navigator.of(d).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Excluir'),
+            style: FilledButton.styleFrom(
+              backgroundColor: e.cancelado
+                  ? AppColors.primary
+                  : AppColors.error,
+            ),
+            child: Text(e.cancelado ? 'Reativar' : 'Cancelar evento'),
           ),
         ],
       ),
@@ -51,8 +63,10 @@ class GerenciarEventosScreen extends ConsumerWidget {
     String mensagem;
     try {
       // Cancela em vez de apagar: o histórico da programação é preservado.
-      await ref.read(eventosRepositoryProvider).definirCancelado(e.id, true);
-      mensagem = 'Evento cancelado.';
+      await ref
+          .read(eventosRepositoryProvider)
+          .definirCancelado(e.id, !e.cancelado);
+      mensagem = e.cancelado ? 'Evento reativado.' : 'Evento cancelado.';
     } on FirebaseException catch (err) {
       mensagem = err.code == 'permission-denied'
           ? 'Sem permissão para esta ação. Confirme seu perfil de liderança.'
@@ -112,7 +126,7 @@ class GerenciarEventosScreen extends ConsumerWidget {
             itemBuilder: (context, i) => _EventoCard(
               evento: eventos[i],
               onEditar: () => _abrirForm(context, evento: eventos[i]),
-              onExcluir: () => _confirmarExcluir(context, ref, eventos[i]),
+              onExcluir: () => _confirmarCancelamento(context, ref, eventos[i]),
             ),
           );
         },
@@ -150,10 +164,17 @@ class _EventoCard extends StatelessWidget {
           Row(
             children: [
               _Etiqueta(
-                texto: passado ? 'Encerrado' : 'Próximo',
-                cor: passado ? AppColors.mutedForeground : AppColors.success,
-                fundo:
-                    passado ? AppColors.surfaceMuted : AppColors.successSoft,
+                texto: evento.cancelado
+                    ? 'Cancelado'
+                    : (passado ? 'Encerrado' : 'Próximo'),
+                cor: evento.cancelado
+                    ? AppColors.error
+                    : (passado ? AppColors.mutedForeground : AppColors.success),
+                fundo: evento.cancelado
+                    ? AppColors.errorSoft
+                    : (passado
+                          ? AppColors.surfaceMuted
+                          : AppColors.successSoft),
               ),
               if (!evento.publico) ...[
                 const SizedBox(width: 6),
@@ -183,14 +204,19 @@ class _EventoCard extends StatelessWidget {
           Text(
             evento.local,
             style: const TextStyle(
-                color: AppColors.mutedForeground, fontSize: 13),
+              color: AppColors.mutedForeground,
+              fontSize: 13,
+            ),
           ),
           if (evento.responsavelNome.isNotEmpty) ...[
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.person_outline,
-                    size: 15, color: AppColors.primary),
+                const Icon(
+                  Icons.person_outline,
+                  size: 15,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
@@ -224,9 +250,13 @@ class _EventoCard extends StatelessWidget {
               const SizedBox(width: 8),
               IconButton(
                 onPressed: onExcluir,
-                icon: const Icon(Icons.delete_outline),
-                color: AppColors.error,
-                tooltip: 'Excluir',
+                icon: Icon(
+                  evento.cancelado
+                      ? Icons.undo_outlined
+                      : Icons.cancel_outlined,
+                ),
+                color: evento.cancelado ? AppColors.primary : AppColors.error,
+                tooltip: evento.cancelado ? 'Reativar' : 'Cancelar',
               ),
             ],
           ),
@@ -237,7 +267,11 @@ class _EventoCard extends StatelessWidget {
 }
 
 class _Etiqueta extends StatelessWidget {
-  const _Etiqueta({required this.texto, required this.cor, required this.fundo});
+  const _Etiqueta({
+    required this.texto,
+    required this.cor,
+    required this.fundo,
+  });
 
   final String texto;
   final Color cor;
@@ -253,8 +287,7 @@ class _Etiqueta extends StatelessWidget {
       ),
       child: Text(
         texto,
-        style: TextStyle(
-            color: cor, fontSize: 11, fontWeight: FontWeight.w700),
+        style: TextStyle(color: cor, fontSize: 11, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -273,8 +306,11 @@ class _VazioEventos extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.event_outlined,
-                size: 48, color: AppColors.mutedForeground),
+            const Icon(
+              Icons.event_outlined,
+              size: 48,
+              color: AppColors.mutedForeground,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Nenhum evento na programação.\nAdicione o primeiro.',
@@ -284,8 +320,7 @@ class _VazioEventos extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onCriar,
-              style:
-                  FilledButton.styleFrom(backgroundColor: AppColors.primary),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
               icon: const Icon(Icons.add),
               label: const Text('Novo evento'),
             ),

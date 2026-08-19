@@ -4,6 +4,10 @@ import 'package:nova_alianca_core/nova_alianca_core.dart';
 DateTime? lerData(dynamic v) =>
     v is Timestamp ? v.toDate() : (v is DateTime ? v : null);
 
+String formatarHorario(DateTime data) =>
+    '${data.hour.toString().padLeft(2, '0')}:'
+    '${data.minute.toString().padLeft(2, '0')}';
+
 // ══════════════════════════════════════════════════════════════════════
 // Modelos do painel
 //
@@ -34,25 +38,25 @@ class Aviso {
   bool get urgente => prioridade == 'urgente';
 
   factory Aviso.doMapa(String id, Map<String, dynamic> d) => Aviso(
-        id: id,
-        titulo: d['titulo'] as String? ?? '',
-        // `conteudo` é canônico; `corpo` é legado aceito só na leitura.
-        conteudo: (d['conteudo'] as String?) ?? (d['corpo'] as String?) ?? '',
-        prioridade: d['prioridade'] as String? ?? 'normal',
-        publico: d['publico'] as bool? ?? false,
-        ativo: d['ativo'] as bool? ?? true,
-        publicadoEm: lerData(d['publicado_em']),
-      );
+    id: id,
+    titulo: d['titulo'] as String? ?? '',
+    // `conteudo` é canônico; `corpo` é legado aceito só na leitura.
+    conteudo: (d['conteudo'] as String?) ?? (d['corpo'] as String?) ?? '',
+    prioridade: d['prioridade'] as String? ?? 'normal',
+    publico: d['publico'] as bool? ?? false,
+    ativo: d['ativo'] as bool? ?? true,
+    publicadoEm: lerData(d['publicado_em']),
+  );
 
   Map<String, dynamic> paraMapa() => {
-        'titulo': titulo,
-        'conteudo': conteudo, // nunca grava `corpo`
-        'prioridade': prioridade,
-        'publico': publico,
-        'ativo': ativo,
-        'publicado_em': publicadoEm ?? FieldValue.serverTimestamp(),
-        'atualizado_em': FieldValue.serverTimestamp(),
-      };
+    'titulo': titulo,
+    'conteudo': conteudo, // nunca grava `corpo`
+    'prioridade': prioridade,
+    'publico': publico,
+    'ativo': ativo,
+    'publicado_em': publicadoEm ?? FieldValue.serverTimestamp(),
+    'atualizado_em': FieldValue.serverTimestamp(),
+  };
 }
 
 class Evento {
@@ -81,30 +85,33 @@ class Evento {
   final String? responsavelNome;
 
   factory Evento.doMapa(String id, Map<String, dynamic> d) => Evento(
-        id: id,
-        titulo: d['titulo'] as String? ?? '',
-        descricao: d['descricao'] as String? ?? '',
-        data: lerData(d['data']) ?? DateTime.now(),
-        local: d['local'] as String? ?? '',
-        tipo: d['tipo'] as String? ?? 'culto',
-        publico: d['publico'] as bool? ?? true,
-        cancelado: d['cancelado'] as bool? ?? false,
-        responsavelId: d['responsavel_id'] as String?,
-        responsavelNome: d['responsavel_nome'] as String?,
-      );
+    id: id,
+    titulo: d['titulo'] as String? ?? '',
+    descricao: d['descricao'] as String? ?? '',
+    data: lerData(d['data']) ?? DateTime.now(),
+    local: d['local'] as String? ?? '',
+    tipo: d['tipo'] as String? ?? 'culto',
+    publico: d['publico'] as bool? ?? true,
+    cancelado: d['cancelado'] as bool? ?? false,
+    responsavelId: d['responsavel_id'] as String?,
+    responsavelNome: d['responsavel_nome'] as String?,
+  );
 
   Map<String, dynamic> paraMapa() => {
-        'titulo': titulo,
-        'descricao': descricao,
-        'data': Timestamp.fromDate(data),
-        'local': local,
-        'tipo': tipo,
-        'publico': publico,
-        'cancelado': cancelado,
-        'responsavel_id': responsavelId,
-        'responsavel_nome': responsavelNome,
-        'atualizado_em': FieldValue.serverTimestamp(),
-      };
+    'titulo': titulo,
+    'descricao': descricao,
+    'data': Timestamp.fromDate(data),
+    // Redundante de propósito: `data` é canônico, mas o app legado ainda
+    // exibe este campo. O leitor móvel deriva de `data` se ele faltar.
+    'horario': formatarHorario(data),
+    'local': local,
+    'tipo': tipo,
+    'publico': publico,
+    'cancelado': cancelado,
+    'responsavel_id': responsavelId,
+    'responsavel_nome': responsavelNome,
+    'atualizado_em': FieldValue.serverTimestamp(),
+  };
 }
 
 class Campanha {
@@ -129,27 +136,27 @@ class Campanha {
   final bool publico;
 
   factory Campanha.doMapa(String id, Map<String, dynamic> d) => Campanha(
-        id: id,
-        titulo: d['titulo'] as String? ?? '',
-        descricao: d['descricao'] as String? ?? '',
-        dataInicio: lerData(d['data_inicio']) ?? DateTime.now(),
-        dataFim: lerData(d['data_fim']),
-        // Meta em centavos, mesmo contrato das transações.
-        metaCentavos: (d['meta_centavos'] as num?)?.toInt() ?? 0,
-        status: d['status'] as String? ?? 'ativa',
-        publico: d['publico'] as bool? ?? true,
-      );
+    id: id,
+    titulo: d['titulo'] as String? ?? '',
+    descricao: d['descricao'] as String? ?? '',
+    dataInicio: lerData(d['data_inicio']) ?? DateTime.now(),
+    dataFim: lerData(d['data_fim']),
+    // Meta em centavos, mesmo contrato das transações.
+    metaCentavos: (d['meta_centavos'] as num?)?.toInt() ?? 0,
+    status: d['status'] as String? ?? 'ativa',
+    publico: d['publico'] as bool? ?? true,
+  );
 
   Map<String, dynamic> paraMapa() => {
-        'titulo': titulo,
-        'descricao': descricao,
-        'data_inicio': Timestamp.fromDate(dataInicio),
-        'data_fim': dataFim == null ? null : Timestamp.fromDate(dataFim!),
-        'meta_centavos': metaCentavos,
-        'status': status,
-        'publico': publico,
-        'atualizado_em': FieldValue.serverTimestamp(),
-      };
+    'titulo': titulo,
+    'descricao': descricao,
+    'data_inicio': Timestamp.fromDate(dataInicio),
+    'data_fim': dataFim == null ? null : Timestamp.fromDate(dataFim!),
+    'meta_centavos': metaCentavos,
+    'status': status,
+    'publico': publico,
+    'atualizado_em': FieldValue.serverTimestamp(),
+  };
 }
 
 class Ministerio {
@@ -172,24 +179,24 @@ class Ministerio {
   final bool publico;
 
   factory Ministerio.doMapa(String id, Map<String, dynamic> d) => Ministerio(
-        id: id,
-        nome: d['nome'] as String? ?? '',
-        descricao: d['descricao'] as String? ?? '',
-        ativo: d['ativo'] as bool? ?? true,
-        liderId: d['lider_id'] as String?,
-        liderNome: d['lider_nome'] as String?,
-        publico: d['publico'] as bool? ?? true,
-      );
+    id: id,
+    nome: d['nome'] as String? ?? '',
+    descricao: d['descricao'] as String? ?? '',
+    ativo: d['ativo'] as bool? ?? true,
+    liderId: d['lider_id'] as String?,
+    liderNome: d['lider_nome'] as String?,
+    publico: d['publico'] as bool? ?? true,
+  );
 
   Map<String, dynamic> paraMapa() => {
-        'nome': nome,
-        'descricao': descricao,
-        'ativo': ativo,
-        'lider_id': liderId,
-        'lider_nome': liderNome,
-        'publico': publico,
-        'atualizado_em': FieldValue.serverTimestamp(),
-      };
+    'nome': nome,
+    'descricao': descricao,
+    'ativo': ativo,
+    'lider_id': liderId,
+    'lider_nome': liderNome,
+    'publico': publico,
+    'atualizado_em': FieldValue.serverTimestamp(),
+  };
 }
 
 class Devocional {
@@ -202,6 +209,7 @@ class Devocional {
     this.referencia,
     this.destaque = false,
     this.ativo = true,
+    this.publico = true,
   });
 
   final String id;
@@ -212,28 +220,31 @@ class Devocional {
   final String? referencia;
   final bool destaque;
   final bool ativo;
+  final bool publico;
 
   factory Devocional.doMapa(String id, Map<String, dynamic> d) => Devocional(
-        id: id,
-        titulo: d['titulo'] as String? ?? '',
-        corpo: d['corpo'] as String? ?? '',
-        autor: d['autor'] as String? ?? '',
-        data: lerData(d['data']) ?? DateTime.now(),
-        referencia: d['referencia'] as String?,
-        destaque: d['destaque'] as bool? ?? false,
-        ativo: d['ativo'] as bool? ?? true,
-      );
+    id: id,
+    titulo: d['titulo'] as String? ?? '',
+    corpo: d['corpo'] as String? ?? '',
+    autor: d['autor'] as String? ?? '',
+    data: lerData(d['data']) ?? DateTime.now(),
+    referencia: d['referencia'] as String?,
+    destaque: d['destaque'] as bool? ?? false,
+    ativo: d['ativo'] as bool? ?? true,
+    publico: d['publico'] as bool? ?? true,
+  );
 
   Map<String, dynamic> paraMapa() => {
-        'titulo': titulo,
-        'corpo': corpo,
-        'autor': autor,
-        'data': Timestamp.fromDate(data),
-        'referencia': referencia,
-        'destaque': destaque,
-        'ativo': ativo,
-        'atualizado_em': FieldValue.serverTimestamp(),
-      };
+    'titulo': titulo,
+    'corpo': corpo,
+    'autor': autor,
+    'data': Timestamp.fromDate(data),
+    'referencia': referencia,
+    'destaque': destaque,
+    'ativo': ativo,
+    'publico': publico,
+    'atualizado_em': FieldValue.serverTimestamp(),
+  };
 }
 
 class PedidoOracao {
@@ -261,9 +272,11 @@ class PedidoOracao {
   final String? motivoRecusa;
   final DateTime? criadoEm;
 
-  String get nomeExibicao => anonimo ? 'Anônimo' : (autorNome.isEmpty ? '—' : autorNome);
+  String get nomeExibicao =>
+      anonimo ? 'Anônimo' : (autorNome.isEmpty ? '—' : autorNome);
 
-  factory PedidoOracao.doMapa(String id, Map<String, dynamic> d) => PedidoOracao(
+  factory PedidoOracao.doMapa(String id, Map<String, dynamic> d) =>
+      PedidoOracao(
         id: id,
         texto: d['texto'] as String? ?? '',
         autorNome: d['autor_nome'] as String? ?? '',
@@ -304,7 +317,7 @@ class Pagina<T> {
 /// derrubar o painel nem gerar leitura desnecessária no Firestore.
 class ConteudoRepository {
   ConteudoRepository({required this.igrejaId, FirebaseFirestore? db})
-      : _dbInjetado = db;
+    : _dbInjetado = db;
 
   final IgrejaId igrejaId;
   final FirebaseFirestore? _dbInjetado;
@@ -345,23 +358,23 @@ class ConteudoRepository {
   /// documentos migrados — ordenar no servidor os excluiria da tela.
   Stream<Pagina<Aviso>> avisos({int limite = limitePadrao}) =>
       _limitada('avisos', limite).snapshots().map(
-            (s) => _paginar(
-              s,
-              limite,
-              Aviso.doMapa,
-              (a, b) => (b.publicadoEm ?? DateTime(0))
-                  .compareTo(a.publicadoEm ?? DateTime(0)),
-            ),
-          );
+        (s) => _paginar(
+          s,
+          limite,
+          Aviso.doMapa,
+          (a, b) => (b.publicadoEm ?? DateTime(0)).compareTo(
+            a.publicadoEm ?? DateTime(0),
+          ),
+        ),
+      );
 
   /// Cartão do dashboard: os últimos avisos publicados.
   ///
   /// Aqui a ordenação é do servidor. Um aviso sem `publicado_em` não é
   /// "recente" — ficar de fora deste cartão é o comportamento correto; ele
   /// continua visível na tela de Avisos.
-  Stream<List<Aviso>> avisosRecentes({int limite = limiteDashboard}) => _col(
-        'avisos',
-      )
+  Stream<List<Aviso>> avisosRecentes({int limite = limiteDashboard}) =>
+      _col('avisos')
           .orderBy('publicado_em', descending: true)
           .limit(limite)
           .snapshots()
@@ -378,22 +391,21 @@ class ConteudoRepository {
   // ── Eventos ─────────────────────────────────────────────────────────
   Stream<Pagina<Evento>> eventos({int limite = limitePadrao}) =>
       _limitada('eventos', limite).snapshots().map(
-            (s) => _paginar(
-              s,
-              limite,
-              Evento.doMapa,
-              (a, b) => b.data.compareTo(a.data),
-            ),
-          );
+        (s) => _paginar(
+          s,
+          limite,
+          Evento.doMapa,
+          (a, b) => b.data.compareTo(a.data),
+        ),
+      );
 
   /// Cartão "Próximas programações": só o que ainda vai acontecer.
   ///
   /// Filtro e ordenação são do servidor (mesmo campo `data`, então não exige
   /// índice composto). Eventos cancelados são removidos no cliente para não
   /// exigir um índice adicional só por isso.
-  Stream<List<Evento>> proximosEventos({int limite = limiteDashboard}) => _col(
-        'eventos',
-      )
+  Stream<List<Evento>> proximosEventos({int limite = limiteDashboard}) =>
+      _col('eventos')
           .where('data', isGreaterThanOrEqualTo: Timestamp.now())
           .orderBy('data')
           .limit(limite + 5)
@@ -416,13 +428,13 @@ class ConteudoRepository {
   // ── Campanhas ───────────────────────────────────────────────────────
   Stream<Pagina<Campanha>> campanhas({int limite = limitePadrao}) =>
       _limitada('campanhas', limite).snapshots().map(
-            (s) => _paginar(
-              s,
-              limite,
-              Campanha.doMapa,
-              (a, b) => b.dataInicio.compareTo(a.dataInicio),
-            ),
-          );
+        (s) => _paginar(
+          s,
+          limite,
+          Campanha.doMapa,
+          (a, b) => b.dataInicio.compareTo(a.dataInicio),
+        ),
+      );
 
   Future<void> salvarCampanha(Campanha c) => c.id.isEmpty
       ? _col('campanhas').add(c.paraMapa())
@@ -434,14 +446,13 @@ class ConteudoRepository {
   // ── Ministérios ─────────────────────────────────────────────────────
   Stream<Pagina<Ministerio>> ministerios({int limite = limitePadrao}) =>
       _limitada('ministerios', limite).snapshots().map(
-            (s) => _paginar(
-              s,
-              limite,
-              Ministerio.doMapa,
-              (a, b) =>
-                  a.nome.toLowerCase().compareTo(b.nome.toLowerCase()),
-            ),
-          );
+        (s) => _paginar(
+          s,
+          limite,
+          Ministerio.doMapa,
+          (a, b) => a.nome.toLowerCase().compareTo(b.nome.toLowerCase()),
+        ),
+      );
 
   Future<void> salvarMinisterio(Ministerio m) => m.id.isEmpty
       ? _col('ministerios').add(m.paraMapa())
@@ -453,13 +464,13 @@ class ConteudoRepository {
   // ── Devocionais ─────────────────────────────────────────────────────
   Stream<Pagina<Devocional>> devocionais({int limite = limitePadrao}) =>
       _limitada('devocionais', limite).snapshots().map(
-            (s) => _paginar(
-              s,
-              limite,
-              Devocional.doMapa,
-              (a, b) => b.data.compareTo(a.data),
-            ),
-          );
+        (s) => _paginar(
+          s,
+          limite,
+          Devocional.doMapa,
+          (a, b) => b.data.compareTo(a.data),
+        ),
+      );
 
   Future<void> salvarDevocional(Devocional d) => d.id.isEmpty
       ? _col('devocionais').add(d.paraMapa())
@@ -469,10 +480,9 @@ class ConteudoRepository {
       _col('devocionais').doc(id).update({'ativo': ativo});
 
   // ── Oração ──────────────────────────────────────────────────────────
-  Query<Map<String, dynamic>> _oracoes({required bool aprovado}) =>
-      _col('pedidos_oracao')
-          .where('privado', isEqualTo: false)
-          .where('aprovado', isEqualTo: aprovado);
+  Query<Map<String, dynamic>> _oracoes({required bool aprovado}) => _col(
+    'pedidos_oracao',
+  ).where('privado', isEqualTo: false).where('aprovado', isEqualTo: aprovado);
 
   /// Fila de moderação: públicos ainda não decididos.
   ///
@@ -482,24 +492,32 @@ class ConteudoRepository {
   Stream<Pagina<PedidoOracao>> oracoesPendentes({int limite = limitePadrao}) =>
       _oracoes(aprovado: false).limit(limite + 1).snapshots().map((s) {
         final truncada = s.docs.length > limite;
-        final itens = (truncada ? s.docs.take(limite) : s.docs)
-            .map((d) => PedidoOracao.doMapa(d.id, d.data()))
-            .where((p) => !p.recusado)
-            .toList()
-          ..sort((a, b) =>
-              (a.criadoEm ?? DateTime(0)).compareTo(b.criadoEm ?? DateTime(0)));
+        final itens =
+            (truncada ? s.docs.take(limite) : s.docs)
+                .map((d) => PedidoOracao.doMapa(d.id, d.data()))
+                .where((p) => !p.recusado)
+                .toList()
+              ..sort(
+                (a, b) => (a.criadoEm ?? DateTime(0)).compareTo(
+                  b.criadoEm ?? DateTime(0),
+                ),
+              );
         return Pagina(itens: itens, truncada: truncada);
       });
 
   /// Mural: públicos aprovados.
   Stream<Pagina<PedidoOracao>> oracoesAprovadas({int limite = limitePadrao}) =>
-      _oracoes(aprovado: true).limit(limite + 1).snapshots().map(
+      _oracoes(aprovado: true)
+          .limit(limite + 1)
+          .snapshots()
+          .map(
             (s) => _paginar(
               s,
               limite,
               PedidoOracao.doMapa,
-              (a, b) => (b.criadoEm ?? DateTime(0))
-                  .compareTo(a.criadoEm ?? DateTime(0)),
+              (a, b) => (b.criadoEm ?? DateTime(0)).compareTo(
+                a.criadoEm ?? DateTime(0),
+              ),
             ),
           );
 

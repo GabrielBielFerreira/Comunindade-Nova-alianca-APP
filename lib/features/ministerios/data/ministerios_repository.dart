@@ -20,6 +20,16 @@ class MinisteriosRepository {
     return _col.where('ativo', isEqualTo: true).snapshots().map(_ordenar);
   }
 
+  /// Visitante precisa enviar os dois filtros que tornam a consulta
+  /// demonstravelmente pública para as Firestore Rules.
+  Stream<List<MinisterioModel>> streamPublicos() {
+    return _col
+        .where('publico', isEqualTo: true)
+        .where('ativo', isEqualTo: true)
+        .snapshots()
+        .map(_ordenar);
+  }
+
   /// Visão de gestão: inclui inativos.
   Stream<List<MinisterioModel>> streamGerenciar() {
     return _col.snapshots().map(_ordenar);

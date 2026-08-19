@@ -13,6 +13,7 @@ class CampanhaModel {
   final DateTime? dataFim;
   final String? imagemUrl;
   final String criadoPor;
+  final bool publico;
 
   const CampanhaModel({
     required this.id,
@@ -25,6 +26,7 @@ class CampanhaModel {
     this.dataFim,
     this.imagemUrl,
     required this.criadoPor,
+    this.publico = true,
   });
 
   double get progresso =>
@@ -35,12 +37,22 @@ class CampanhaModel {
 
   factory CampanhaModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    return CampanhaModel.fromMap(doc.id, data);
+  }
+
+  /// Contrato compartilhado com o painel web.
+  ///
+  /// `meta_centavos` é o campo canônico. `meta_valor` é aceito somente na
+  /// leitura para preservar campanhas criadas antes da migração.
+  factory CampanhaModel.fromMap(String id, Map<String, dynamic> data) {
+    final meta = data['meta_centavos'] ?? data['meta_valor'];
+    final arrecadado = data['valor_arrecadado'];
     return CampanhaModel(
-      id: doc.id,
+      id: id,
       titulo: data['titulo'] as String? ?? '',
       descricao: data['descricao'] as String? ?? '',
-      metaValor: data['meta_valor'] as int? ?? 0,
-      valorArrecadado: data['valor_arrecadado'] as int? ?? 0,
+      metaValor: meta is num ? meta.toInt() : 0,
+      valorArrecadado: arrecadado is num ? arrecadado.toInt() : 0,
       status: (data['status'] as String?) == 'encerrada'
           ? StatusCampanha.encerrada
           : StatusCampanha.ativa,
@@ -49,18 +61,20 @@ class CampanhaModel {
       dataFim: (data['data_fim'] as Timestamp?)?.toDate(),
       imagemUrl: data['imagem_url'] as String?,
       criadoPor: data['criado_por'] as String? ?? '',
+      publico: data['publico'] as bool? ?? true,
     );
   }
 
   Map<String, dynamic> toMap() => {
-        'titulo': titulo,
-        'descricao': descricao,
-        'meta_valor': metaValor,
-        'valor_arrecadado': valorArrecadado,
-        'status': status.name,
-        'data_inicio': Timestamp.fromDate(dataInicio),
-        'data_fim': dataFim != null ? Timestamp.fromDate(dataFim!) : null,
-        'imagem_url': imagemUrl,
-        'criado_por': criadoPor,
-      };
+    'titulo': titulo,
+    'descricao': descricao,
+    'meta_centavos': metaValor,
+    'valor_arrecadado': valorArrecadado,
+    'status': status.name,
+    'data_inicio': Timestamp.fromDate(dataInicio),
+    'data_fim': dataFim != null ? Timestamp.fromDate(dataFim!) : null,
+    'imagem_url': imagemUrl,
+    'criado_por': criadoPor,
+    'publico': publico,
+  };
 }

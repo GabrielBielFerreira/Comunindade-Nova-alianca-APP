@@ -23,13 +23,7 @@ class EventosRepository {
   }
 
   List<EventoModel> _futuros(QuerySnapshot<Map<String, dynamic>> snap) {
-    final ontem = DateTime.now().subtract(const Duration(days: 1));
-    final lista = snap.docs
-        .map(EventoModel.fromFirestore)
-        .where((e) => e.data.isAfter(ontem))
-        .toList();
-    lista.sort((a, b) => a.data.compareTo(b.data));
-    return lista;
+    return filtrarEventosProximos(snap.docs.map(EventoModel.fromFirestore));
   }
 
   /// Visão de gestão: todos os eventos, inclusive passados.
@@ -54,4 +48,18 @@ class EventosRepository {
   Future<void> definirCancelado(String id, bool cancelado) {
     return _col.doc(id).update({'cancelado': cancelado});
   }
+}
+
+/// Programação pública/próxima nunca inclui evento cancelado. A gestão usa
+/// [EventosRepository.streamGerenciar] e continua vendo o histórico completo.
+List<EventoModel> filtrarEventosProximos(
+  Iterable<EventoModel> eventos, {
+  DateTime? agora,
+}) {
+  final ontem = (agora ?? DateTime.now()).subtract(const Duration(days: 1));
+  final lista = eventos
+      .where((e) => !e.cancelado && e.data.isAfter(ontem))
+      .toList();
+  lista.sort((a, b) => a.data.compareTo(b.data));
+  return lista;
 }

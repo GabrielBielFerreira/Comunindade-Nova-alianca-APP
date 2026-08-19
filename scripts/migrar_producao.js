@@ -106,7 +106,7 @@ async function migrarColecao(nome) {
     }
     if (!dryRun) {
       await destino.set({
-        ...doc.data(),
+        ...normalizarContratoConteudo(nome, doc.data() ?? {}),
         migrado_de: `${nome}/${doc.id}`,
         migrado_em: admin.firestore.FieldValue.serverTimestamp(),
       });
@@ -115,6 +115,45 @@ async function migrarColecao(nome) {
   }
 
   registrar(nome, origem.size, migrados, ignorados);
+}
+
+/**
+ * Alinha documentos legados ao contrato que painel e aplicativo compartilham.
+ *
+ * A ausência de `publico` vira `false`: conteúdo antigo sem decisão explícita
+ * não deve ser exposto a visitantes durante a migração. A liderança pode
+ * publicá-lo depois pelo painel.
+ */
+function normalizarContratoConteudo(nome, dados) {
+  const d = { ...dados };
+
+  if (["avisos", "eventos", "campanhas", "ministerios", "devocionais"].includes(nome)) {
+    d.publico = d.publico === true;
+  }
+
+  if (nome === "campanhas") {
+    const meta =
+      typeof d.meta_centavos === "number"
+        ? d.meta_centavos
+        : typeof d.meta_valor === "number"
+          ? d.meta_valor
+          : 0;
+    d.meta_centavos = Math.round(meta);
+  }
+
+  if (nome === "eventos") {
+    d.cancelado = d.cancelado === true;
+    if (typeof d.horario !== "string" || d.horario.trim() === "") {
+      const data = d.data?.toDate?.();
+      if (data instanceof Date && !Number.isNaN(data.getTime())) {
+        d.horario =
+          `${String(data.getHours()).padStart(2, "0")}:` +
+          String(data.getMinutes()).padStart(2, "0");
+      }
+    }
+  }
+
+  return d;
 }
 
 /** Cria as unidades. Petrolina entra INATIVA e sem dados inventados. */
