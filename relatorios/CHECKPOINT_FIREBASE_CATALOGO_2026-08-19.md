@@ -62,8 +62,10 @@ O preflight comprovou `tokens_dispositivo=11` e planejou todos os documentos
 para `usuarios/{uid}/tokens_dispositivo/{token}`. O token validado é o mesmo ID
 canônico que o app grava e desativa no logout; IDs automáticos legados não são
 reutilizados e duplicatas do mesmo usuário/token são consolidadas sem reativar
-uma cópia já inativa. Um token associado a UIDs diferentes agora bloqueia o
-preflight inteiro, sem planejar destinos e sem expor token ou UID no erro.
+uma cópia já inativa. Um token associado a UIDs diferentes agora é preservado
+em cada destino canônico privado com `ativo=false`, sem escolher dono, reativar
+o aparelho ou expor token/UID nos relatórios; destinos existentes divergentes
+continuam bloqueando o preflight.
 Também comprovou
 `configuracoes=0`; qualquer documento nessa coleção passa a bloquear o plano,
 pois ainda não existe contrato de destino seguro.
@@ -83,7 +85,7 @@ abre sem marcar explicitamente o visitante.
 
 ## Validação local
 
-- Scripts de migração/canários: 42/42.
+- Scripts de migração/canários: 45/45.
 - Functions (build + testes unitários): 92/92.
 - Functions no Firestore Emulator: 33/33, incluindo rollback de raiz,
   catálogo e auditoria quando o commit transacional falha.

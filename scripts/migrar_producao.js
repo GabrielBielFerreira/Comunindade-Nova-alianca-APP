@@ -1165,22 +1165,18 @@ async function planejarTokensDispositivo(ctx, plano) {
     uidsPorToken.set(token, uids);
   }
 
-  // Um token identifica uma instalação, portanto não pode permanecer associado
-  // a usuários diferentes. A ambiguidade é bloqueada antes de qualquer escrita
-  // e o conflito usa somente caminho/campo sanitizados.
-  const tokensCompartilhados = new Set();
-  for (const [token, uids] of uidsPorToken.entries()) {
-    if (uids.size <= 1) continue;
-    tokensCompartilhados.add(token);
-    registrarConflito(plano, "tokens_dispositivo/{id}", [
-      "token_compartilhado_entre_perfis",
-    ]);
-    conflitos++;
-  }
+  // Um token legado associado a mais de um perfil não tem dono confiável.
+  // Em vez de escolher um UID ou bloquear toda a migração, preservamos uma
+  // cópia canônica privada em cada perfil e colocamos todas em quarentena. Assim
+  // nenhuma das associações ambíguas pode receber push até uma nova gravação
+  // autenticada pelo app substituir explicitamente esse estado.
+  const tokensCompartilhados = new Set(
+    [...uidsPorToken.entries()]
+      .filter(([, uids]) => uids.size > 1)
+      .map(([token]) => token)
+  );
 
   for (const grupo of grupos.values()) {
-    if (tokensCompartilhados.has(grupo.token)) continue;
-
     const plataformas = new Set(
       grupo.documentos.map((item) => item.dados.plataforma.trim())
     );
@@ -1202,9 +1198,12 @@ async function planejarTokensDispositivo(ctx, plano) {
         perfil_id: grupo.uid,
         token: grupo.token,
         plataforma: [...plataformas][0],
-        // Se qualquer cópia registra logout, a consolidação não pode reativar
-        // silenciosamente o mesmo aparelho.
-        ativo: grupo.documentos.every((item) => item.dados.ativo === true),
+        // Token compartilhado entre perfis é sempre inativo em todos os
+        // destinos. Para um único perfil, qualquer cópia com logout também
+        // impede reativação silenciosa durante a consolidação.
+        ativo: tokensCompartilhados.has(grupo.token)
+          ? false
+          : grupo.documentos.every((item) => item.dados.ativo === true),
         migrado_de: grupo.documentos.map(
           (item) => `tokens_dispositivo/${item.id}`
         ),
