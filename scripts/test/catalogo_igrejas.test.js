@@ -837,6 +837,7 @@ test("tokens globais são planejados no usuário com proveniência preservada", 
       perfil_id: "uid-1",
       token: tokenSecreto,
       plataforma: "android",
+      ativo: true,
     },
   });
   const ctx = criarContexto({
@@ -847,13 +848,21 @@ test("tokens globais são planejados no usuário com proveniência preservada", 
   });
   const plano = await prepararPlanoCompleto(ctx);
   const operacao = plano.operacoes.find(
-    (item) => item.caminho === "usuarios/uid-1/tokens_dispositivo/token-doc"
+    (item) =>
+      item.caminho === `usuarios/uid-1/tokens_dispositivo/${tokenSecreto}`
   );
 
   assert.equal(Boolean(operacao), true);
+  assert.equal(
+    plano.operacoes.some(
+      (item) =>
+        item.caminho === "usuarios/uid-1/tokens_dispositivo/token-doc"
+    ),
+    false
+  );
   assert.equal(operacao.caminhoSeguro, "usuarios/{uid}/tokens_dispositivo/{id}");
   assert.equal(operacao.dados.token, tokenSecreto);
-  assert.equal(operacao.dados.migrado_de, "tokens_dispositivo/token-doc");
+  assert.deepEqual(operacao.dados.migrado_de, ["tokens_dispositivo/token-doc"]);
 
   const resultado = await aplicarPlanoAtomico({
     admin: fake.admin,
@@ -865,9 +874,93 @@ test("tokens globais são planejados no usuário com proveniência preservada", 
   });
   assert.equal(resultado.posVerificacao, true);
   assert.equal(
-    fake.obter("usuarios/uid-1/tokens_dispositivo/token-doc").token,
+    fake.obter(`usuarios/uid-1/tokens_dispositivo/${tokenSecreto}`).token,
     tokenSecreto
   );
+});
+
+test("tokens duplicados do mesmo usuário viram um único documento canônico", async () => {
+  const token = "TOKEN-DUPLICADO";
+  const fake = criarFirestoreTransacionalFake({
+    "tokens_dispositivo/auto-b": {
+      perfil_id: "uid-1",
+      token,
+      plataforma: "android",
+      ativo: true,
+    },
+    "tokens_dispositivo/auto-a": {
+      perfil_id: "uid-1",
+      token,
+      plataforma: "android",
+      ativo: false,
+    },
+  });
+  const ctx = criarContexto({
+    admin: fake.admin,
+    db: fake.db,
+    dryRun: true,
+    silencioso: true,
+  });
+  const plano = await prepararPlanoCompleto(ctx);
+  const operacoes = plano.operacoes.filter((item) =>
+    item.caminhoSeguro?.includes("tokens_dispositivo")
+  );
+
+  assert.equal(operacoes.length, 1);
+  assert.equal(
+    operacoes[0].caminho,
+    `usuarios/uid-1/tokens_dispositivo/${token}`
+  );
+  assert.equal(operacoes[0].dados.ativo, false);
+  assert.deepEqual(operacoes[0].dados.migrado_de, [
+    "tokens_dispositivo/auto-a",
+    "tokens_dispositivo/auto-b",
+  ]);
+});
+
+test("token ativo compartilhado entre UIDs bloqueia o preflight sem vazar dados", async () => {
+  const tokenSecreto = "TOKEN-CRUZADO-SECRETO";
+  const uidSecretoA = "uid-secreto-a";
+  const uidSecretoB = "uid-secreto-b";
+  const fake = criarFirestoreTransacionalFake({
+    "tokens_dispositivo/auto-a": {
+      perfil_id: uidSecretoA,
+      token: tokenSecreto,
+      plataforma: "android",
+      ativo: true,
+    },
+    "tokens_dispositivo/auto-b": {
+      perfil_id: uidSecretoB,
+      token: tokenSecreto,
+      plataforma: "android",
+      ativo: true,
+    },
+  });
+  const ctx = criarContexto({
+    admin: fake.admin,
+    db: fake.db,
+    dryRun: true,
+    silencioso: true,
+  });
+  const plano = await prepararPlanoCompleto(ctx, { validar: false });
+
+  assert.equal(
+    plano.operacoes.some((item) =>
+      item.caminhoSeguro?.includes("tokens_dispositivo")
+    ),
+    false
+  );
+  assert.deepEqual(
+    plano.conflitos.filter((item) => item.includes("tokens_dispositivo")),
+    ["tokens_dispositivo/{id}[token_compartilhado_entre_perfis]"]
+  );
+  assert.throws(() => validarPlanoAtomico(plano), (erro) => {
+    assert.match(erro.message, /tokens_dispositivo/);
+    assert.equal(erro.message.includes(tokenSecreto), false);
+    assert.equal(erro.message.includes(uidSecretoA), false);
+    assert.equal(erro.message.includes(uidSecretoB), false);
+    return true;
+  });
 });
 
 test("onze tokens globais acrescentam exatamente onze operações privadas", async () => {
@@ -878,6 +971,7 @@ test("onze tokens globais acrescentam exatamente onze operações privadas", asy
         perfil_id: `uid-${indice}`,
         token: `token-privado-${indice}`,
         plataforma: "android",
+        ativo: true,
       },
     ])
   );
@@ -906,6 +1000,8 @@ test("UID inválido e colisão de token geram conflitos sem expor UID ou token",
         "tokens_dispositivo/doc-secreto": {
           perfil_id: "uid/secreto",
           token: "TOKEN-SECRETO",
+          plataforma: "android",
+          ativo: true,
         },
       },
     },
@@ -915,10 +1011,14 @@ test("UID inválido e colisão de token geram conflitos sem expor UID ou token",
         "tokens_dispositivo/doc-secreto": {
           perfil_id: "uid-secreto",
           token: "TOKEN-SECRETO",
+          plataforma: "android",
+          ativo: true,
         },
-        "usuarios/uid-secreto/tokens_dispositivo/doc-secreto": {
+        "usuarios/uid-secreto/tokens_dispositivo/TOKEN-SECRETO": {
           perfil_id: "uid-secreto",
           token: "OUTRO-TOKEN",
+          plataforma: "android",
+          ativo: true,
         },
       },
     },

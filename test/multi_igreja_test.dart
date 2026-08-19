@@ -540,6 +540,64 @@ void main() {
         expect(repositorio.privadaTemAssinatura, isFalse);
       },
     );
+
+    test('vínculo aprovado de outro UID nunca abre a fonte privada', () async {
+      SharedPreferences.setMockInitialValues({
+        'igreja_visualizada_id': olinda.valor,
+      });
+      final repositorio = _RepositorioIgrejasDinamico(olinda);
+      addTearDown(repositorio.dispose);
+
+      final c = ProviderContainer(
+        overrides: [
+          igrejasRepositoryProvider.overrideWithValue(repositorio),
+          usuarioAtualProvider.overrideWith(
+            (ref) => Stream.value(
+              UsuarioModel(
+                uid: 'uid-ana',
+                nome: 'Ana',
+                email: 'ana@exemplo.test',
+                telefone: '',
+                dataCadastro: DateTime(2026, 8, 1),
+                perfil: PerfilUsuario.membro,
+                status: StatusUsuario.aprovado,
+                igrejaPrincipalId: olinda.valor,
+              ),
+            ),
+          ),
+        ],
+      );
+      addTearDown(c.dispose);
+
+      while (!c.read(igrejaVisualizadaProvider).carregado) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      await c.read(usuarioAtualProvider.future);
+
+      final dadosPublicos = esperarDados(
+        c,
+        principal: false,
+        aceitar: (igreja) => igreja?.nome == 'Catálogo seguro',
+      );
+      await repositorio.esperarVinculo();
+      repositorio.vinculos.add(
+        VinculoIgreja(
+          uid: 'uid-usuario-anterior',
+          igrejaId: olinda,
+          status: StatusVinculo.aprovado,
+          perfil: PerfilComunitario.pastor,
+        ),
+      );
+      await repositorio.esperarCatalogo();
+      repositorio.catalogo.add(
+        IgrejaModel(id: olinda, nome: 'Catálogo seguro', ativa: true),
+      );
+
+      expect((await dadosPublicos)?.nome, 'Catálogo seguro');
+      expect(c.read(isMembroAprovadoAtualProvider), isFalse);
+      expect(c.read(autorizacaoAtualProvider)?.podeAcessarPainel, isFalse);
+      expect(repositorio.privadaTemAssinatura, isFalse);
+    });
   });
 }
 

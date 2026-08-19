@@ -163,7 +163,13 @@ class _ContribuirScreenState extends ConsumerState<ContribuirScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.isVisitor) {
+    // `isVisitor` é apenas apresentação; a autorização vem do vínculo atual.
+    // Isso fecha rotas antigas/deep links que abrem `/contribuir` sem marcar o
+    // chamador como visitante.
+    final membroAprovado = widget.isVisitor
+        ? false
+        : ref.watch(isMembroAprovadoAtualProvider);
+    if (!membroAprovado) {
       return const _ContribuicaoVisitanteBloqueada();
     }
 

@@ -3,11 +3,12 @@
 ## Escopo e Git
 
 - Projeto: `nova-alianca-app`
-- Worktree: `worktree-firebase-catalogo-p0`
-- Branch: `fix/firebase-catalogo-publico-p0`
+- Worktree: `worktree-integracao-release-p0`
+- Branch: `agent/firebase-catalogo-release-p0`
 - HEAD base: `6f0ffb06bd19`
-- Nenhum merge, push, `--apply`, deploy, build final ou upload foi feito. As
-  alterações serão consolidadas no único commit local deste checkpoint.
+- Versão Android preparada para o próximo artefato: `1.3.1+2011`.
+- Nenhum push, `--apply`, deploy, build final ou upload foi feito neste
+  checkpoint. As frentes Firebase e UI já estão integradas localmente.
 
 ## Auditoria remota somente leitura
 
@@ -58,7 +59,12 @@ O relatório técnico exibiu somente contagens e nomes de campos; nenhum valor,
 e-mail, token ou UID foi impresso.
 
 O preflight comprovou `tokens_dispositivo=11` e planejou todos os documentos
-para `usuarios/{uid}/tokens_dispositivo/{id}`. Também comprovou
+para `usuarios/{uid}/tokens_dispositivo/{token}`. O token validado é o mesmo ID
+canônico que o app grava e desativa no logout; IDs automáticos legados não são
+reutilizados e duplicatas do mesmo usuário/token são consolidadas sem reativar
+uma cópia já inativa. Um token associado a UIDs diferentes agora bloqueia o
+preflight inteiro, sem planejar destinos e sem expor token ou UID no erro.
+Também comprovou
 `configuracoes=0`; qualquer documento nessa coleção passa a bloquear o plano,
 pois ainda não existe contrato de destino seguro.
 
@@ -70,27 +76,31 @@ publicar uma chave potencialmente pessoal, o fluxo **Contribuir** do visitante
 agora mostra um bloqueio honesto; membros aprovados continuam usando o
 documento operacional privado.
 
+A revisão integrada também fechou dois caminhos de autorização no cliente:
+um vínculo só concede capacidade quando seu UID coincide com o usuário atual,
+e a tela de contribuição exige vínculo aprovado mesmo quando uma rota antiga a
+abre sem marcar explicitamente o visitante.
+
 ## Validação local
 
-- Scripts de migração/canários: 40/40.
+- Scripts de migração/canários: 42/42.
 - Functions (build + testes unitários): 92/92.
 - Functions no Firestore Emulator: 33/33, incluindo rollback de raiz,
   catálogo e auditoria quando o commit transacional falha.
 - Firestore/Storage Rules Emulator: 160/160.
-- Flutter direcionado (multi-igreja, onboarding, bootstrap fail-closed e
-  contribuição do visitante): 51/51.
-- `flutter analyze --no-pub lib`: sem problemas na passada final completa. Foi
-  usado somente um stub local ignorado do arquivo gerado de configuração; o
-  stub foi removido imediatamente e não entrou no Git.
-- Análise direcionada da alteração Flutter final e seu teste: sem problemas.
+- Flutter app completo: 327/327.
+- Painel web completo: 248/248.
+- Pacote central de domínio/autorização: 64/64.
+- Análise estática do app, painel e pacote central: sem problemas. No app, foi
+  usado somente um stub local sem credenciais para o `firebase_options.dart`
+  ignorado pelo Git; o stub foi removido imediatamente e não entrou no Git.
 - `node --check` dos seeds, aceite, fixtures e teste de catálogo: sem erros.
+- `npm audit --omit=dev`: 8 moderadas e 0 altas/críticas nas dependências de
+  produção das Functions/scripts; nenhuma atualização automática foi aplicada.
 - `git diff --check`: sem erros; apenas avisos informativos de LF/CRLF.
 
-O comando amplo `flutter analyze --no-pub` na raiz também percorre os projetos
-aninhados `admin_web` e `packages/nova_alianca_core`, que não têm
-`.dart_tool/package_config.json` neste worktree; por isso ele reporta erros de
-resolução desses pacotes. O app principal e os arquivos alterados foram
-analisados separadamente e estão limpos.
+Cada projeto Dart foi analisado no seu próprio diretório e com o próprio
+`package_config`, evitando falsos erros de resolução entre projetos aninhados.
 
 ## Operações reais ainda bloqueadas
 

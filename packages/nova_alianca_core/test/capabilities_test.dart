@@ -67,6 +67,22 @@ void main() {
   });
 
   group('acesso financeiro — negativas', () {
+    test('vínculo de outro UID nunca concede autorização', () {
+      final a = Autorizacao(
+        uid: 'usuario-atual',
+        igrejaId: IgrejaId.olinda,
+        vinculo: vinculo(
+          uid: 'usuario-anterior',
+          perfil: PerfilComunitario.pastor,
+        ),
+      );
+
+      expect(a.temVinculoAtivo, isFalse);
+      expect(a.podeAcessarPainel, isFalse);
+      expect(a.podeLerFinancas, isFalse);
+      expect(a.perfilEfetivo, PerfilComunitario.membro);
+    });
+
     test('editor NÃO lê finanças só por ser editor', () {
       final a = auth(vinculo(
         perfil: PerfilComunitario.membro,

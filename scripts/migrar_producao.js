@@ -539,6 +539,19 @@ function uidDestinoValido(valor) {
   );
 }
 
+function tokenDocumentoValido(valor) {
+  return (
+    typeof valor === "string" &&
+    valor.length >= 1 &&
+    valor === valor.trim() &&
+    !valor.includes("/") &&
+    valor !== "." &&
+    valor !== ".." &&
+    !/^__.*__$/.test(valor) &&
+    Buffer.byteLength(valor, "utf8") <= 1500
+  );
+}
+
 function planejarIgrejaPrincipal(
   plano,
   { caminho, caminhoSeguro, dadosAtuais, precondicao }
@@ -1122,24 +1135,79 @@ async function planejarTokensDispositivo(ctx, plano) {
   let criar = 0;
   let inalterados = 0;
   let conflitos = 0;
+  const grupos = new Map();
+  const uidsPorToken = new Map();
 
-  for (const doc of origem.docs) {
+  for (const doc of [...origem.docs].sort((a, b) => a.id.localeCompare(b.id))) {
     const d = doc.data() ?? {};
     const uid = d.perfil_id;
-    if (!uidDestinoValido(uid)) {
-      registrarConflito(plano, "tokens_dispositivo/{id}", ["perfil_id"]);
+    const token = d.token;
+    const camposInvalidos = [];
+    if (!uidDestinoValido(uid)) camposInvalidos.push("perfil_id");
+    if (!tokenDocumentoValido(token)) camposInvalidos.push("token");
+    if (typeof d.ativo !== "boolean") camposInvalidos.push("ativo");
+    if (typeof d.plataforma !== "string" || d.plataforma.trim() === "") {
+      camposInvalidos.push("plataforma");
+    }
+    if (camposInvalidos.length > 0) {
+      registrarConflito(plano, "tokens_dispositivo/{id}", camposInvalidos);
       conflitos++;
       continue;
     }
 
-    const caminho = `usuarios/${uid}/tokens_dispositivo/${doc.id}`;
+    const chave = JSON.stringify([uid, token]);
+    const grupo = grupos.get(chave) ?? { uid, token, documentos: [] };
+    grupo.documentos.push({ id: doc.id, dados: d });
+    grupos.set(chave, grupo);
+
+    const uids = uidsPorToken.get(token) ?? new Set();
+    uids.add(uid);
+    uidsPorToken.set(token, uids);
+  }
+
+  // Um token identifica uma instalação, portanto não pode permanecer associado
+  // a usuários diferentes. A ambiguidade é bloqueada antes de qualquer escrita
+  // e o conflito usa somente caminho/campo sanitizados.
+  const tokensCompartilhados = new Set();
+  for (const [token, uids] of uidsPorToken.entries()) {
+    if (uids.size <= 1) continue;
+    tokensCompartilhados.add(token);
+    registrarConflito(plano, "tokens_dispositivo/{id}", [
+      "token_compartilhado_entre_perfis",
+    ]);
+    conflitos++;
+  }
+
+  for (const grupo of grupos.values()) {
+    if (tokensCompartilhados.has(grupo.token)) continue;
+
+    const plataformas = new Set(
+      grupo.documentos.map((item) => item.dados.plataforma.trim())
+    );
+    if (plataformas.size !== 1) {
+      registrarConflito(plano, "tokens_dispositivo/{id}", ["plataforma"]);
+      conflitos++;
+      continue;
+    }
+
+    const base = grupo.documentos[0];
+    const caminho =
+      `usuarios/${grupo.uid}/tokens_dispositivo/${grupo.token}`;
     const snap = await ctx.obterDocumento(caminho);
     const resultado = planejarCriacaoDocumento(plano, {
       caminho,
       caminhoSeguro: "usuarios/{uid}/tokens_dispositivo/{id}",
       dados: {
-        ...d,
-        migrado_de: `tokens_dispositivo/${doc.id}`,
+        ...base.dados,
+        perfil_id: grupo.uid,
+        token: grupo.token,
+        plataforma: [...plataformas][0],
+        // Se qualquer cópia registra logout, a consolidação não pode reativar
+        // silenciosamente o mesmo aparelho.
+        ativo: grupo.documentos.every((item) => item.dados.ativo === true),
+        migrado_de: grupo.documentos.map(
+          (item) => `tokens_dispositivo/${item.id}`
+        ),
         migrado_em: ctx.admin.firestore.FieldValue.serverTimestamp(),
       },
       atual: snap.exists ? snap.data() ?? {} : undefined,

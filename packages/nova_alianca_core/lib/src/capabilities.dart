@@ -50,7 +50,7 @@ class Autorizacao {
   /// unidade seja usado por engano como autorização nesta.
   bool get temVinculoAtivo {
     final v = vinculo;
-    return v != null && v.isAtivo && v.igrejaId == igrejaId;
+    return v != null && v.uid == uid && v.isAtivo && v.igrejaId == igrejaId;
   }
 
   bool get _isLiderancaMinisterial =>

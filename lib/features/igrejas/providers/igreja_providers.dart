@@ -157,7 +157,9 @@ final igrejaAtualDadosProvider = Provider<AsyncValue<IgrejaModel?>>((ref) {
       .watch(vinculoAtualProvider)
       .when(
         data: (vinculo) => ref.watch(
-          vinculo?.isAtivo == true && vinculo?.igrejaId == id
+          vinculo?.uid == usuario.uid &&
+                  vinculo?.isAtivo == true &&
+                  vinculo?.igrejaId == id
               ? _igrejaPrivadaDadosProvider(id)
               : _igrejaCatalogoDadosProvider(id),
         ),
@@ -247,7 +249,9 @@ final igrejaPrincipalDadosProvider = Provider<AsyncValue<IgrejaModel?>>((ref) {
       .watch(vinculoPrincipalProvider)
       .when(
         data: (vinculo) => ref.watch(
-          vinculo?.isAtivo == true && vinculo?.igrejaId == id
+          vinculo?.uid == usuario.uid &&
+                  vinculo?.isAtivo == true &&
+                  vinculo?.igrejaId == id
               ? _igrejaPrivadaDadosProvider(id)
               : _igrejaCatalogoDadosProvider(id),
         ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nova_alianca_app/visual/screens/contribuir_screen.dart';
+import 'package:nova_alianca_app/features/igrejas/providers/igreja_providers.dart';
 import 'package:nova_alianca_app/visual/visual_router.dart';
 
 void main() {
@@ -10,11 +11,11 @@ void main() {
     (tester) async {
       await tester.pumpWidget(
         ProviderScope(
+          overrides: [isMembroAprovadoAtualProvider.overrideWithValue(false)],
           child: MaterialApp(
             initialRoute: VisualRoutes.contribuir,
             routes: {
-              VisualRoutes.contribuir: (_) =>
-                  const ContribuirScreen(isLeader: false, isVisitor: true),
+              ...visualRoutes,
               VisualRoutes.entraconta: (_) =>
                   const Scaffold(body: Center(child: Text('Tela de entrada'))),
             },
@@ -41,4 +42,20 @@ void main() {
       expect(find.text('Tela de entrada'), findsOneWidget);
     },
   );
+
+  testWidgets('membro aprovado mantém acesso ao formulário', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [isMembroAprovadoAtualProvider.overrideWithValue(true)],
+        child: const MaterialApp(home: ContribuirScreen(isLeader: false)),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('contribuicao_visitante_bloqueada')),
+      findsNothing,
+    );
+    expect(find.text('R\$ 0,00'), findsOneWidget);
+  });
 }
