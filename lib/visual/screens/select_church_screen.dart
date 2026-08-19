@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,7 +82,7 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
   }
 
   List<IgrejaOpcao> _filtrar(List<IgrejaOpcao> todas) {
-    final query = _normalize(_query);
+    final query = _normalize(_query.trim());
     if (query.isEmpty) return todas;
     return todas
         .where((church) => _normalize(church.buscavel).contains(query))
@@ -131,8 +132,6 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
                                 setState(() => _query = value);
                               },
                             ),
-                            SizedBox(height: 16 * scale),
-                            _LocationButton(scale: scale),
                             SizedBox(height: 24 * scale),
                             igrejasAsync.when(
                               loading: () => Padding(
@@ -143,14 +142,16 @@ class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
                                   child: CircularProgressIndicator(),
                                 ),
                               ),
-                              error: (erro, _) => _MensagemLista(
-                                scale: scale,
-                                titulo: 'Não foi possível carregar as igrejas',
-                                detalhe:
-                                    'Verifique sua conexão e tente novamente.',
-                                onTentarNovamente: () =>
-                                    ref.invalidate(igrejasAtivasProvider),
-                              ),
+                              error: (erro, _) {
+                                final mensagem = _mensagemParaErro(erro);
+                                return _MensagemLista(
+                                  scale: scale,
+                                  titulo: mensagem.titulo,
+                                  detalhe: mensagem.detalhe,
+                                  onTentarNovamente: () =>
+                                      ref.invalidate(igrejasAtivasProvider),
+                                );
+                              },
                               data: (igrejas) {
                                 final opcoes = igrejas
                                     .map(IgrejaOpcao.de)
@@ -368,10 +369,12 @@ class _SearchBox extends StatelessWidget {
           SizedBox(width: 22 * scale),
           Expanded(
             child: TextField(
+              key: const Key('select-church-search-field'),
               controller: controller,
               onChanged: onChanged,
               cursorColor: AuthColors.primary,
               textInputAction: TextInputAction.search,
+              maxLines: 1,
               style: GoogleFonts.inter(
                 fontSize: 16 * scale,
                 fontWeight: FontWeight.w400,
@@ -381,7 +384,15 @@ class _SearchBox extends StatelessWidget {
               decoration: InputDecoration(
                 isCollapsed: true,
                 border: InputBorder.none,
-                hintText: SelectChurchMockData.searchHint,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Nome ou endereço',
                 hintStyle: GoogleFonts.inter(
                   fontSize: 16 * scale,
                   fontWeight: FontWeight.w400,
@@ -398,41 +409,39 @@ class _SearchBox extends StatelessWidget {
   }
 }
 
-class _LocationButton extends StatelessWidget {
-  const _LocationButton({required this.scale});
+class _MensagemErroIgrejas {
+  const _MensagemErroIgrejas(this.titulo, this.detalhe);
 
-  final double scale;
+  final String titulo;
+  final String detalhe;
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 52 * scale,
-      decoration: BoxDecoration(
-        color: AuthColors.primary.withValues(alpha: 0.24),
-        borderRadius: BorderRadius.circular(8 * scale),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AuthAssetImage(
-            ChurchAssets.location,
-            width: 18.25 * scale,
-            height: 18.25 * scale,
-          ),
-          SizedBox(width: 8 * scale),
-          Text(
-            SelectChurchMockData.locationButton,
-            style: GoogleFonts.inter(
-              fontSize: 14 * scale,
-              fontWeight: FontWeight.w500,
-              height: 20 / 14,
-              color: AuthColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
+_MensagemErroIgrejas _mensagemParaErro(Object erro) {
+  if (erro is FirebaseException) {
+    switch (erro.code) {
+      case 'permission-denied':
+        return const _MensagemErroIgrejas(
+          'Lista de igrejas temporariamente indisponível',
+          'Não foi possível acessar a lista. Tente novamente e, se o problema '
+              'continuar, entre em contato com o suporte.',
+        );
+      case 'unavailable':
+        return const _MensagemErroIgrejas(
+          'Sem conexão com o serviço',
+          'Confirme sua conexão com a internet e tente novamente.',
+        );
+      case 'failed-precondition':
+        return const _MensagemErroIgrejas(
+          'Lista de igrejas em atualização',
+          'O serviço está sendo preparado. Tente novamente em alguns minutos.',
+        );
+    }
   }
+
+  return const _MensagemErroIgrejas(
+    'Não foi possível carregar as igrejas',
+    'Tente novamente. Se o problema continuar, entre em contato com o suporte.',
+  );
 }
 
 class _ChurchCard extends StatelessWidget {
