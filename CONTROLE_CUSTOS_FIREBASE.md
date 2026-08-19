@@ -105,16 +105,25 @@ Sem política de retenção, elas acumulam e passam a custar armazenamento.
 Depois do **primeiro** deploy de Functions:
 
 ```bash
-node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifacts:setpolicy --days 1 --project nova-alianca-app
+node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifacts:setpolicy --days 1 --location southamerica-east1 --project nova-alianca-app --force
 ```
+
+> **`--location` é obrigatório aqui.** O padrão do comando é `us-central1`, e
+> as Functions desta rede ficam em `southamerica-east1`. Sem a flag, a política
+> seria criada num repositório de artefatos vazio e o nosso continuaria
+> acumulando imagens.
 
 Confira a política aplicada logo em seguida:
 
 ```bash
-node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifacts:getpolicy --project nova-alianca-app
+node test_rules/node_modules/firebase-tools/lib/bin/firebase.js functions:artifacts:getpolicy --location southamerica-east1 --project nova-alianca-app
 ```
 
 Não use `--none`: isso desliga a limpeza.
+
+A CLI instalada no repositório (`test_rules/node_modules`) é a **13.35.1**, e
+já traz `functions:artifacts:setpolicy` com `--days` e `--location`. Não é
+necessário atualizar para a 14 só por causa deste comando.
 
 ## 6. Consumo do lado do cliente
 
