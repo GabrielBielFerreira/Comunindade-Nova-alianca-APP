@@ -315,6 +315,16 @@ async function esperaNegado(nome, promessa) {
   // ── Igrejas ────────────────────────────────────────────────────────
   console.log("\n[igrejas]");
 
+  const igrejaAceiteRef = db.doc("igrejas/unidade_teste_aceite");
+  const catalogoAceiteRef = db.doc("catalogo_igrejas/unidade_teste_aceite");
+
+  // Remove resíduos de uma execução anterior interrompida. Apagar apenas o
+  // documento raiz não remove a subcoleção de auditoria no Firestore.
+  await Promise.all([
+    db.recursiveDelete(igrejaAceiteRef),
+    catalogoAceiteRef.delete(),
+  ]);
+
   await esperaNegado(
     "pastor NAO cria unidade (so super_admin)",
     chamar("criarIgreja", tokens["pastor.olinda@teste.local"], {
@@ -331,13 +341,85 @@ async function esperaNegado(nome, promessa) {
     })
   );
 
-  const nova = await db.doc("igrejas/unidade_teste_aceite").get();
+  const [nova, novoCatalogo] = await Promise.all([
+    igrejaAceiteRef.get(),
+    catalogoAceiteRef.get(),
+  ]);
   if (nova.data()?.ativa === false && nova.data()?.configurada === false) {
     ok("unidade nova nasce inativa e nao configurada");
   } else {
     erro("unidade nova", `ativa=${nova.data()?.ativa} configurada=${nova.data()?.configurada}`);
   }
-  await db.doc("igrejas/unidade_teste_aceite").delete();
+  const camposPublicos = [
+    "nome",
+    "ativa",
+    "configurada",
+    "endereco",
+    "cidade_estado",
+    "endereco_secundario",
+    "slogan",
+    "cultos_recorrentes",
+    "instagram",
+    "youtube_url",
+    "pastores_publicos",
+  ];
+  if (!novoCatalogo.exists) {
+    erro("catalogo da unidade nova", "documento catalogo_igrejas ausente");
+  } else if (
+    JSON.stringify(Object.keys(novoCatalogo.data()).sort()) !==
+    JSON.stringify([...camposPublicos].sort())
+  ) {
+    erro(
+      "catalogo da unidade nova",
+      `campos inesperados: ${JSON.stringify(Object.keys(novoCatalogo.data()).sort())}`
+    );
+  } else if (
+    novoCatalogo.data().ativa !== false ||
+    novoCatalogo.data().configurada !== false
+  ) {
+    erro(
+      "catalogo da unidade nova",
+      `ativa=${novoCatalogo.data().ativa} configurada=${novoCatalogo.data().configurada}`
+    );
+  } else if (
+    novoCatalogo.data().endereco !== null ||
+    novoCatalogo.data().cidade_estado !== null ||
+    novoCatalogo.data().endereco_secundario !== null ||
+    novoCatalogo.data().slogan !== null ||
+    novoCatalogo.data().instagram !== null ||
+    novoCatalogo.data().youtube_url !== null ||
+    !Array.isArray(novoCatalogo.data().cultos_recorrentes) ||
+    novoCatalogo.data().cultos_recorrentes.length !== 0 ||
+    !Array.isArray(novoCatalogo.data().pastores_publicos) ||
+    novoCatalogo.data().pastores_publicos.length !== 0
+  ) {
+    erro("catalogo da unidade nova", "defaults públicos inesperados");
+  } else {
+    ok("catalogo publico nasce junto e com contrato exato");
+  }
+
+  await Promise.all([
+    db.recursiveDelete(igrejaAceiteRef),
+    catalogoAceiteRef.delete(),
+  ]);
+
+  const [igrejaAposLimpeza, catalogoAposLimpeza, auditoriaAposLimpeza] = await Promise.all([
+    igrejaAceiteRef.get(),
+    catalogoAceiteRef.get(),
+    igrejaAceiteRef.collection("auditoria").limit(1).get(),
+  ]);
+  if (
+    igrejaAposLimpeza.exists ||
+    catalogoAposLimpeza.exists ||
+    !auditoriaAposLimpeza.empty
+  ) {
+    erro(
+      "limpeza da unidade de aceite",
+      `raiz=${igrejaAposLimpeza.exists} catalogo=${catalogoAposLimpeza.exists} auditoria=${auditoriaAposLimpeza.size}`
+    );
+  } else {
+    ok("limpeza remove raiz, catalogo e auditoria para permitir rerun");
+  }
 
   console.log(`\n=== RESULTADO: ${passou} ok, ${falhou} falha(s) ===\n`);
   process.exit(falhou > 0 ? 1 : 0);

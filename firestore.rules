@@ -152,11 +152,26 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // IGREJAS
+    // CATÁLOGO PÚBLICO DE IGREJAS
+    //
+    // Projeção sanitizada usada antes do login. A consulta do cliente deve
+    // incluir `where('ativa', '==', true)`: o Firestore rejeita listagens que
+    // também poderiam retornar uma unidade inativa.
+    // ═══════════════════════════════════════════════════════════════════
+    match /catalogo_igrejas/{igrejaId} {
+      allow get, list: if resource.data.ativa == true;
+      allow create, update, delete: if false; // somente servidor
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // IGREJAS — DOCUMENTO INSTITUCIONAL PRIVADO E SUBCOLEÇÕES
     // ═══════════════════════════════════════════════════════════════════
     match /igrejas/{igrejaId} {
-      // Catálogo público: o app precisa listar unidades antes do login.
-      allow read: if true;
+      // O documento raiz pode conter UIDs administrativos, configuração de
+      // pagamentos e outros metadados internos. Um membro aprovado lê apenas
+      // a própria unidade; somente super_admin pode listar todas.
+      allow get: if isSuperAdmin() || isMembroDa(igrejaId);
+      allow list: if isSuperAdmin();
 
       // Criar/remover unidade é exclusivo do super_admin, via Function.
       allow create, delete: if false;

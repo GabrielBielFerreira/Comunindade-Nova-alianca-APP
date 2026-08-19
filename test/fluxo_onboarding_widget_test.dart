@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,7 @@ import 'package:nova_alianca_app/features/auth/data/usuario_model.dart';
 import 'package:nova_alianca_app/features/auth/providers/auth_provider.dart';
 import 'package:nova_alianca_app/core/services/notification_preferences.dart';
 import 'package:nova_alianca_app/features/igrejas/providers/igreja_providers.dart';
+import 'package:nova_alianca_app/features/igrejas/data/igrejas_repository.dart';
 import 'package:nova_alianca_app/visual/screens/home_leader_screen.dart';
 import 'package:nova_alianca_app/visual/screens/home_member_screen.dart';
 import 'package:nova_alianca_app/visual/screens/select_church_screen.dart';
@@ -63,8 +66,12 @@ void main() {
   /// Sessão ausente: o caminho do visitante.
   final semSessao = authStateProvider.overrideWith((ref) => Stream.value(null));
 
-  Override comIgrejas(List<IgrejaModel> lista) =>
-      igrejasAtivasProvider.overrideWith((ref) => Stream.value(lista));
+  Override comIgrejas(
+    List<IgrejaModel> lista, {
+    bool confirmadoNoServidor = true,
+  }) => igrejasRepositoryProvider.overrideWithValue(
+    _RepositorioCatalogoFixo(lista, confirmadoNoServidor: confirmadoNoServidor),
+  );
 
   Future<void> montar(WidgetTester tester, Widget widget) async {
     tester.view.devicePixelRatio = 1.0;
@@ -73,6 +80,18 @@ void main() {
 
     await tester.pumpWidget(widget);
     await tester.pumpAndSettle();
+  }
+
+  Future<void> bombearAte(
+    WidgetTester tester,
+    Finder alvo, {
+    int limite = 20,
+  }) async {
+    for (var tentativa = 0; tentativa < limite; tentativa++) {
+      await tester.pump();
+      if (alvo.evaluate().isNotEmpty) return;
+    }
+    throw TestFailure('Widget esperado não apareceu após $limite quadros.');
   }
 
   // ══════════════════════════════════════════════════════════════════
@@ -119,6 +138,102 @@ void main() {
       await montar(tester, app(overrides: [semSessao, comIgrejas(unidades)]));
 
       expect(find.byType(SelectChurchScreen), findsNothing);
+      expect(find.byType(WelcomeAccessScreen), findsOneWidget);
+    });
+
+    testWidgets('preferência de unidade desativada é limpa e volta à seleção', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'igreja_visualizada_id': 'petrolina',
+      });
+
+      await montar(
+        tester,
+        app(
+          overrides: [
+            semSessao,
+            comIgrejas([unidades.first]),
+          ],
+        ),
+      );
+
+      expect(find.byType(SelectChurchScreen), findsOneWidget);
+      expect(find.byType(WelcomeAccessScreen), findsNothing);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('igreja_visualizada_id'), isNull);
+    });
+
+    testWidgets('cache vazio offline preserva a preferência local', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'igreja_visualizada_id': 'petrolina',
+      });
+
+      await montar(
+        tester,
+        app(
+          overrides: [
+            semSessao,
+            comIgrejas(const [], confirmadoNoServidor: false),
+          ],
+        ),
+      );
+
+      expect(find.byType(SelectChurchScreen), findsNothing);
+      expect(find.textContaining('Não foi possível confirmar'), findsOneWidget);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('igreja_visualizada_id'), 'petrolina');
+    });
+
+    testWidgets('desativação posterior limpa a escolha sem reiniciar o app', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({
+        'igreja_visualizada_id': 'petrolina',
+      });
+      final catalogo = StreamController<CatalogoIgrejasAtivas>.broadcast(
+        sync: true,
+      );
+      addTearDown(catalogo.close);
+
+      await tester.pumpWidget(
+        app(
+          overrides: [
+            semSessao,
+            igrejasRepositoryProvider.overrideWithValue(
+              _RepositorioCatalogoDinamico(catalogo, [unidades.first]),
+            ),
+          ],
+        ),
+      );
+      for (
+        var tentativa = 0;
+        tentativa < 20 && !catalogo.hasListener;
+        tentativa++
+      ) {
+        await tester.pump();
+      }
+      expect(catalogo.hasListener, isTrue);
+      catalogo.add(
+        CatalogoIgrejasAtivas(igrejas: unidades, confirmadoNoServidor: true),
+      );
+      await bombearAte(tester, find.byType(WelcomeAccessScreen));
+      expect(find.byType(WelcomeAccessScreen), findsOneWidget);
+
+      catalogo.add(
+        CatalogoIgrejasAtivas(
+          igrejas: [unidades.first],
+          confirmadoNoServidor: true,
+        ),
+      );
+      await bombearAte(tester, find.byType(SelectChurchScreen));
+
+      expect(find.byType(SelectChurchScreen), findsOneWidget);
+      expect(find.byType(WelcomeAccessScreen), findsNothing);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('igreja_visualizada_id'), isNull);
     });
 
     testWidgets('sem unidade ativa, o estado vazio é honesto', (tester) async {
@@ -669,6 +784,43 @@ void main() {
       },
     );
   });
+}
+
+class _RepositorioCatalogoFixo implements IgrejasRepository {
+  _RepositorioCatalogoFixo(this.igrejas, {required this.confirmadoNoServidor});
+
+  final List<IgrejaModel> igrejas;
+  final bool confirmadoNoServidor;
+
+  @override
+  Stream<List<IgrejaModel>> streamAtivas() => Stream.value(igrejas);
+
+  @override
+  Stream<CatalogoIgrejasAtivas> streamAtivasComMetadados() => Stream.value(
+    CatalogoIgrejasAtivas(
+      igrejas: igrejas,
+      confirmadoNoServidor: confirmadoNoServidor,
+    ),
+  );
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RepositorioCatalogoDinamico implements IgrejasRepository {
+  _RepositorioCatalogoDinamico(this.catalogo, this.igrejasParaSelecao);
+
+  final StreamController<CatalogoIgrejasAtivas> catalogo;
+  final List<IgrejaModel> igrejasParaSelecao;
+
+  @override
+  Stream<List<IgrejaModel>> streamAtivas() => Stream.value(igrejasParaSelecao);
+
+  @override
+  Stream<CatalogoIgrejasAtivas> streamAtivasComMetadados() => catalogo.stream;
+
+  @override
+  noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
 /// Observa as inscricoes de topico sem precisar do Firebase.

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/root_gate.dart';
+import 'app/firebase_initialization_error_app.dart';
 import 'core/config/ambiente.dart';
 import 'core/services/navigation_service.dart';
 import 'core/theme/app_theme.dart';
@@ -45,9 +46,8 @@ Future<void> main() async {
     ),
   );
 
-  // Firebase é obrigatório em produção. Enquanto google-services.json /
-  // firebase_options.dart não estiverem configurados, a inicialização falha —
-  // o app ainda abre (degradado) e o RootGate exibe a tela pública.
+  // Firebase é obrigatório. Sem configuração válida não é seguro montar o
+  // RootGate: seus serviços pressupõem que o app Firebase já existe.
   try {
     final opcoes = DefaultFirebaseOptions.currentPlatform;
 
@@ -66,10 +66,24 @@ Future<void> main() async {
       await conectarAoEmulador();
       debugPrint('Firebase conectado ao EMULADOR (${HostsEmulador.host}).');
     }
+  } catch (erro, stackTrace) {
+    if (kDebugMode) {
+      debugPrint('Falha ao inicializar o Firebase: $erro');
+      debugPrintStack(stackTrace: stackTrace);
+    } else {
+      // Nunca inclua a exceção/configuração bruta no log de um build release.
+      debugPrint('Falha ao inicializar serviços essenciais.');
+    }
+    runApp(const FirebaseInitializationErrorApp());
+    return;
+  }
 
+  // Mensageria e relatório de erros são integrações observacionais: uma falha
+  // nelas não deve bloquear um app cujo Firebase principal já foi inicializado
+  // com sucesso.
+  try {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Relatório de erros em produção (desligado em modo debug para não poluir).
     final crashlytics = FirebaseCrashlytics.instance;
     await crashlytics.setCrashlyticsCollectionEnabled(!kDebugMode);
 
@@ -81,8 +95,13 @@ Future<void> main() async {
       crashlytics.recordError(error, stack, fatal: true);
       return true;
     };
-  } catch (e) {
-    debugPrint('Falha ao inicializar o Firebase: $e');
+  } catch (erro, stackTrace) {
+    if (kDebugMode) {
+      debugPrint('Falha ao configurar o Crashlytics: $erro');
+      debugPrintStack(stackTrace: stackTrace);
+    } else {
+      debugPrint('Falha ao configurar o relatório de erros.');
+    }
   }
 
   runApp(const ProviderScope(child: NovaAliancaApp()));

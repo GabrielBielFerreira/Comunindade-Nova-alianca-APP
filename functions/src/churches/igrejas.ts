@@ -7,34 +7,129 @@
  */
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { FieldValue, REGIAO, db } from "../firebase";
-import { writeAuditLog } from "../audit/audit";
+import { writeAuditLogTx } from "../audit/audit";
 import { requireChurchPastor, requireSuperAdmin } from "../authorization/guards";
 import { validarIgrejaId } from "../dominio/tipos";
+import { projetarCatalogoPublico } from "./catalogoPublico";
 
 const opcoes = { region: REGIAO } as const;
 
-/** Campos institucionais editáveis. Ausência = "não configurado". */
-const CAMPOS_INSTITUCIONAIS = [
-  "pastor_responsavel",
-  "endereco",
-  "cidade_estado",
-  "cep",
-  "telefone",
-  "instagram",
-  "pix_chave",
-  "pix_tipo",
-] as const;
+type ValorInstitucional = string | null | string[];
+type DadosInstitucionais = Record<string, ValorInstitucional>;
 
-function extrairInstitucionais(bruto: unknown): Record<string, string | null> {
-  const entrada = (bruto ?? {}) as Record<string, unknown>;
-  const saida: Record<string, string | null> = {};
-  for (const campo of CAMPOS_INSTITUCIONAIS) {
+/**
+ * Allowlist de edição da raiz privada. Campos financeiros/contato existentes
+ * continuam operacionais, mas a projeção pública decide separadamente o que
+ * pode sair em `catalogo_igrejas`.
+ */
+export const LIMITES_CAMPOS_TEXTO = Object.freeze({
+  pastor_responsavel: 120,
+  endereco: 300,
+  cidade_estado: 120,
+  endereco_secundario: 300,
+  slogan: 240,
+  cep: 16,
+  telefone: 32,
+  instagram: 120,
+  youtube_url: 500,
+  pix_chave: 180,
+  pix_tipo: 32,
+});
+
+export const LIMITES_CAMPOS_LISTA = Object.freeze({
+  cultos_recorrentes: { itens: 20, caracteresPorItem: 160 },
+  pastores_publicos: { itens: 20, caracteresPorItem: 120 },
+});
+
+const CAMPOS_INSTITUCIONAIS = new Set([
+  ...Object.keys(LIMITES_CAMPOS_TEXTO),
+  ...Object.keys(LIMITES_CAMPOS_LISTA),
+]);
+
+function erroInstitucional(mensagem: string): never {
+  throw new HttpsError("invalid-argument", mensagem);
+}
+
+function comoEntradaInstitucional(bruto: unknown): Record<string, unknown> {
+  if (bruto === undefined || bruto === null) return {};
+  if (typeof bruto !== "object" || Array.isArray(bruto)) {
+    return erroInstitucional("Dados institucionais devem ser um objeto.");
+  }
+  const entrada = bruto as Record<string, unknown>;
+  if (Object.keys(entrada).some((campo) => !CAMPOS_INSTITUCIONAIS.has(campo))) {
+    return erroInstitucional("Há campos institucionais não permitidos.");
+  }
+  return entrada;
+}
+
+/** Sanitiza estritamente o payload usado tanto em criar quanto em atualizar. */
+export function extrairInstitucionais(bruto: unknown): DadosInstitucionais {
+  const entrada = comoEntradaInstitucional(bruto);
+  const saida: DadosInstitucionais = {};
+
+  for (const [campo, limite] of Object.entries(LIMITES_CAMPOS_TEXTO)) {
     const valor = entrada[campo];
     if (valor === undefined) continue;
-    const texto = String(valor ?? "").trim();
+    if (valor === null) {
+      saida[campo] = null;
+      continue;
+    }
+    if (typeof valor !== "string") {
+      erroInstitucional("Campo institucional de texto inválido.");
+    }
+    const texto = valor.trim();
+    if (texto.length > limite) {
+      erroInstitucional("Campo institucional excede o limite permitido.");
+    }
     saida[campo] = texto.length > 0 ? texto : null;
   }
+
+  for (const [campo, limite] of Object.entries(LIMITES_CAMPOS_LISTA)) {
+    const valor = entrada[campo];
+    if (valor === undefined) continue;
+    if (valor === null) {
+      saida[campo] = [];
+      continue;
+    }
+    if (!Array.isArray(valor) || valor.length > limite.itens) {
+      erroInstitucional("Lista institucional inválida ou acima do limite.");
+    }
+    const itens: string[] = [];
+    for (const item of valor) {
+      if (typeof item !== "string") {
+        erroInstitucional("Lista institucional contém item inválido.");
+      }
+      const texto = item.trim();
+      if (texto.length > limite.caracteresPorItem) {
+        erroInstitucional("Item institucional excede o limite permitido.");
+      }
+      if (texto.length > 0 && !itens.includes(texto)) itens.push(texto);
+    }
+    saida[campo] = itens;
+  }
+
   return saida;
+}
+
+export function temDadosInstitucionais(dados: Record<string, unknown>): boolean {
+  return Object.entries(dados).some(
+    ([campo, valor]) =>
+      CAMPOS_INSTITUCIONAIS.has(campo) &&
+      (Array.isArray(valor)
+        ? valor.length > 0
+        : typeof valor === "string" && valor.trim().length > 0)
+  );
+}
+
+export function mesclarInstitucionais(
+  atuais: unknown,
+  alteracoes: unknown
+): Record<string, unknown> {
+  const base =
+    typeof atuais === "object" && atuais !== null && !Array.isArray(atuais)
+      ? (atuais as Record<string, unknown>)
+      : {};
+  return { ...base, ...extrairInstitucionais(alteracoes) };
 }
 
 function exigirNome(bruto: unknown): string {
@@ -60,17 +155,25 @@ export const criarIgreja = onCall(opcoes, async (request) => {
 
   const nome = exigirNome(request.data?.nome);
   const ref = db.doc(`igrejas/${igrejaId}`);
+  const catalogoRef = db.doc(`catalogo_igrejas/${igrejaId}`);
 
   const criada = await db.runTransaction(async (tx) => {
     const existente = await tx.get(ref);
+    const catalogoExistente = await tx.get(catalogoRef);
     if (existente.exists) {
       throw new HttpsError("already-exists", "Já existe uma unidade com este identificador.");
     }
+    if (catalogoExistente.exists) {
+      throw new HttpsError(
+        "already-exists",
+        "Já existe uma entrada de catálogo com este identificador. Nenhuma unidade foi criada."
+      );
+    }
 
     const institucionais = extrairInstitucionais(request.data?.dados_institucionais);
-    const temAlgumDado = Object.values(institucionais).some((v) => v !== null);
+    const temAlgumDado = temDadosInstitucionais(institucionais);
 
-    tx.set(ref, {
+    const novaIgreja = {
       nome,
       slug: igrejaId,
       // Unidade nova entra desligada e não configurada, de propósito.
@@ -81,17 +184,19 @@ export const criarIgreja = onCall(opcoes, async (request) => {
       criado_em: FieldValue.serverTimestamp(),
       atualizado_em: FieldValue.serverTimestamp(),
       criado_por: chamador.uid,
+    };
+
+    tx.set(ref, novaIgreja);
+    tx.set(catalogoRef, projetarCatalogoPublico(novaIgreja));
+    writeAuditLogTx(tx, {
+      igrejaId,
+      acao: "criar_igreja",
+      autorUid: chamador.uid,
+      autorSuperAdmin: true,
+      depois: { nome, ativa: false, configurada: temAlgumDado },
     });
 
     return { igrejaId, nome };
-  });
-
-  await writeAuditLog({
-    igrejaId,
-    acao: "criar_igreja",
-    autorUid: chamador.uid,
-    autorSuperAdmin: true,
-    depois: { nome, ativa: false, configurada: false },
   });
 
   return { ok: true, ...criada };
@@ -100,6 +205,7 @@ export const criarIgreja = onCall(opcoes, async (request) => {
 export const atualizarIgreja = onCall(opcoes, async (request) => {
   const ctx = await requireChurchPastor(request, request.data?.igrejaId);
   const ref = db.doc(`igrejas/${ctx.igrejaId}`);
+  const catalogoRef = db.doc(`catalogo_igrejas/${ctx.igrejaId}`);
 
   // Ativar/desativar uma unidade é decisão de rede, não da própria unidade.
   const querAlterarAtiva = request.data?.ativa !== undefined;
@@ -118,13 +224,11 @@ export const atualizarIgreja = onCall(opcoes, async (request) => {
     const antes = snap.data() ?? {};
 
     const institucionais = extrairInstitucionais(request.data?.dados_institucionais);
-    const mesclados = {
-      ...((antes.dados_institucionais as Record<string, unknown>) ?? {}),
-      ...institucionais,
-    };
-    const temAlgumDado = Object.values(mesclados).some(
-      (v) => v !== null && v !== undefined && String(v).trim() !== ""
+    const mesclados = mesclarInstitucionais(
+      antes.dados_institucionais,
+      request.data?.dados_institucionais
     );
+    const temAlgumDado = temDadosInstitucionais(mesclados);
 
     const alteracoes: Record<string, unknown> = {
       dados_institucionais: mesclados,
@@ -139,15 +243,23 @@ export const atualizarIgreja = onCall(opcoes, async (request) => {
       alteracoes.ativa = request.data?.ativa === true;
     }
 
-    tx.update(ref, alteracoes);
-  });
+    const depois = {
+      ...antes,
+      ...alteracoes,
+      dados_institucionais: mesclados,
+    };
 
-  await writeAuditLog({
-    igrejaId: ctx.igrejaId,
-    acao: "atualizar_igreja",
-    autorUid: ctx.uid,
-    autorSuperAdmin: ctx.isSuperAdmin,
-    detalhes: { campos: Object.keys(extrairInstitucionais(request.data?.dados_institucionais)) },
+    tx.update(ref, alteracoes);
+    // `set` sem merge substitui qualquer documento antigo e mantém somente a
+    // projeção pública explicitamente permitida.
+    tx.set(catalogoRef, projetarCatalogoPublico(depois));
+    writeAuditLogTx(tx, {
+      igrejaId: ctx.igrejaId,
+      acao: "atualizar_igreja",
+      autorUid: ctx.uid,
+      autorSuperAdmin: ctx.isSuperAdmin,
+      detalhes: { campos: Object.keys(institucionais) },
+    });
   });
 
   return { ok: true, igrejaId: ctx.igrejaId };

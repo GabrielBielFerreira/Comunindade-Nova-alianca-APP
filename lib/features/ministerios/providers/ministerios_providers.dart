@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../../../core/data/igreja_scope.dart';
 import '../../avisos/data/ministerio_model.dart';
@@ -17,8 +16,9 @@ final ministeriosProvider = StreamProvider.autoDispose<List<MinisterioModel>>((
   ref,
 ) {
   if (ref.watch(igrejaScopeProvider) == null) return Stream.value(const []);
-  final vinculo = ref.watch(vinculoAtualProvider).valueOrNull;
-  final aprovado = vinculo?.status == StatusVinculo.aprovado;
+  // Inclui a validação do IgrejaId para não reaproveitar o vínculo anterior
+  // enquanto o stream da nova unidade ainda está carregando.
+  final aprovado = ref.watch(isMembroAprovadoAtualProvider);
   final repo = ref.watch(ministeriosRepositoryProvider);
   return aprovado ? repo.stream() : repo.streamPublicos();
 });
@@ -39,8 +39,9 @@ final meuMinisterioProvider = FutureProvider.autoDispose<MinisterioModel?>((
 ) async {
   if (ref.watch(igrejaScopeProvider) == null) return null;
 
-  final vinculo = ref.watch(vinculoAtualProvider).valueOrNull;
-  final ids = vinculo?.ministerioIds ?? const <String>[];
+  final autorizacao = ref.watch(autorizacaoAtualProvider);
+  if (autorizacao?.temVinculoAtivo != true) return null;
+  final ids = autorizacao!.vinculo!.ministerioIds;
   if (ids.isEmpty) return null;
 
   return ref.watch(ministeriosRepositoryProvider).obter(ids.first);

@@ -52,7 +52,7 @@ const resultado = spawnSync(
     "firestore",
     "--project",
     PROJETO,
-    "node --test --test-concurrency=1 test/transferencia.test.js test/pedido_oracao_urgente.test.js",
+    "node --test --test-concurrency=1 test/igrejas_transacao.test.js test/transferencia.test.js test/pedido_oracao_urgente.test.js",
   ],
   { cwd: RAIZ_FUNCTIONS, stdio: "inherit" }
 );

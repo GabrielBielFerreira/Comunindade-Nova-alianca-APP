@@ -31,7 +31,12 @@ enum StatusMercadoPago {
       };
 }
 
-/// Uma unidade da rede: o documento `/igrejas/{igrejaId}`.
+/// Uma unidade da rede.
+///
+/// Pode ser hidratada pelo catálogo público sanitizado
+/// `/catalogo_igrejas/{igrejaId}` ou, em contexto administrativo autorizado,
+/// pelo documento operacional privado `/igrejas/{igrejaId}`. Campos ausentes
+/// no catálogo permanecem nulos; nenhum fallback inventa dados.
 ///
 /// Campos institucionais são deliberadamente opcionais. Uma unidade recém
 /// cadastrada aparece como "não configurada" em vez de exibir dado inventado.

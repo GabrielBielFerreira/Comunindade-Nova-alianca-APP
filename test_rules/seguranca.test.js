@@ -295,8 +295,9 @@ describe("CONTEÚDO público e restrito", () => {
     );
   });
 
-  test("catálogo de igrejas é legível sem login (seleção de unidade)", async () => {
-    await assertSucceeds(anon().doc(`igrejas/${OLINDA}`).get());
+  test("somente o catálogo sanitizado é legível sem login", async () => {
+    await assertSucceeds(anon().doc(`catalogo_igrejas/${OLINDA}`).get());
+    await assertFails(anon().doc(`igrejas/${OLINDA}`).get());
   });
 
   test("ninguém altera a configuração da igreja pelo cliente", async () => {

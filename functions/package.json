@@ -11,7 +11,8 @@
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "npm run build && node --test test/limites_custo.test.js && node test/comEmulador.js",
+    "test": "npm run test:unit && node test/comEmulador.js",
+    "test:unit": "npm run build && node --test test/limites_custo.test.js test/catalogo_publico.test.js",
     "test:limites": "npm run build && node --test test/limites_custo.test.js",
     "test:comEmuladorNoAr": "npm run build && node --test test/transferencia.test.js"
   },

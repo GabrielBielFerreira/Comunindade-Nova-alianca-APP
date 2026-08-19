@@ -107,7 +107,53 @@ class RootGate extends ConsumerWidget {
             return const SelectChurchScreen(modo: ModoSelecaoIgreja.onboarding);
           }
 
-          return const WelcomeAccessScreen();
+          // Uma preferência local não é prova de que a unidade continua
+          // pública. O catálogo contém somente unidades ativas; validar pela
+          // lista evita consultar diretamente um documento que acabou de ser
+          // desativado (essa leitura é negada pelas Rules).
+          final catalogoAtivo = ref.watch(catalogoIgrejasAtivasProvider);
+          return catalogoAtivo.when(
+            loading: () => const SplashScreen(),
+            error: (_, _) => SplashScreen(
+              mensagem:
+                  'Não foi possível verificar as igrejas disponíveis. '
+                  'Verifique sua conexão e tente novamente.',
+              onTentarNovamente: () =>
+                  ref.invalidate(catalogoIgrejasAtivasProvider),
+            ),
+            data: (catalogo) {
+              final idSalvo = preferencia.id!;
+              final continuaAtiva = catalogo.igrejas.any(
+                (igreja) => igreja.id == idSalvo && igreja.ativa,
+              );
+              if (!continuaAtiva && !catalogo.confirmadoNoServidor) {
+                // Cache local ausente/vazio não confirma desativação. Mantém a
+                // preferência e oferece nova tentativa quando a rede voltar.
+                return SplashScreen(
+                  mensagem:
+                      'Não foi possível confirmar a igreja selecionada. '
+                      'Verifique sua conexão e tente novamente.',
+                  onTentarNovamente: () =>
+                      ref.invalidate(catalogoIgrejasAtivasProvider),
+                );
+              }
+              if (!continuaAtiva) {
+                // A mutação ocorre depois deste build e só apaga o mesmo ID
+                // que foi validado. Um callback atrasado não remove uma nova
+                // escolha feita pela pessoa.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!context.mounted) return;
+                  final atual = ref.read(igrejaVisualizadaProvider);
+                  if (atual.id == idSalvo) {
+                    ref.read(igrejaVisualizadaProvider.notifier).limpar();
+                  }
+                });
+                return const SplashScreen();
+              }
+
+              return const WelcomeAccessScreen();
+            },
+          );
         }
 
         final usuarioAsync = ref.watch(usuarioAtualProvider);
