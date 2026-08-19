@@ -10,15 +10,16 @@ import 'package:image_picker/image_picker.dart';
 import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/perfil/providers/perfil_providers.dart';
-import '../profile_photo_notifier.dart';
+import '../../features/perfil/data/foto_perfil_repository.dart';
+import '../../features/perfil/providers/foto_perfil_provider.dart';
 import '../widgets/internal_header.dart';
 import '../escala_tela.dart';
 
 /// Tela "Dados pessoais" — versão digital da ficha cadastral.
 ///
 /// Carrega e salva os dados no Firestore (`usuarios/{uid}.dados_pessoais`).
-/// A foto é mantida localmente por enquanto (upload ao Firebase Storage
-/// depende do plano Blaze — ver STATUS_FINAL_CNA_APP.md).
+/// A foto vai para o Firebase Storage em `perfil/{uid}/avatar` e a URL fica
+/// em `usuarios/{uid}.foto_url` — ver [FotoPerfilRepository].
 class DadosPessoaisScreen extends ConsumerStatefulWidget {
   const DadosPessoaisScreen({super.key});
 
@@ -57,8 +58,10 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
   bool get _isLider => _ehLider == _sim;
 
   // ---------- Foto de perfil ----------
+  //
+  // A foto persistida vem de `fotoPerfilUrlProvider`; o arquivo local só
+  // existe enquanto o upload acontece.
   final _picker = ImagePicker();
-  File? _profileImage;
 
   // ---------- Endereço (preenchido pelo ViaCEP) ----------
   final _cepController = TextEditingController();
@@ -93,7 +96,6 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
   @override
   void initState() {
     super.initState();
-    _profileImage = profilePhotoNotifier.value;
     _cepFocus.addListener(() {
       if (!_cepFocus.hasFocus) {
         _buscarCep(_cepController.text);
@@ -137,8 +139,11 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
     final usuario = ref.read(usuarioProvider);
     if (usuario == null) return;
     try {
-      final dados = await ref.read(perfilRepositoryProvider).carregar(usuario.uid);
-      final dp = (dados['dados_pessoais'] as Map?)?.cast<String, dynamic>() ??
+      final dados = await ref
+          .read(perfilRepositoryProvider)
+          .carregar(usuario.uid);
+      final dp =
+          (dados['dados_pessoais'] as Map?)?.cast<String, dynamic>() ??
           <String, dynamic>{};
       if (!mounted) return;
       setState(() {
@@ -191,7 +196,9 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
     }
     setState(() => _saving = true);
     try {
-      await ref.read(perfilRepositoryProvider).salvar(
+      await ref
+          .read(perfilRepositoryProvider)
+          .salvar(
             usuario.uid,
             nome: _nomeCtrl.text.trim(),
             telefone: _telefoneCtrl.text.trim(),
@@ -237,27 +244,44 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
   }
 
   Future<void> _pickImage() async {
-    try {
-      final picked = await _picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 512,
-      );
-      if (picked == null) return;
+    final uid = ref.read(usuarioAtualProvider).valueOrNull?.uid;
+    if (uid == null) {
+      _showMessage('Entre na sua conta para trocar a foto.');
+      return;
+    }
 
-      final file = File(picked.path);
-      if (!mounted) return;
-      setState(() => _profileImage = file);
-      profilePhotoNotifier.value = file;
+    final XFile? picked;
+    try {
+      // O próprio seletor reduz e recomprime: evita subir 8 MB de câmera
+      // para exibir um avatar de 104 px.
+      picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: FotoPerfilRepository.ladoMaximo.toDouble(),
+        maxHeight: FotoPerfilRepository.ladoMaximo.toDouble(),
+        imageQuality: FotoPerfilRepository.qualidade,
+      );
     } catch (_) {
       _showMessage('Não foi possível abrir a galeria');
+      return;
+    }
+    if (picked == null) return;
+
+    final enviado = await ref
+        .read(fotoPerfilProvider.notifier)
+        .enviar(uid: uid, arquivo: File(picked.path));
+
+    if (!mounted) return;
+    if (enviado) {
+      _showMessage('Foto atualizada.');
+    } else {
+      _showMessage(
+        ref.read(fotoPerfilProvider).erro ?? 'Não foi possível enviar a foto.',
+      );
     }
   }
 
@@ -354,10 +378,7 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
             },
           ),
         ),
-        bottomNavigationBar: _SaveBar(
-          onSave: _salvar,
-          saving: _saving,
-        ),
+        bottomNavigationBar: _SaveBar(onSave: _salvar, saving: _saving),
       ),
     );
   }
@@ -370,7 +391,9 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         Center(
           child: _AvatarPicker(
             scale: scale,
-            image: _profileImage,
+            preview: ref.watch(fotoPerfilProvider).previewLocal,
+            url: ref.watch(fotoPerfilUrlProvider),
+            enviando: ref.watch(fotoPerfilProvider).enviando,
             onTap: _pickImage,
           ),
         ),
@@ -379,11 +402,7 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         // ================= Bloco 1: Dados básicos =================
         _SectionTitle('Dados básicos', scale: scale),
         SizedBox(height: 16 * scale),
-        _FormTextField(
-          label: 'Nome *',
-          scale: scale,
-          controller: _nomeCtrl,
-        ),
+        _FormTextField(label: 'Nome *', scale: scale, controller: _nomeCtrl),
         _FormTextField(
           label: 'Sobrenome *',
           scale: scale,
@@ -434,10 +453,12 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         // ================= Bloco 2: Vida eclesiástica =================
         _SectionTitle('Vida eclesiástica', scale: scale),
         SizedBox(height: 16 * scale),
-        // Igreja do VINCULO da pessoa, nao um nome fixo.
+        // Igreja do VÍNCULO OFICIAL — nunca a unidade apenas visualizada.
+        // Quem é de Olinda e está visitando Petrolina continua vendo Olinda
+        // aqui, porque este campo afirma vínculo, não contexto de leitura.
         _LinkedChurchField(
           scale: scale,
-          church: ref.watch(nomeIgrejaEmFocoProvider),
+          church: ref.watch(nomeIgrejaPrincipalProvider),
         ),
         SizedBox(height: 18 * scale),
         _DropdownField(
@@ -456,9 +477,10 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         ),
         if (_isCasado) ...[
           _FormTextField(
-              label: 'Nome do cônjuge',
-              scale: scale,
-              controller: _conjugeNomeCtrl),
+            label: 'Nome do cônjuge',
+            scale: scale,
+            controller: _conjugeNomeCtrl,
+          ),
           _RadioField(
             label: 'Cônjuge é cristão?',
             scale: scale,
@@ -480,14 +502,14 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
             scale: scale,
             value: _batizadoNestaIgreja,
             options: _simNao,
-            onChanged: (value) =>
-                setState(() => _batizadoNestaIgreja = value),
+            onChanged: (value) => setState(() => _batizadoNestaIgreja = value),
           ),
           if (_batizadoFora)
             _FormTextField(
-                label: 'Qual igreja?',
-                scale: scale,
-                controller: _qualIgrejaCtrl),
+              label: 'Qual igreja?',
+              scale: scale,
+              controller: _qualIgrejaCtrl,
+            ),
           _FormTextField(
             label: 'Data de batismo ou quantos anos faz',
             scale: scale,
@@ -532,9 +554,10 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         ),
         if (_isLider)
           _FormTextField(
-              label: 'De qual grupo?',
-              scale: scale,
-              controller: _qualGrupoCtrl),
+            label: 'De qual grupo?',
+            scale: scale,
+            controller: _qualGrupoCtrl,
+          ),
         SizedBox(height: 12 * scale),
 
         // ================= Bloco 3: Ocupação =================
@@ -552,11 +575,13 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
             'Aposentado',
             'Estudante',
           ],
-          onChanged: (value) =>
-              setState(() => _situacaoProfissional = value),
+          onChanged: (value) => setState(() => _situacaoProfissional = value),
         ),
         _FormTextField(
-            label: 'Profissão', scale: scale, controller: _profissaoCtrl),
+          label: 'Profissão',
+          scale: scale,
+          controller: _profissaoCtrl,
+        ),
         SizedBox(height: 12 * scale),
 
         // ================= Bloco 4: Endereço =================
@@ -668,44 +693,91 @@ class _MaskTextInputFormatter extends TextInputFormatter {
   }
 }
 
+/// Avatar da ficha cadastral.
+///
+/// Ordem de precedência: o arquivo local (enquanto o upload acontece), depois
+/// a foto já persistida e, por último, o ícone. Se a rede cair no meio, o
+/// preview é descartado e a foto anterior volta — nunca fica um preview
+/// mentindo que a troca deu certo.
 class _AvatarPicker extends StatelessWidget {
   const _AvatarPicker({
     required this.scale,
-    required this.image,
+    required this.preview,
+    required this.url,
+    required this.enviando,
     required this.onTap,
   });
 
   final double scale;
-  final File? image;
+  final File? preview;
+  final String? url;
+  final bool enviando;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final lado = 104 * scale;
+
+    Widget conteudo;
+    if (preview != null) {
+      conteudo = ClipOval(
+        child: Image.file(
+          preview!,
+          width: lado,
+          height: lado,
+          fit: BoxFit.cover,
+        ),
+      );
+    } else if (url != null) {
+      conteudo = ClipOval(
+        child: Image.network(
+          url!,
+          width: lado,
+          height: lado,
+          fit: BoxFit.cover,
+          // Sem foto na tela é melhor que um X quebrado.
+          errorBuilder: (_, _, _) => Icon(
+            Icons.photo_camera,
+            size: 40 * scale,
+            color: _DadosPessoaisScreenState._avatarIcon,
+          ),
+        ),
+      );
+    } else {
+      conteudo = Icon(
+        Icons.photo_camera,
+        size: 40 * scale,
+        color: _DadosPessoaisScreenState._avatarIcon,
+      );
+    }
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        width: 104 * scale,
-        height: 104 * scale,
-        alignment: Alignment.center,
-        decoration: const BoxDecoration(
-          color: _DadosPessoaisScreenState._avatarBg,
-          shape: BoxShape.circle,
-        ),
-        child: image == null
-            ? Icon(
-                Icons.photo_camera,
-                size: 40 * scale,
-                color: _DadosPessoaisScreenState._avatarIcon,
-              )
-            : ClipOval(
-                child: Image.file(
-                  image!,
-                  width: 104 * scale,
-                  height: 104 * scale,
-                  fit: BoxFit.cover,
-                ),
+      onTap: enviando ? null : onTap,
+      child: Semantics(
+        button: true,
+        label: 'Foto de perfil',
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: lado,
+              height: lado,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(
+                color: _DadosPessoaisScreenState._avatarBg,
+                shape: BoxShape.circle,
               ),
+              child: conteudo,
+            ),
+            if (enviando)
+              SizedBox(
+                width: lado,
+                height: lado,
+                child: const CircularProgressIndicator(strokeWidth: 3),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1021,16 +1093,17 @@ class _DropdownField extends StatelessWidget {
 /// Igreja vinculada — somente leitura na V1 (app exclusivo da Comunidade Nova
 /// Aliança; sem troca de igreja). Exibe a igreja sem afordância de toque.
 class _LinkedChurchField extends StatelessWidget {
-  const _LinkedChurchField({
-    required this.scale,
-    required this.church,
-  });
+  const _LinkedChurchField({required this.scale, required this.church});
 
   final double scale;
-  final String church;
+
+  /// `null` enquanto o vínculo não carregou ou quando não existe.
+  final String? church;
 
   @override
   Widget build(BuildContext context) {
+    final texto = church ?? 'Sem vínculo com uma unidade';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1055,7 +1128,7 @@ class _LinkedChurchField extends StatelessWidget {
               SizedBox(width: 10 * scale),
               Expanded(
                 child: Text(
-                  church,
+                  texto,
                   style: GoogleFonts.inter(
                     fontSize: 15 * scale,
                     fontWeight: FontWeight.w600,
@@ -1089,9 +1162,7 @@ class _SaveBar extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: _DadosPessoaisScreenState._line),
-        ),
+        border: Border(top: BorderSide(color: _DadosPessoaisScreenState._line)),
       ),
       child: SafeArea(
         top: false,

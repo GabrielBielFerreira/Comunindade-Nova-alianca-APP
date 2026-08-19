@@ -144,8 +144,27 @@ conta), já implementado:
 | Serviço | Situação |
 |---|---|
 | Mercado Pago | **Não publicado.** Código legado preservado, desativado e não exportado. O webhook antigo não valida assinatura. |
-| Firebase Storage | **Não publicado** nesta entrega — o código atual não faz upload relevante. As Rules ficam versionadas para uso futuro. |
 | Functions agendadas | Não existem. Nenhum gatilho roda sozinho. |
+
+## 7.1 Firebase Storage — ativo, com teto por construção
+
+O Storage passou a ser usado pela foto de perfil. O consumo é limitado pelo
+desenho, não por uma promessa:
+
+| Controle | Valor | Efeito |
+|---|---|---|
+| Caminho | `perfil/{uid}/avatar` (fixo) | A foto nova **sobrescreve** a anterior. Um nome com timestamp acumularia um arquivo por troca, para sempre. |
+| Tamanho | 2 MB nas Rules **e** no app | O aplicativo valida antes de gastar rede; as Rules recusam de novo no servidor. |
+| Redução | 512 px, qualidade 85 | Uma foto de câmera de 8 MB não sobe inteira para exibir um avatar de 104 px. |
+| Tipo | só `image/*` | Recusa PDF, vídeo e upload sem `contentType`. |
+| Demais caminhos | negados | Nem o próprio dono grava fora de `perfil/{uid}/avatar`. Sem isso, a pasta viraria armazenamento livre. |
+
+Teto prático: **um arquivo de até 2 MB por pessoa cadastrada**. Com centenas de
+membros, isso fica na casa de poucas centenas de MB — dentro da franquia
+gratuita do Storage.
+
+As regras são testadas contra o motor real do Storage Emulator em
+`test_rules/storage.test.js`.
 
 ## 8. Checklist antes de cada deploy
 
