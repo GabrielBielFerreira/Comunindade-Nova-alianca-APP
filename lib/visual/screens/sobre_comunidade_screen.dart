@@ -3,9 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants/igreja_info.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// "Sobre a Comunidade" — tela interna (push) acessível a membros e liderança
 /// pelo menu "Mais". Apresenta dados públicos reais da igreja ([IgrejaInfo]):
@@ -47,7 +51,7 @@ class SobreComunidadeScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -81,16 +85,20 @@ class SobreComunidadeScreen extends StatelessWidget {
   }
 }
 
-class _Content extends StatelessWidget {
+class _Content extends ConsumerWidget {
   const _Content({required this.scale, required this.abrir});
 
   final double scale;
   final Future<void> Function(String url) abrir;
 
   @override
-  Widget build(BuildContext context) {
-    final enderecoMapsUrl =
-        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(IgrejaInfo.endereco)}';
+  Widget build(BuildContext context, WidgetRef ref) {
+    final igreja = ref.watch(igrejaAtualDadosProvider).valueOrNull;
+    final mapaUrl = igreja?.mapaUrl;
+    final pastores = igreja?.pastoresExibicao ?? const <String>[];
+    final enderecos = igreja?.enderecosExibicao ?? const <String>[];
+    final cultos = igreja?.cultosRecorrentes ?? const <String>[];
+    const naoInformado = 'Não informado';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +130,7 @@ class _Content extends StatelessWidget {
               ),
               SizedBox(height: 12 * scale),
               Text(
-                IgrejaInfo.nome,
+                igreja?.nome ?? naoInformado,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.montserrat(
                   fontSize: 22 * scale,
@@ -133,7 +141,7 @@ class _Content extends StatelessWidget {
               ),
               SizedBox(height: 6 * scale),
               Text(
-                IgrejaInfo.slogan,
+                igreja?.slogan ?? '',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 14 * scale,
@@ -160,67 +168,95 @@ class _Content extends StatelessWidget {
           ),
         ),
         SizedBox(height: 24 * scale),
-        _SectionTitle('Pastor', scale: scale),
-        SizedBox(height: 12 * scale),
-        _InfoTile(
+        _SectionTitle(
+          pastores.length > 1 ? 'Pastores' : 'Pastor',
           scale: scale,
-          icon: Icons.person_outline,
-          title: IgrejaInfo.pastor,
-          subtitle: 'Pastor responsável',
         ),
+        SizedBox(height: 12 * scale),
+        // Sem nome confirmado, diz que não sabe — nunca elege um pastor.
+        if (pastores.isEmpty)
+          _InfoTile(
+            scale: scale,
+            icon: Icons.person_outline,
+            title: naoInformado,
+            subtitle: 'Liderança ainda não cadastrada no aplicativo',
+          )
+        else
+          for (final pastor in pastores) ...[
+            _InfoTile(
+              scale: scale,
+              icon: Icons.person_outline,
+              title: pastor,
+              subtitle: pastores.length > 1
+                  ? 'Liderança pastoral'
+                  : 'Pastor responsável',
+            ),
+            SizedBox(height: 10 * scale),
+          ],
         SizedBox(height: 24 * scale),
         _SectionTitle('Horários de culto', scale: scale),
         SizedBox(height: 12 * scale),
-        for (final culto in IgrejaInfo.cultos) ...[
+        if (cultos.isEmpty)
           _InfoTile(
             scale: scale,
             icon: Icons.event,
-            title: culto['nome'] ?? '',
-            subtitle: '${_formatDay(culto['dia'])} • ${culto['horario'] ?? ''}',
-          ),
-          SizedBox(height: 10 * scale),
-        ],
+            title: naoInformado,
+            subtitle: 'Programação ainda não cadastrada',
+          )
+        else
+          for (final culto in cultos) ...[
+            _InfoTile(scale: scale, icon: Icons.event, title: culto),
+            SizedBox(height: 10 * scale),
+          ],
         SizedBox(height: 14 * scale),
         _SectionTitle('Onde estamos', scale: scale),
         SizedBox(height: 12 * scale),
-        _InfoTile(
-          scale: scale,
-          icon: Icons.location_on_outlined,
-          title: IgrejaInfo.cidadeEstado,
-          subtitle: IgrejaInfo.endereco,
-          onTap: () => abrir(enderecoMapsUrl),
-        ),
-        SizedBox(height: 10 * scale),
-        _InfoTile(
-          scale: scale,
-          icon: Icons.camera_alt_outlined,
-          title: 'Instagram',
-          subtitle: IgrejaInfo.instagram,
-          onTap: () => abrir(IgrejaInfo.instagramUrl),
-        ),
+        if (enderecos.isEmpty)
+          _InfoTile(
+            scale: scale,
+            icon: Icons.location_on_outlined,
+            title: igreja?.cidadeEstado ?? naoInformado,
+            subtitle: 'Endereço ainda não cadastrado',
+          )
+        else
+          for (var i = 0; i < enderecos.length; i++) ...[
+            _InfoTile(
+              scale: scale,
+              icon: Icons.location_on_outlined,
+              title: i == 0
+                  ? (igreja?.cidadeEstado ?? 'Endereço principal')
+                  : 'Outro endereço',
+              subtitle: enderecos[i],
+              // Link de mapa só no principal, e só se houver endereço.
+              onTap: (i == 0 && mapaUrl != null) ? () => abrir(mapaUrl) : null,
+            ),
+            SizedBox(height: 10 * scale),
+          ],
+        if (igreja?.instagram != null) ...[
+          SizedBox(height: 10 * scale),
+          _InfoTile(
+            scale: scale,
+            icon: Icons.camera_alt_outlined,
+            title: 'Instagram',
+            subtitle: igreja!.instagram!,
+            onTap: () => abrir(
+              'https://instagram.com/'
+              '${igreja.instagram!.replaceAll('@', '')}',
+            ),
+          ),
+        ],
+        if (igreja?.youtubeUrl != null) ...[
+          SizedBox(height: 10 * scale),
+          _InfoTile(
+            scale: scale,
+            icon: Icons.play_circle_outline,
+            title: 'YouTube',
+            subtitle: 'Assistir aos cultos',
+            onTap: () => abrir(igreja!.youtubeUrl!),
+          ),
+        ],
       ],
     );
-  }
-
-  static String _formatDay(String? dia) {
-    switch (dia) {
-      case 'domingo':
-        return 'Domingo';
-      case 'segunda':
-        return 'Segunda-feira';
-      case 'terca':
-        return 'Terça-feira';
-      case 'quarta':
-        return 'Quarta-feira';
-      case 'quinta':
-        return 'Quinta-feira';
-      case 'sexta':
-        return 'Sexta-feira';
-      case 'sabado':
-        return 'Sábado';
-      default:
-        return dia ?? '';
-    }
   }
 }
 
@@ -249,7 +285,7 @@ class _InfoTile extends StatelessWidget {
     required this.scale,
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle = '',
     this.onTap,
   });
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
@@ -10,8 +12,9 @@ import '../widgets/leader_bottom_navigation.dart';
 import 'pagamento_boleto_screen.dart';
 import 'pagamento_cartao_screen.dart';
 import 'pagamento_pix_screen.dart';
+import '../escala_tela.dart';
 
-class RevisarContribuicaoScreen extends StatelessWidget {
+class RevisarContribuicaoScreen extends ConsumerWidget {
   const RevisarContribuicaoScreen({
     super.key,
     required this.isLeader,
@@ -40,7 +43,7 @@ class RevisarContribuicaoScreen extends StatelessWidget {
   final ContribuicaoCampaignData? campaign;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -56,7 +59,7 @@ class RevisarContribuicaoScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -88,7 +91,7 @@ class RevisarContribuicaoScreen extends StatelessWidget {
                                 valueLabel: valueLabel,
                                 destination:
                                     campaign?.title ??
-                                    HomeMockData.communityName,
+                                    ref.watch(nomeIgrejaEmFocoProvider),
                                 method: paymentMethod,
                               ),
                               SizedBox(height: 24 * scale),

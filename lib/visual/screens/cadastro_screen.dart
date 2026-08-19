@@ -3,11 +3,15 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 
 import '../../features/auth/data/auth_error.dart';
 import '../../features/auth/providers/auth_controller.dart';
+import '../../features/igrejas/providers/escolha_igreja_provider.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/auth_widgets.dart';
 
 class CadastroScreen extends ConsumerStatefulWidget {
@@ -39,6 +43,21 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
   bool _isValidEmail(String value) {
     final email = value.trim();
     return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+  }
+
+  /// Abre a seleção no modo cadastro.
+  ///
+  /// Esta tela permanece VIVA na pilha, então os campos já digitados são
+  /// preservados — a seleção volta por `pop`, sem reconstruir o formulário.
+  Future<void> _abrirSelecaoDeIgreja() async {
+    await Navigator.of(context).push<IgrejaId>(
+      MaterialPageRoute(
+        builder: (_) =>
+            const SelectChurchScreen(modo: ModoSelecaoIgreja.cadastro),
+      ),
+    );
+    // O valor escolhido já foi gravado no provider pela própria seleção; não
+    // é preciso nada aqui além de deixar a tela reconstruir.
   }
 
   void _showMessage(String message) {
@@ -73,6 +92,15 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
       return;
     }
 
+    // Sem unidade escolhida nao existe vinculo a criar, e o cadastro nao
+    // apareceria em "Cadastros pendentes" de nenhuma igreja.
+    final igrejaId = ref.read(igrejaEscolhidaCadastroProvider);
+    if (igrejaId == null) {
+      _showMessage('Escolha sua igreja para concluir o cadastro.');
+      _abrirSelecaoDeIgreja();
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       await ref.read(authActionsProvider).cadastrar(
@@ -80,7 +108,10 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
             email: _emailController.text.trim().toLowerCase(),
             telefone: _telefoneController.text.trim(),
             senha: _senhaController.text,
+            igrejaId: igrejaId,
           );
+      // A escolha ja virou vinculo; nao deve vazar para um proximo cadastro.
+      await ref.read(igrejaEscolhidaCadastroProvider.notifier).limpar();
       // Conta criada com status pendente. O RootGate mostrará a tela de
       // "Aguardando aprovação"; voltamos à raiz para revelá-la.
       if (mounted) {
@@ -146,7 +177,7 @@ class _CadastroScreenState extends ConsumerState<CadastroScreen> {
   }
 }
 
-class _CadastroCard extends StatelessWidget {
+class _CadastroCard extends ConsumerWidget {
   const _CadastroCard({
     required this.scale,
     required this.nomeController,
@@ -168,7 +199,7 @@ class _CadastroCard extends StatelessWidget {
   final VoidCallback onSubmit;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -195,6 +226,7 @@ class _CadastroCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          _IgrejaEscolhida(scale: scale),
           AuthInputField(
             label: CadastroMockData.nomeLabel,
             hint: CadastroMockData.nomeHint,
@@ -331,6 +363,92 @@ class _CadastroCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Mostra em qual unidade o cadastro vai nascer.
+///
+/// A escolha da igreja define quem aprova a pessoa e a que dados ela terá
+/// acesso — não pode ser uma decisão invisível tomada duas telas atrás.
+class _IgrejaEscolhida extends ConsumerWidget {
+  const _IgrejaEscolhida({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final id = ref.watch(igrejaEscolhidaCadastroProvider);
+    final igrejas = ref.watch(igrejasAtivasProvider).valueOrNull;
+
+    final nome = id == null
+        ? null
+        : igrejas
+            ?.where((i) => i.id == id)
+            .map((i) => i.nome)
+            .cast<String?>()
+            .firstWhere((_) => true, orElse: () => null);
+
+    final semIgreja = id == null;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 24 * scale),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(12 * scale),
+        decoration: BoxDecoration(
+          color: semIgreja ? const Color(0xFFFEF3C7) : AuthColors.soft,
+          borderRadius: BorderRadius.circular(8 * scale),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              semIgreja ? Icons.warning_amber_rounded : Icons.church_outlined,
+              size: 18 * scale,
+              color: AuthColors.primary,
+            ),
+            SizedBox(width: 10 * scale),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    semIgreja ? 'Nenhuma igreja escolhida' : 'Sua igreja',
+                    style: GoogleFonts.inter(
+                      fontSize: 11 * scale,
+                      color: AuthColors.muted,
+                    ),
+                  ),
+                  Text(
+                    // Sem o nome carregado ainda, mostra o id em vez de um
+                    // nome inventado.
+                    semIgreja
+                        ? 'Toque para escolher antes de continuar'
+                        : (nome ?? id.valor),
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5 * scale,
+                      fontWeight: FontWeight.w600,
+                      color: AuthColors.title,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context)
+                  .push<IgrejaId>(
+                        MaterialPageRoute(
+                          builder: (_) => const SelectChurchScreen(
+                            modo: ModoSelecaoIgreja.cadastro,
+                          ),
+                        ),
+                      ),
+              child: Text(semIgreja ? 'Escolher' : 'Trocar'),
+            ),
+          ],
+        ),
       ),
     );
   }

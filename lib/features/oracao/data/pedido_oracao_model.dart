@@ -18,6 +18,15 @@ class PedidoOracaoModel {
 
   /// Moderação: pedidos públicos só aparecem na Comunidade após `aprovado`.
   final bool aprovado;
+
+  /// Recusado pela moderação. O documento é PRESERVADO — recusar marca este
+  /// campo em vez de apagar, para não destruir o histórico do pedido nem o
+  /// registro de quem moderou.
+  final bool recusado;
+  final String? motivoRecusa;
+  final String? moderadoPor;
+  final DateTime? moderadoEm;
+
   final StatusPedidoOracao status;
   final DateTime criadoEm;
   final String? testemunho;
@@ -33,6 +42,10 @@ class PedidoOracaoModel {
     this.anonimo = false,
     this.urgente = false,
     this.aprovado = false,
+    this.recusado = false,
+    this.motivoRecusa,
+    this.moderadoPor,
+    this.moderadoEm,
     required this.status,
     required this.criadoEm,
     this.testemunho,
@@ -56,6 +69,10 @@ class PedidoOracaoModel {
       anonimo: data['anonimo'] as bool? ?? false,
       urgente: data['urgente'] as bool? ?? false,
       aprovado: data['aprovado'] as bool? ?? false,
+      recusado: data['recusado'] as bool? ?? false,
+      motivoRecusa: data['motivo_recusa'] as String?,
+      moderadoPor: data['moderado_por'] as String?,
+      moderadoEm: (data['moderado_em'] as Timestamp?)?.toDate(),
       status: StatusPedidoOracao.values.firstWhere(
         (e) => e.name == (data['status'] as String? ?? 'recebido'),
         orElse: () => StatusPedidoOracao.recebido,
@@ -77,6 +94,10 @@ class PedidoOracaoModel {
         'anonimo': anonimo,
         'urgente': urgente,
         'aprovado': aprovado,
+        'recusado': recusado,
+        'motivo_recusa': motivoRecusa,
+        'moderado_por': moderadoPor,
+        'moderado_em': moderadoEm != null ? Timestamp.fromDate(moderadoEm!) : null,
         'status': status.name,
         'criado_em': Timestamp.fromDate(criadoEm),
         'testemunho': testemunho,

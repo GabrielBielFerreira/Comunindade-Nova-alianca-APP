@@ -48,13 +48,20 @@ class GerenciarAvisosScreen extends ConsumerWidget {
     _mostrar(context, mensagem);
   }
 
+  /// Despublica em vez de excluir.
+  ///
+  /// A exclusão física foi removida: o histórico da unidade é preservado e o
+  /// aviso pode voltar ao ar sem ser recriado.
   Future<void> _confirmarExcluir(
       BuildContext context, WidgetRef ref, AvisoModel a) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
-        title: const Text('Excluir aviso'),
-        content: Text('Remover "${a.titulo}" definitivamente?'),
+        title: const Text('Despublicar aviso'),
+        content: Text(
+          'Tirar "${a.titulo}" do ar? Ele sai do aplicativo, mas continua '
+          'aqui e pode ser republicado.',
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(d).pop(false),
@@ -62,7 +69,7 @@ class GerenciarAvisosScreen extends ConsumerWidget {
           FilledButton(
             onPressed: () => Navigator.of(d).pop(true),
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Excluir'),
+            child: const Text('Despublicar'),
           ),
         ],
       ),
@@ -70,8 +77,8 @@ class GerenciarAvisosScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
     await _executar(
       context,
-      () => ref.read(avisosRepositoryProvider).excluir(a.id),
-      sucesso: 'Aviso excluído.',
+      () => ref.read(avisosRepositoryProvider).definirAtivo(a.id, false),
+      sucesso: 'Aviso despublicado.',
     );
   }
 

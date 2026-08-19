@@ -1,0 +1,16 @@
+{
+  "name": "nova-alianca-rules-tests",
+  "description": "Testes das Firestore Rules no Emulator Suite (isolamento por igreja, permissoes, financas, auditoria).",
+  "private": true,
+  "scripts": {
+    "preflight": "node preflight.js",
+    "emu": "npm run preflight && firebase emulators:start --only firestore --project demo-nova-alianca",
+    "pretest": "node preflight.js",
+    "test": "firebase emulators:exec --only firestore --project demo-nova-alianca \"jest --runInBand\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-tools": "^13.23.1",
+    "jest": "^29.7.0"
+  }
+}

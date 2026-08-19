@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
-import '../../auth/data/usuario_model.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../igrejas/providers/igreja_providers.dart';
+import '../data/membros_repository.dart';
 import '../providers/aprovacoes_providers.dart';
 
-/// Cadastros pendentes — líder/pastor/diácono aprovam ou recusam novos membros.
+/// Cadastros pendentes DA UNIDADE EM FOCO.
+///
+/// A aprovação é feita por Cloud Function: o cliente não tem permissão de
+/// escrever `status` de vínculo nem de gravar auditoria.
 class CadastrosPendentesScreen extends ConsumerWidget {
   const CadastrosPendentesScreen({super.key});
 
@@ -20,25 +25,26 @@ class CadastrosPendentesScreen extends ConsumerWidget {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  UsuarioModel? _liderOuAviso(BuildContext context, WidgetRef ref) {
-    final aprovador = ref.read(usuarioProvider);
-    if (aprovador == null || !aprovador.isLider) {
-      _mostrar(context, 'Ação restrita à liderança.');
+  /// Confere a autorização na unidade em foco. O servidor revalida.
+  IgrejaId? _igrejaAutorizadaOuAviso(BuildContext context, WidgetRef ref) {
+    final autorizacao = ref.read(autorizacaoAtualProvider);
+    if (autorizacao == null || !autorizacao.podeAprovarMembro) {
+      _mostrar(context, 'Ação restrita à liderança desta igreja.');
       return null;
     }
-    return aprovador;
+    return autorizacao.igrejaId;
   }
 
   Future<void> _aprovar(
-      BuildContext context, WidgetRef ref, UsuarioModel alvo) async {
-    final aprovador = _liderOuAviso(context, ref);
-    if (aprovador == null) return;
+      BuildContext context, WidgetRef ref, MembroUnidade alvo) async {
+    final igrejaId = _igrejaAutorizadaOuAviso(context, ref);
+    if (igrejaId == null) return;
 
     final ok = await showDialog<bool>(
       context: context,
       builder: (d) => AlertDialog(
         title: const Text('Aprovar cadastro'),
-        content: Text('Liberar o acesso de ${alvo.nome}?'),
+        content: Text('Liberar o acesso de ${alvo.exibicao}?'),
         actions: [
           TextButton(
               onPressed: () => Navigator.of(d).pop(false),
@@ -54,18 +60,17 @@ class CadastrosPendentesScreen extends ConsumerWidget {
     await _executar(
       context,
       () => ref.read(aprovacoesRepositoryProvider).aprovar(
-            uid: alvo.uid,
-            aprovadorUid: aprovador.uid,
-            aprovadorNome: aprovador.nome,
+            igrejaId: igrejaId,
+            uid: alvo.vinculo.uid,
           ),
       sucesso: 'Cadastro aprovado. O membro já pode entrar.',
     );
   }
 
   Future<void> _recusar(
-      BuildContext context, WidgetRef ref, UsuarioModel alvo) async {
-    final aprovador = _liderOuAviso(context, ref);
-    if (aprovador == null) return;
+      BuildContext context, WidgetRef ref, MembroUnidade alvo) async {
+    final igrejaId = _igrejaAutorizadaOuAviso(context, ref);
+    if (igrejaId == null) return;
 
     final motivo = await _pedirMotivo(context, alvo);
     if (motivo == null || !context.mounted) return; // cancelado
@@ -73,32 +78,33 @@ class CadastrosPendentesScreen extends ConsumerWidget {
     await _executar(
       context,
       () => ref.read(aprovacoesRepositoryProvider).recusar(
-            uid: alvo.uid,
-            aprovadorUid: aprovador.uid,
-            aprovadorNome: aprovador.nome,
+            igrejaId: igrejaId,
+            uid: alvo.vinculo.uid,
             motivo: motivo,
           ),
-      sucesso: 'Cadastro recusado.',
+      sucesso: 'Cadastro recusado. O vínculo ficou inativo e o histórico foi preservado.',
     );
   }
 
-  /// Diálogo que EXIGE um motivo para a recusa (registrado na auditoria e
-  /// enviado ao membro). Retorna o motivo, ou null se cancelado.
-  Future<String?> _pedirMotivo(BuildContext context, UsuarioModel alvo) {
+  /// Diálogo que EXIGE um motivo para a recusa (o servidor rejeita sem ele e
+  /// o registra na auditoria). Retorna o motivo, ou null se cancelado.
+  Future<String?> _pedirMotivo(BuildContext context, MembroUnidade alvo) {
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
       builder: (d) {
         return StatefulBuilder(
           builder: (d, setState) {
-            final valido = controller.text.trim().length >= 3;
+            // O servidor exige 5 caracteres; o botão segue o mesmo limite para
+            // não deixar o usuário enviar algo que será recusado.
+            final valido = controller.text.trim().length >= 5;
             return AlertDialog(
               title: const Text('Recusar cadastro'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Informe o motivo da recusa de ${alvo.nome}.',
+                  Text('Informe o motivo da recusa de ${alvo.exibicao}.',
                       style: const TextStyle(fontSize: 14)),
                   const SizedBox(height: 12),
                   TextField(
@@ -220,21 +226,21 @@ class CadastrosPendentesScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(u.nome,
+                    Text(u.exibicao,
                         style: GoogleFonts.inter(
                             fontWeight: FontWeight.w700,
                             color: AppColors.foreground)),
-                    const SizedBox(height: 4),
-                    Text(u.email,
-                        style: const TextStyle(
-                            color: AppColors.mutedForeground, fontSize: 13)),
-                    if (u.telefone.isNotEmpty)
-                      Text(u.telefone,
+                    if ((u.email ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(u.email!,
                           style: const TextStyle(
                               color: AppColors.mutedForeground, fontSize: 13)),
-                    Text('Cadastrado em ${Formatters.data(u.dataCadastro)}',
-                        style: const TextStyle(
-                            color: AppColors.muted, fontSize: 12)),
+                    ],
+                    if (u.vinculo.atualizadoEm != null)
+                      Text(
+                          'Solicitado em ${Formatters.data(u.vinculo.atualizadoEm!)}',
+                          style: const TextStyle(
+                              color: AppColors.muted, fontSize: 12)),
                     const SizedBox(height: 12),
                     Row(
                       children: [

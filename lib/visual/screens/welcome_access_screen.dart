@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class WelcomeAccessScreen extends StatefulWidget {
   const WelcomeAccessScreen({super.key});
@@ -43,7 +44,7 @@ class _WelcomeAccessScreenState extends State<WelcomeAccessScreen> {
               final width = constraints.maxWidth;
               final height = constraints.maxHeight;
               final scale = (math.min(width, _designWidth) / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final heightScale = (height / _designHeight)
                   .clamp(0.92, 1.08)

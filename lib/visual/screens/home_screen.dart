@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../core/config/app_config.dart';
-import '../../core/constants/igreja_info.dart';
 import '../../core/utils/formatters.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/eventos/providers/eventos_providers.dart';
@@ -19,6 +19,7 @@ import '../widgets/app_bottom_navigation.dart';
 import '../widgets/mais_menu.dart';
 import '../widgets/motion.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({
@@ -73,7 +74,7 @@ class HomeScreen extends ConsumerWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -169,7 +170,9 @@ class _TopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final naoLidas = ref.watch(naoLidasCountProvider);
-    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
+    // Liderança na UNIDADE EM FOCO. O perfil global valia para qualquer
+    // igreja e mostrava o menu de liderança ao visualizar outra unidade.
+    final isLider = ref.watch(isLiderancaNaUnidadeProvider);
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -194,7 +197,7 @@ class _TopBar extends ConsumerWidget {
             SizedBox(width: 11 * scale),
             Expanded(
               child: Text(
-                ' ${HomeMockData.communityName}',
+                ' ${ref.watch(nomeIgrejaEmFocoProvider)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(
@@ -316,7 +319,7 @@ class _HomeContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scale = (MediaQuery.sizeOf(context).width / HomeScreen._designWidth)
-        .clamp(0.86, 1.0)
+        .clamp(escalaMinima, 1.0)
         .toDouble();
 
     // Próximo culto: primeiro evento futuro do Firestore (sem horário fixo).
@@ -504,7 +507,7 @@ class _PalavraELouvorSection extends StatelessWidget {
 
 /// Seção "Vida na Comunidade": Meu Ministério, Mural de Oração, Ao Vivo,
 /// Instagram.
-class _VidaNaComunidadeSection extends StatelessWidget {
+class _VidaNaComunidadeSection extends ConsumerWidget {
   const _VidaNaComunidadeSection({required this.scale, required this.muralRoute});
 
   final double scale;
@@ -516,7 +519,14 @@ class _VidaNaComunidadeSection extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Instagram da UNIDADE EM FOCO: ao visualizar Petrolina o atalho leva ao
+    // perfil de Petrolina, nao ao de Olinda.
+    final instagram =
+        ref.watch(igrejaAtualDadosProvider).valueOrNull?.instagram;
+    final instagramUrl = instagram == null
+        ? null
+        : "https://instagram.com/${instagram.replaceAll("@", "")}";
     return _SecaoAtalhos(
       titulo: 'VIDA NA COMUNIDADE',
       scale: scale,
@@ -525,10 +535,14 @@ class _VidaNaComunidadeSection extends StatelessWidget {
             () => Navigator.pushNamed(context, VisualRoutes.meuMinisterio)),
         _Atalho(Icons.favorite_rounded, 'Mural de Oração', 'Ore em comunidade',
             () => Navigator.pushNamed(context, muralRoute)),
-        _Atalho(Icons.live_tv_rounded, 'Ao Vivo', 'Transmissões no Instagram',
-            () => _abrir(IgrejaInfo.instagramUrl)),
-        _Atalho(Icons.camera_alt_rounded, 'Instagram', IgrejaInfo.instagram,
-            () => _abrir(IgrejaInfo.instagramUrl)),
+        // Sem Instagram cadastrado os atalhos somem, em vez de abrirem o
+        // perfil de outra unidade.
+        if (instagramUrl != null) ...[
+          _Atalho(Icons.live_tv_rounded, 'Ao Vivo', 'Transmissões no Instagram',
+              () => _abrir(instagramUrl)),
+          _Atalho(Icons.camera_alt_rounded, 'Instagram', instagram!,
+              () => _abrir(instagramUrl)),
+        ],
       ],
     );
   }

@@ -1,0 +1,12 @@
+{
+  "name": "nova-alianca-seed-emulador",
+  "description": "Seed de demonstração para o Firebase Emulator Suite. NUNCA roda contra produção.",
+  "private": true,
+  "scripts": {
+    "seed": "node seed_emulador.js",
+    "bootstrap-super-admin": "node bootstrap_super_admin.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

@@ -114,17 +114,24 @@ class _AppBottomNavigationItem extends StatelessWidget {
         SizedBox(height: 2 * scale),
         SizedBox(
           width: 58 * scale,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              item.label,
-              maxLines: 1,
-              style: GoogleFonts.inter(
-                fontSize: item.fontSize * scale,
-                fontWeight: FontWeight.w500,
-                height: item.fontSize == 11 ? 13 / 11 : 16.8 / 12,
-                color: color,
-                decoration: TextDecoration.none,
+          // O rótulo é legenda de ícone dentro de uma barra de altura fixa,
+          // não texto de leitura. Deixá-lo crescer com a fonte do sistema
+          // estourava a barra (~3 px em textScale 1.3) e cortava a navegação.
+          // Todo o conteúdo de leitura do aplicativo continua respeitando a
+          // ampliação escolhida pela pessoa; só esta legenda é fixada.
+          child: MediaQuery.withNoTextScaling(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                item.label,
+                maxLines: 1,
+                style: GoogleFonts.inter(
+                  fontSize: item.fontSize * scale,
+                  fontWeight: FontWeight.w500,
+                  height: item.fontSize == 11 ? 13 / 11 : 16.8 / 12,
+                  color: color,
+                  decoration: TextDecoration.none,
+                ),
               ),
             ),
           ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../features/auth/providers/auth_controller.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/notificacoes/providers/notificacoes_providers.dart';
@@ -14,6 +15,7 @@ import '../profile_photo_notifier.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class PerfilScreen extends StatelessWidget {
   const PerfilScreen({super.key, required this.isLeader});
@@ -50,7 +52,7 @@ class PerfilScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -110,7 +112,9 @@ class _ProfileTopBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final naoLidas = ref.watch(naoLidasCountProvider);
-    final isLider = ref.watch(usuarioProvider)?.isLider ?? false;
+    // Liderança na UNIDADE EM FOCO. O perfil global valia para qualquer
+    // igreja e mostrava o menu de liderança ao visualizar outra unidade.
+    final isLider = ref.watch(isLiderancaNaUnidadeProvider);
     return Container(
       height: 64 * scale + topPadding,
       width: double.infinity,
@@ -135,7 +139,7 @@ class _ProfileTopBar extends ConsumerWidget {
             SizedBox(width: 11 * scale),
             Expanded(
               child: Text(
-                ' ${HomeMockData.communityName}',
+                ' ${ref.watch(nomeIgrejaEmFocoProvider)}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.montserrat(

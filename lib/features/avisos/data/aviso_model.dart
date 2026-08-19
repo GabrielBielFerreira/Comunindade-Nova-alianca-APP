@@ -17,6 +17,11 @@ class AvisoModel {
   final DateTime publicadoEm;
   final bool ativo;
 
+  /// Conteúdo visível a qualquer autenticado (inclui visitante anônimo).
+  /// As Rules exigem `publico == true` no documento E o filtro correspondente
+  /// na consulta — um aviso interno nunca chega a quem não é membro.
+  final bool publico;
+
   const AvisoModel({
     required this.id,
     required this.titulo,
@@ -28,6 +33,7 @@ class AvisoModel {
     required this.autorId,
     required this.publicadoEm,
     required this.ativo,
+    this.publico = false,
   });
 
   bool get isUrgente => prioridade == PrioridadeAviso.urgente;
@@ -37,7 +43,10 @@ class AvisoModel {
     return AvisoModel(
       id: doc.id,
       titulo: data['titulo'] as String? ?? '',
-      conteudo: data['conteudo'] as String? ?? '',
+      // `conteudo` é o campo canônico. `corpo` é aceito apenas na LEITURA,
+      // por compatibilidade com documentos gravados antes da padronização;
+      // nenhuma gravação nova usa `corpo`.
+      conteudo: (data['conteudo'] as String?) ?? (data['corpo'] as String?) ?? '',
       prioridade: (data['prioridade'] as String?) == 'urgente'
           ? PrioridadeAviso.urgente
           : PrioridadeAviso.normal,
@@ -51,11 +60,13 @@ class AvisoModel {
       publicadoEm:
           (data['publicado_em'] as Timestamp?)?.toDate() ?? DateTime.now(),
       ativo: data['ativo'] as bool? ?? true,
+      publico: data['publico'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toMap() => {
         'titulo': titulo,
+        // Somente `conteudo`: `corpo` é legado de leitura.
         'conteudo': conteudo,
         'prioridade': prioridade.name,
         'segmento': segmento.name,
@@ -64,5 +75,30 @@ class AvisoModel {
         'autor_id': autorId,
         'publicado_em': Timestamp.fromDate(publicadoEm),
         'ativo': ativo,
+        'publico': publico,
       };
+
+  AvisoModel copiarCom({
+    String? titulo,
+    String? conteudo,
+    PrioridadeAviso? prioridade,
+    SegmentoAviso? segmento,
+    String? segmentoId,
+    bool? ativo,
+    bool? publico,
+  }) {
+    return AvisoModel(
+      id: id,
+      titulo: titulo ?? this.titulo,
+      conteudo: conteudo ?? this.conteudo,
+      prioridade: prioridade ?? this.prioridade,
+      segmento: segmento ?? this.segmento,
+      segmentoId: segmentoId ?? this.segmentoId,
+      imagemUrl: imagemUrl,
+      autorId: autorId,
+      publicadoEm: publicadoEm,
+      ativo: ativo ?? this.ativo,
+      publico: publico ?? this.publico,
+    );
+  }
 }

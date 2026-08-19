@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../mock_data.dart';
+import '../escala_tela.dart';
 
 class AuthColors {
   const AuthColors._();
@@ -24,7 +25,7 @@ class AuthColors {
 double authScaleFor(BuildContext context, double referenceWidth) {
   final width = MediaQuery.sizeOf(context).width;
   final effectiveWidth = width > referenceWidth ? referenceWidth : width;
-  return (effectiveWidth / referenceWidth).clamp(0.86, 1.0);
+  return (effectiveWidth / referenceWidth).clamp(escalaMinima, 1.0);
 }
 
 class AuthCanvas extends StatelessWidget {

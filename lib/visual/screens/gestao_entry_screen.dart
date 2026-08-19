@@ -6,7 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../features/admin/providers/aprovacoes_providers.dart';
 import '../../features/oracao/providers/oracao_providers.dart';
 import '../visual_router.dart';
+import '../widgets/abrir_painel_card.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class GestaoEntryScreen extends StatelessWidget {
   const GestaoEntryScreen({super.key});
@@ -38,7 +40,7 @@ class GestaoEntryScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -58,7 +60,15 @@ class GestaoEntryScreen extends StatelessWidget {
                             20 * scale,
                             navHeight + 20 * scale,
                           ),
-                          child: _GestaoContent(scale: scale),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // Caminho principal da gestao: o painel web.
+                              // A gestao interna abaixo continua como apoio.
+                              AbrirPainelCard(scale: scale),
+                              _GestaoContent(scale: scale),
+                            ],
+                          ),
                         ),
                       ),
                     ],

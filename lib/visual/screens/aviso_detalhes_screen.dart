@@ -4,21 +4,26 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../core/constants/igreja_info.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
+
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock/avisos_mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/avisos_bottom_navigation.dart';
 import '../widgets/leader_bottom_navigation.dart';
-
-/// Abre o mapa (Google Maps) no endereço da igreja.
-Future<void> _abrirMapaIgreja() async {
-  final query = Uri.encodeComponent(IgrejaInfo.endereco);
-  final uri = Uri.parse('https://www.google.com/maps/search/?api=1&query=$query');
-  await launchUrl(uri, mode: LaunchMode.externalApplication);
+import '../escala_tela.dart';
+/// Abre o mapa no endereço da UNIDADE EM FOCO.
+///
+/// Recebe a URL já pronta de `IgrejaExibicao.mapaUrl`. Sem endereço cadastrado
+/// a url é nula e o toque nem é oferecido — melhor que abrir o mapa no
+/// endereço de outra igreja.
+Future<void> _abrirMapa(String url) async {
+  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
 }
 
-class AvisoDetalhesScreen extends StatelessWidget {
+class AvisoDetalhesScreen extends ConsumerWidget {
   const AvisoDetalhesScreen({
     super.key,
     required this.notice,
@@ -47,7 +52,8 @@ class AvisoDetalhesScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mapaUrl = ref.watch(igrejaAtualDadosProvider).valueOrNull?.mapaUrl;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -63,7 +69,7 @@ class AvisoDetalhesScreen extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -100,7 +106,8 @@ class AvisoDetalhesScreen extends StatelessWidget {
                               ? VisualRoutes.programacaoLeader
                               : VisualRoutes.programacao,
                         ),
-                        onLocation: _abrirMapaIgreja,
+                        onLocation:
+                            mapaUrl == null ? null : () => _abrirMapa(mapaUrl),
                       ),
                     ),
                   ),
@@ -220,14 +227,16 @@ class _DetailsContent extends StatelessWidget {
     required this.scale,
     required this.onDownload,
     required this.onSchedule,
-    required this.onLocation,
+    this.onLocation,
   });
 
   final AvisoData notice;
   final double scale;
   final VoidCallback onDownload;
   final VoidCallback onSchedule;
-  final VoidCallback onLocation;
+  /// Nulo quando a unidade não tem endereço cadastrado: o item de local
+  /// simplesmente não fica tocável.
+  final VoidCallback? onLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -621,13 +630,13 @@ class _DetailsActions extends StatelessWidget {
     required this.scale,
     required this.hasLocation,
     required this.onSchedule,
-    required this.onLocation,
+    this.onLocation,
   });
 
   final double scale;
   final bool hasLocation;
   final VoidCallback onSchedule;
-  final VoidCallback onLocation;
+  final VoidCallback? onLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -656,7 +665,7 @@ class _DetailsActions extends StatelessWidget {
               label: 'Abrir localização',
               iconAsset: AvisosMockData.detailsLocationAsset,
               filled: false,
-              onTap: onLocation,
+              onTap: onLocation!,
             ),
           ],
         ],

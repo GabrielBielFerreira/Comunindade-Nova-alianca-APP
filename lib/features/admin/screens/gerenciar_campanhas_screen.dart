@@ -51,8 +51,11 @@ class GerenciarCampanhasScreen extends ConsumerWidget {
 
     String mensagem;
     try {
-      await ref.read(campanhasRepositoryProvider).excluir(c.id);
-      mensagem = 'Campanha excluída.';
+      // Encerra em vez de apagar: o histórico da campanha é preservado.
+      await ref
+          .read(campanhasRepositoryProvider)
+          .definirStatus(c.id, 'encerrada');
+      mensagem = 'Campanha encerrada.';
     } on FirebaseException catch (e) {
       mensagem = e.code == 'permission-denied'
           ? 'Sem permissão para esta ação. Confirme seu perfil de liderança.'

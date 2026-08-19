@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app/root_gate.dart';
+import 'core/config/ambiente.dart';
 import 'core/services/navigation_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/palavra_dia/palavra_dia_watcher.dart';
@@ -48,9 +49,22 @@ Future<void> main() async {
   // firebase_options.dart não estiverem configurados, a inicialização falha —
   // o app ainda abre (degradado) e o RootGate exibe a tela pública.
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    final opcoes = DefaultFirebaseOptions.currentPlatform;
+
+    // Fail-closed: um build de produção com configuração de emulador para
+    // aqui, em vez de conversar com o projeto errado em silêncio.
+    exigirConfiguracaoDeProducao(opcoes);
+
+    await Firebase.initializeApp(options: opcoes);
+
+    // Só conecta ao Emulator Suite quando o build pediu explicitamente
+    // (--dart-define=APP_ENV=emulator). Um build sem a flag é de produção e
+    // jamais aponta para localhost.
+    if (Ambiente.atual.isEmulador) {
+      await conectarAoEmulador();
+      debugPrint('Firebase conectado ao EMULADOR (${HostsEmulador.host}).');
+    }
+
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // Relatório de erros em produção (desligado em modo debug para não poluir).

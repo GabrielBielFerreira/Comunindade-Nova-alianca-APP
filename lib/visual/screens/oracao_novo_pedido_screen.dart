@@ -8,6 +8,7 @@ import '../../features/auth/providers/auth_provider.dart';
 import '../../features/oracao/providers/oracao_providers.dart';
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/oracao_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class OracaoNovoPedidoScreen extends ConsumerStatefulWidget {
   const OracaoNovoPedidoScreen({super.key, required this.isLeader});
@@ -125,7 +126,7 @@ class _OracaoNovoPedidoScreenState
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

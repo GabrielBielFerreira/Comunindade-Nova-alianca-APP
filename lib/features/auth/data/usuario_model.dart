@@ -1,6 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PerfilUsuario { pastor, diacono, lider, membro, visitante }
+/// Perfil histórico, mantido para compatibilidade de leitura dos documentos
+/// globais anteriores à arquitetura multi-igreja.
+///
+/// O perfil que vale para autorização é o do VÍNCULO
+/// (`igrejas/{igrejaId}/membros/{uid}.perfil`), modelado por
+/// `PerfilComunitario` em `nova_alianca_core`. Não use este enum para decidir
+/// permissão.
+enum PerfilUsuario { pastor, diacono, evangelista, lider, membro, visitante }
 
 enum StatusUsuario { pendente, aprovado, inativo }
 
@@ -89,6 +96,12 @@ class UsuarioModel {
   final String? aprovadoPor;
   final DateTime? aprovadoEm;
 
+  /// Unidade à qual a pessoa está vinculada (`igrejas/{id}`).
+  ///
+  /// Só o servidor altera este campo. A igreja *visualizada* é preferência
+  /// local e não muda o vínculo.
+  final String? igrejaPrincipalId;
+
   const UsuarioModel({
     required this.uid,
     required this.nome,
@@ -105,6 +118,7 @@ class UsuarioModel {
     this.qualificacao,
     this.aprovadoPor,
     this.aprovadoEm,
+    this.igrejaPrincipalId,
   });
 
   bool get isAprovado => status == StatusUsuario.aprovado;
@@ -145,6 +159,7 @@ class UsuarioModel {
           : null,
       aprovadoPor: map['aprovado_por'] as String?,
       aprovadoEm: (map['aprovado_em'] as Timestamp?)?.toDate(),
+      igrejaPrincipalId: map['igreja_principal_id'] as String?,
     );
   }
 
@@ -168,6 +183,7 @@ class UsuarioModel {
         'aprovado_por': aprovadoPor,
         'aprovado_em':
             aprovadoEm != null ? Timestamp.fromDate(aprovadoEm!) : null,
+        'igreja_principal_id': igrejaPrincipalId,
       };
 
   UsuarioModel copyWith({
@@ -178,6 +194,7 @@ class UsuarioModel {
     PerfilUsuario? perfil,
     StatusUsuario? status,
     String? ministerioId,
+    String? igrejaPrincipalId,
   }) {
     return UsuarioModel(
       uid: uid,
@@ -195,6 +212,56 @@ class UsuarioModel {
       qualificacao: qualificacao,
       aprovadoPor: aprovadoPor,
       aprovadoEm: aprovadoEm,
+      igrejaPrincipalId: igrejaPrincipalId ?? this.igrejaPrincipalId,
     );
   }
 }
+
+/// Mapa de CRIAÇÃO de `usuarios/{uid}`.
+///
+/// As Rules restringem o create a um conjunto fechado de chaves
+/// (`hasOnly([...])` em `match /usuarios/{uid}`). O [UsuarioModel.toMap]
+/// escreve `uid`, `perfil`, `status`, `data_cadastro` e outros campos que NÃO
+/// estão nessa lista — usá-lo no cadastro faz o Firestore recusar a escrita em
+/// produção.
+///
+/// Autorização não mora mais aqui: `perfil` e `status` pertencem ao vínculo
+/// `igrejas/{igrejaId}/membros/{uid}`. Este documento guarda só identidade.
+Map<String, dynamic> mapaDeCriacaoUsuario({
+  required String nome,
+  required String email,
+  required String telefone,
+  required String igrejaPrincipalId,
+  String? fotoUrl,
+  DateTime? dataNascimento,
+  Map<String, dynamic>? dadosPessoais,
+}) {
+  return <String, dynamic>{
+    'nome': nome,
+    'email': email,
+    'telefone': telefone,
+    'foto_url': ?fotoUrl,
+    if (dataNascimento != null)
+      'data_nascimento': Timestamp.fromDate(dataNascimento),
+    'igreja_principal_id': igrejaPrincipalId,
+    'criado_em': FieldValue.serverTimestamp(),
+    'atualizado_em': FieldValue.serverTimestamp(),
+    'dados_pessoais': ?dadosPessoais,
+  };
+}
+
+/// Chaves aceitas pelas Rules no create de `usuarios/{uid}`.
+///
+/// Espelha `firestore.rules`. Existe para que um teste detecte a divergência
+/// antes de ela virar "cadastro recusado em producao".
+const chavesPermitidasCriacaoUsuario = <String>{
+  'nome',
+  'email',
+  'telefone',
+  'foto_url',
+  'data_nascimento',
+  'igreja_principal_id',
+  'criado_em',
+  'atualizado_em',
+  'dados_pessoais',
+};

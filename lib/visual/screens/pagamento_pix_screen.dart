@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../core/constants/igreja_info.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../features/contribuir/data/pix_payload.dart';
 import '../mock/contribuicao_mock_data.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/leader_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 /// PIX **manual e honesto**: mostra o QR Code e o "copia e cola" gerados a
 /// partir da chave pública da igreja. Não há confirmação automática — o
 /// recebimento é conferido pela tesouraria. Nenhum segredo trafega no app.
-class PagamentoPixScreen extends StatelessWidget {
+class PagamentoPixScreen extends ConsumerWidget {
   const PagamentoPixScreen({
     super.key,
     required this.isLeader,
@@ -44,17 +47,34 @@ class PagamentoPixScreen extends StatelessWidget {
     return (int.tryParse(digits) ?? 0) / 100;
   }
 
-  String get _payload => PixPayload.gerar(
-        chave: IgrejaInfo.pixChave,
+  /// Payload PIX da unidade EM FOCO.
+  ///
+  /// Nunca cai numa chave padrão: se a igreja visualizada não tem PIX
+  /// configurado, a tela bloqueia o pagamento em vez de exibir a chave de
+  /// outra unidade — dinheiro enviado para a igreja errada é irreversível.
+  String _payloadDe(IgrejaModel igreja) => PixPayload.gerar(
+        chave: igreja.pixChave!,
         valor: _valorReais > 0 ? _valorReais : null,
-        nomeRecebedor: IgrejaInfo.nome,
-        cidade: 'Olinda',
+        nomeRecebedor: igreja.nome,
+        cidade: igreja.cidadeEstado?.split('—').first.trim() ?? '',
         txid: campaign?.campanhaId ?? '***',
       );
 
   @override
-  Widget build(BuildContext context) {
-    final payload = _payload;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final igrejaAsync = ref.watch(igrejaAtualDadosProvider);
+    final igreja = igrejaAsync.valueOrNull;
+
+    // Sem dados da unidade ou sem chave: estado bloqueado e honesto.
+    if (igreja == null || (igreja.pixChave?.trim().isEmpty ?? true)) {
+      return _PixIndisponivel(
+        carregando: igrejaAsync.isLoading,
+        nomeIgreja: igreja?.nome,
+        isLeader: isLeader,
+      );
+    }
+
+    final payload = _payloadDe(igreja);
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.white,
@@ -70,7 +90,7 @@ class PagamentoPixScreen extends StatelessWidget {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -98,7 +118,7 @@ class PagamentoPixScreen extends StatelessWidget {
                                     ? contributionType
                                     : 'Campanha',
                                 destination:
-                                    campaign?.title ?? IgrejaInfo.nome,
+                                    campaign?.title ?? igreja.nome,
                                 valueLabel: valueLabel,
                               ),
                               SizedBox(height: 24 * scale),
@@ -732,6 +752,78 @@ class _PixNavigationItem extends StatelessWidget {
                 height: 44.8 * scale,
                 child: Center(child: content),
               ),
+      ),
+    );
+  }
+}
+
+/// Contribuição indisponível para a unidade em foco.
+///
+/// Estado deliberadamente bloqueante: é melhor a pessoa não conseguir
+/// contribuir agora do que contribuir para a igreja errada. Nenhuma chave de
+/// outra unidade é exibida como alternativa.
+class _PixIndisponivel extends StatelessWidget {
+  const _PixIndisponivel({
+    required this.carregando,
+    required this.nomeIgreja,
+    required this.isLeader,
+  });
+
+  final bool carregando;
+  final String? nomeIgreja;
+  final bool isLeader;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFFAFAFA),
+      appBar: AppBar(
+        title: const Text('Contribuir'),
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1C1B1B),
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: carregando
+                ? const CircularProgressIndicator()
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 56,
+                        color: Color(0xFF7A0022),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Contribuições ainda não configuradas para esta '
+                        'igreja',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        nomeIgreja == null
+                            ? 'Não foi possível identificar a unidade em '
+                                'foco. Tente novamente.'
+                            : '$nomeIgreja ainda não cadastrou uma chave PIX '
+                                'no aplicativo. Fale com a tesouraria da '
+                                'unidade antes de contribuir.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 24),
+                      FilledButton.tonal(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        child: const Text('Voltar'),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
       ),
     );
   }

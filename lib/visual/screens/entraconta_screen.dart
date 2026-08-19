@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:nova_alianca_core/nova_alianca_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../features/auth/data/auth_error.dart';
+import '../../features/auth/data/auth_service.dart';
 import '../../features/auth/providers/auth_controller.dart';
+import '../../features/igrejas/providers/escolha_igreja_provider.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
 class EntracontaScreen extends ConsumerStatefulWidget {
   const EntracontaScreen({super.key});
@@ -111,11 +116,27 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
     FocusScope.of(context).unfocus();
     setState(() => _loading = true);
     try {
-      final ok = await ref.read(authActionsProvider).entrarComGoogle();
+      // No PRIMEIRO acesso o cadastro precisa de uma unidade; nos seguintes o
+      // valor e ignorado pelo servico.
+      final ok = await ref.read(authActionsProvider).entrarComGoogle(
+            igrejaId: ref.read(igrejaEscolhidaCadastroProvider),
+          );
       // Sucesso: o RootGate reage à sessão; voltamos à raiz. Cancelamento
       // (ok == false) não faz nada.
       if (ok && mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on IgrejaObrigatoriaNoCadastro {
+      // Primeiro acesso sem igreja: leva a pessoa para escolher em vez de
+      // deixar a conta autenticada sem vinculo nenhum.
+      if (mounted) {
+        _showMessage('Escolha sua igreja para concluir o cadastro.');
+        Navigator.of(context).push<IgrejaId>(
+          MaterialPageRoute(
+            builder: (_) =>
+                const SelectChurchScreen(modo: ModoSelecaoIgreja.cadastro),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) _showMessage(mensagemErroAuth(e));
@@ -138,7 +159,7 @@ class _EntracontaScreenState extends ConsumerState<EntracontaScreen> {
         child: Builder(
           builder: (context) {
             final screen = MediaQuery.sizeOf(context);
-            final scale = (screen.width / 391).clamp(0.86, 1.0);
+            final scale = (screen.width / 391).clamp(escalaMinima, 1.0);
             final headerHeight = 287.0 * scale;
             final figmaCardHeight = 534.0 * scale;
             final remainingHeight = screen.height - headerHeight;
@@ -450,7 +471,7 @@ class _FormFieldBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final scale = (width / 391).clamp(0.86, 1.16);
+    final scale = (width / 391).clamp(escalaMinima, 1.16);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

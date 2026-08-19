@@ -70,8 +70,10 @@ class GerenciarMinisteriosScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
     await _executar(
       context,
-      () => ref.read(ministeriosRepositoryProvider).excluir(m.id),
-      sucesso: 'Ministério excluído.',
+      // Inativa em vez de apagar: escalas, autoria e histórico dependem do
+      // documento do ministério.
+      () => ref.read(ministeriosRepositoryProvider).definirAtivo(m.id, false),
+      sucesso: 'Ministério inativado.',
     );
   }
 

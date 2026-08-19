@@ -1,50 +1,52 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../../core/data/igreja_scope.dart';
 import 'campanha_model.dart';
 
-/// Acesso ao Firestore para campanhas (coleção `campanhas`). Filtra ativas e
-/// ordena no cliente para evitar índices compostos. Escrita é restrita à
-/// liderança pelas regras.
+/// Campanhas de UMA unidade: `igrejas/{igrejaId}/campanhas`.
 class CampanhasRepository {
-  CampanhasRepository({FirebaseFirestore? db})
-      : _col = (db ?? FirebaseFirestore.instance).collection('campanhas');
+  CampanhasRepository(this._scope);
 
-  final CollectionReference<Map<String, dynamic>> _col;
+  final IgrejaScope _scope;
+
+  CollectionReference<Map<String, dynamic>> get _col => _scope.campanhas;
 
   Stream<List<CampanhaModel>> streamAtivas() {
+    return _col.where('status', isEqualTo: 'ativa').snapshots().map(_ordenar);
+  }
+
+  /// Campanhas visíveis a visitante: ativas E públicas.
+  Stream<List<CampanhaModel>> streamAtivasPublicas() {
     return _col
+        .where('publico', isEqualTo: true)
         .where('status', isEqualTo: 'ativa')
         .snapshots()
-        .map((snap) {
-      final lista = snap.docs.map(CampanhaModel.fromFirestore).toList()
-        ..sort((a, b) => b.dataInicio.compareTo(a.dataInicio));
-      return lista;
-    });
+        .map(_ordenar);
   }
 
-  /// Visão da liderança (Gestão): TODAS as campanhas, inclusive encerradas.
+  /// Visão de gestão: todas, inclusive encerradas.
   Stream<List<CampanhaModel>> streamGerenciar() {
-    return _col.snapshots().map((snap) {
-      final lista = snap.docs.map(CampanhaModel.fromFirestore).toList()
-        ..sort((a, b) => b.dataInicio.compareTo(a.dataInicio));
-      return lista;
-    });
+    return _col.snapshots().map(_ordenar);
   }
 
-  /// Cria uma nova campanha. Retorna o id gerado.
+  List<CampanhaModel> _ordenar(QuerySnapshot<Map<String, dynamic>> snap) {
+    return snap.docs.map(CampanhaModel.fromFirestore).toList()
+      ..sort((a, b) => b.dataInicio.compareTo(a.dataInicio));
+  }
+
   Future<String> criar(CampanhaModel campanha) async {
     final ref = await _col.add(campanha.toMap());
     return ref.id;
   }
 
-  /// Atualiza uma campanha existente. O `valor_arrecadado` é cache do servidor
-  /// e não deve ser sobrescrito por engano — quem chama preserva o valor atual.
+  /// `valor_arrecadado` é cache mantido pelo servidor — quem chama preserva o
+  /// valor atual em vez de sobrescrevê-lo.
   Future<void> atualizar(CampanhaModel campanha) {
     return _col.doc(campanha.id).update(campanha.toMap());
   }
 
-  /// Remove definitivamente uma campanha.
-  Future<void> excluir(String id) {
-    return _col.doc(id).delete();
+  /// Encerra sem apagar, preservando o histórico.
+  Future<void> definirStatus(String id, String status) {
+    return _col.doc(id).update({'status': status});
   }
 }

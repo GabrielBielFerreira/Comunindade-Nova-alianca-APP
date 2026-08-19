@@ -1,172 +1,314 @@
 rules_version = '2';
 
-// Regras de segurança do Firestore — Comunidade Nova Aliança.
-// Princípios: negar por padrão; leitura apenas autenticada; escrita de conteúdo
-// (avisos/eventos/campanhas) restrita à liderança; dados pessoais e financeiros
-// acessíveis apenas ao próprio dono (ou liderança quando fizer sentido).
+// ═══════════════════════════════════════════════════════════════════════════
+// Firestore Rules — rede Nova Aliança (multi-igreja)
+//
+// Princípios inegociáveis:
+//  1. Negar por padrão.
+//  2. Autorização SEMPRE relativa a uma igreja: nasce do vínculo aprovado em
+//     /igrejas/{igrejaId}/membros/{uid}. Selecionar unidade no cliente não
+//     concede nada.
+//  3. O cliente NUNCA escreve perfil, status, funcoes_admin, auditoria nem
+//     status financeiro. Essas mutações são exclusivas das Cloud Functions
+//     (Admin SDK), que ignoram estas regras e repetem a autorização.
+//  4. super_admin vem de custom claim — nunca de documento gravável.
+//  5. Nada é apagado para representar saída: inativa-se o vínculo.
+//
+// Espelha packages/nova_alianca_core/lib/src/capabilities.dart.
+// ═══════════════════════════════════════════════════════════════════════════
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helpers ────────────────────────────────────────────────────────
+    // ── Helpers base ──────────────────────────────────────────────────
     function isSignedIn() {
       return request.auth != null;
-    }
-
-    function meu() {
-      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
-    }
-
-    function isAprovado() {
-      return isSignedIn() && meu().status.lower() == 'aprovado';
-    }
-
-    // Tolerante a maiúsculas e a acentos (edições manuais no Firestore como
-    // "Líder"/"Diácono" continuam sendo reconhecidas). O app normaliza da mesma
-    // forma — evita o descompasso em que o cliente vê a Gestão mas o servidor
-    // nega as leituras/gravações.
-    function isLider() {
-      return isAprovado()
-        && meu().perfil.lower() in ['pastor', 'diacono', 'diácono', 'lider', 'líder'];
     }
 
     function isDono(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // ── Usuários ───────────────────────────────────────────────────────
-    // Cada um lê/edita o próprio perfil. Liderança pode ler todos (aprovação).
-    // Campos sensíveis de controle (perfil, status, aprovado_por) NÃO podem ser
-    // alterados pelo próprio usuário — apenas pela liderança/painel.
+    // Custom claim definida pelo backend. Ausente => false.
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.super_admin == true;
+    }
+
+    // ── Vínculo com a unidade ─────────────────────────────────────────
+    function vinculoPath(igrejaId) {
+      return /databases/$(database)/documents/igrejas/$(igrejaId)/membros/$(request.auth.uid);
+    }
+
+    function temVinculo(igrejaId) {
+      return isSignedIn() && exists(vinculoPath(igrejaId));
+    }
+
+    function vinculo(igrejaId) {
+      return get(vinculoPath(igrejaId)).data;
+    }
+
+    // Único status que concede acesso.
+    function isAprovadoNa(igrejaId) {
+      return temVinculo(igrejaId) && vinculo(igrejaId).status == 'aprovado';
+    }
+
+    function perfilNa(igrejaId) {
+      return vinculo(igrejaId).perfil;
+    }
+
+    function funcoesNa(igrejaId) {
+      return vinculo(igrejaId).get('funcoes_admin', []);
+    }
+
+    // Grupo DERIVADO — nunca lido de um campo gravável.
+    function isLiderancaMinisterial(igrejaId) {
+      return isAprovadoNa(igrejaId)
+        && perfilNa(igrejaId) in ['pastor', 'diacono', 'evangelista', 'lider'];
+    }
+
+    function isPastorDaIgreja(igrejaId) {
+      return isAprovadoNa(igrejaId) && perfilNa(igrejaId) == 'pastor';
+    }
+
+    function temFuncao(igrejaId, funcao) {
+      return isAprovadoNa(igrejaId) && funcao in funcoesNa(igrejaId);
+    }
+
+    // ── Capacidades (espelham capabilities.dart) ──────────────────────
+    function canReadFinance(igrejaId) {
+      return isSuperAdmin()
+        || isLiderancaMinisterial(igrejaId)
+        || temFuncao(igrejaId, 'tesoureiro');
+    }
+
+    function canManageContent(igrejaId) {
+      return isSuperAdmin()
+        || isLiderancaMinisterial(igrejaId)
+        || temFuncao(igrejaId, 'editor');
+    }
+
+    function canModeratePrayer(igrejaId) {
+      return isSuperAdmin()
+        || isLiderancaMinisterial(igrejaId)
+        || temFuncao(igrejaId, 'moderador_oracao');
+    }
+
+    function canReadAudit(igrejaId) {
+      return isSuperAdmin() || isLiderancaMinisterial(igrejaId);
+    }
+
+    // Membro aprovado da unidade: base para ler conteúdo restrito.
+    function isMembroDa(igrejaId) {
+      return isAprovadoNa(igrejaId);
+    }
+
+    // Conteúdo marcado como público é legível por qualquer autenticado
+    // (inclui visitante anônimo). Exige o campo booleano `publico == true`,
+    // de modo que a consulta do cliente precise filtrar por ele.
+    function isPublico() {
+      return resource.data.get('publico', false) == true;
+    }
+
+    function podeLerConteudo(igrejaId) {
+      return isPublico() || isMembroDa(igrejaId) || canManageContent(igrejaId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // PERFIL GLOBAL DO USUÁRIO
+    // Identidade e dados pessoais. NENHUMA permissão mora aqui.
+    // ═══════════════════════════════════════════════════════════════════
     match /usuarios/{uid} {
-      allow read: if isDono(uid) || isLider();
+      // Somente o dono e o super_admin. A liderança enxerga as pessoas pela
+      // subcoleção de membros da PRÓPRIA unidade, nunca por esta coleção
+      // global (era o vazamento entre igrejas da versão anterior).
+      allow read: if isDono(uid) || isSuperAdmin();
+
       allow create: if isDono(uid)
-                    && request.resource.data.status == 'pendente'
-                    && request.resource.data.perfil == 'membro';
-      allow update: if isLider()
-                    || (isDono(uid)
-                        && request.resource.data.perfil == resource.data.perfil
-                        && request.resource.data.status == resource.data.status);
-      allow delete: if false; // exclusão de conta tratada via função/servidor
-    }
+                    && request.resource.data.keys().hasOnly([
+                         'nome', 'email', 'telefone', 'foto_url',
+                         'data_nascimento', 'igreja_principal_id',
+                         'criado_em', 'atualizado_em', 'dados_pessoais'
+                       ]);
 
-    // ── Tokens de dispositivo (FCM) ────────────────────────────────────
-    match /tokens_dispositivo/{tokenId} {
-      allow read: if isSignedIn() && resource.data.perfil_id == request.auth.uid;
-      allow create: if isSignedIn()
-                    && request.resource.data.perfil_id == request.auth.uid;
-      allow update, delete: if isSignedIn()
-                    && resource.data.perfil_id == request.auth.uid;
-    }
+      // O dono edita os próprios dados cadastrais. Campos de autorização não
+      // existem aqui; igreja_principal_id só muda pelo servidor (vincular a
+      // outra unidade é uma operação auditada).
+      allow update: if isDono(uid)
+                    && !request.resource.data.diff(resource.data)
+                          .affectedKeys()
+                          .hasAny(['igreja_principal_id', 'criado_em']);
 
-    // ── Avisos ─────────────────────────────────────────────────────────
-    match /avisos/{avisoId} {
-      allow read: if isAprovado();
-      allow write: if isLider();
-    }
+      allow delete: if false;
 
-    // ── Eventos / Programação ──────────────────────────────────────────
-    match /eventos/{eventoId} {
-      allow read: if isAprovado();
-      allow write: if isLider();
+      match /notificacoes/{notificacaoId} {
+        allow read: if isDono(uid);
+        // Marcar como lida — e nada além disso.
+        allow update: if isDono(uid)
+                      && request.resource.data.diff(resource.data)
+                           .affectedKeys().hasOnly(['lida']);
+        allow delete: if isDono(uid);
+        allow create: if false; // somente servidor
+      }
 
-      // Confirmações de presença: o próprio usuário gerencia a sua.
-      match /participantes/{uid} {
-        allow read: if isAprovado();
-        allow write: if isDono(uid);
+      match /tokens_dispositivo/{tokenId} {
+        allow read, create, update, delete: if isDono(uid);
       }
     }
 
-    // ── Campanhas ──────────────────────────────────────────────────────
-    match /campanhas/{campanhaId} {
-      allow read: if isAprovado();
-      allow write: if isLider();
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // IGREJAS
+    // ═══════════════════════════════════════════════════════════════════
+    match /igrejas/{igrejaId} {
+      // Catálogo público: o app precisa listar unidades antes do login.
+      allow read: if true;
 
-    // ── Pedidos de oração ──────────────────────────────────────────────
-    // Pedidos privados só são visíveis ao dono e à liderança. Pedidos públicos
-    // (não privados e não anônimos-restritos) são visíveis a aprovados.
-    match /pedidos_oracao/{pedidoId} {
-      allow read: if isLider()
-                  || (isSignedIn() && resource.data.autor_id == request.auth.uid)
-                  || (isAprovado() && resource.data.privado == false
-                      && resource.data.aprovado == true);
-      // Aberto a qualquer autenticado (inclui visitantes anônimos): o pedido
-      // entra como NÃO aprovado (moderação). Isso permite pedidos de oração
-      // sem exigir conta/aprovação.
-      allow create: if isSignedIn()
-                    && request.resource.data.autor_id == request.auth.uid
-                    && request.resource.data.aprovado == false;
-      allow update: if isLider()
+      // Criar/remover unidade é exclusivo do super_admin, via Function.
+      allow create, delete: if false;
+      // Configuração institucional: somente servidor (pastor/super_admin
+      // autorizados dentro da Function, com auditoria).
+      allow update: if false;
+
+      // ── Vínculos ────────────────────────────────────────────────────
+      match /membros/{uid} {
+        // A pessoa lê o próprio vínculo; quem administra a unidade lê todos.
+        allow read: if isDono(uid)
+                    || isSuperAdmin()
+                    || isLiderancaMinisterial(igrejaId)
+                    || temFuncao(igrejaId, 'tesoureiro')
+                    || temFuncao(igrejaId, 'editor')
+                    || temFuncao(igrejaId, 'moderador_oracao');
+
+        // Autocadastro: só o próprio uid, sempre PENDENTE, sempre membro e
+        // sempre sem funções administrativas. Fecha a autopromoção na criação.
+        allow create: if isDono(uid)
+                      && request.resource.data.status == 'pendente'
+                      && request.resource.data.perfil == 'membro'
+                      && request.resource.data.get('funcoes_admin', []).size() == 0;
+
+        // Toda mutação de perfil/status/funções é exclusiva do servidor.
+        // Isto fecha D.1 (autopromoção e promoção arbitrária).
+        allow update: if false;
+
+        // Saída é inativação auditada, nunca exclusão física.
+        allow delete: if false;
+      }
+
+      // ── Conteúdo (avisos, eventos, campanhas, ministérios, devocionais) ──
+      match /avisos/{avisoId} {
+        allow read: if podeLerConteudo(igrejaId);
+        allow write: if canManageContent(igrejaId);
+      }
+
+      match /eventos/{eventoId} {
+        allow read: if podeLerConteudo(igrejaId);
+        allow write: if canManageContent(igrejaId);
+
+        match /participantes/{uid} {
+          allow read: if isMembroDa(igrejaId) || canManageContent(igrejaId);
+          allow write: if isDono(uid) && isMembroDa(igrejaId);
+        }
+      }
+
+      match /campanhas/{campanhaId} {
+        allow read: if podeLerConteudo(igrejaId);
+        allow write: if canManageContent(igrejaId);
+      }
+
+      match /ministerios/{ministerioId} {
+        allow read: if podeLerConteudo(igrejaId);
+        allow write: if canManageContent(igrejaId);
+      }
+
+      match /devocionais/{devocionalId} {
+        allow read: if podeLerConteudo(igrejaId);
+        allow write: if canManageContent(igrejaId);
+      }
+
+      match /interesses_ministerio/{interesseId} {
+        allow create: if isMembroDa(igrejaId)
+                      && request.resource.data.usuario_id == request.auth.uid;
+        allow read, update, delete: if canManageContent(igrejaId);
+      }
+
+      // ── Pedidos de oração ───────────────────────────────────────────
+      match /pedidos_oracao/{pedidoId} {
+        allow read: if canModeratePrayer(igrejaId)
                     || (isSignedIn() && resource.data.autor_id == request.auth.uid)
-                    // Reação "Estou orando": qualquer aprovado incrementa o contador,
-                    // sem alterar o conteúdo do pedido.
-                    || (isAprovado()
-                        && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['oram_count', 'oram_por']));
-      allow delete: if isLider()
-                    || (isSignedIn() && resource.data.autor_id == request.auth.uid);
+                    || (isMembroDa(igrejaId)
+                        && resource.data.privado == false
+                        && resource.data.aprovado == true);
+
+        // Aberto a qualquer autenticado (inclui visitante anônimo), mas o
+        // pedido entra SEMPRE como não aprovado — a moderação decide.
+        allow create: if isSignedIn()
+                      && request.resource.data.autor_id == request.auth.uid
+                      && request.resource.data.aprovado == false;
+
+        allow update: if canModeratePrayer(igrejaId)
+                      || (isSignedIn()
+                          && resource.data.autor_id == request.auth.uid
+                          && !request.resource.data.diff(resource.data)
+                                .affectedKeys().hasAny(['aprovado', 'oram_count', 'oram_por']))
+                      // Reação "Estou orando": incremento de exatamente 1 e
+                      // inclusão do PRÓPRIO uid, uma única vez. Fecha D.6.
+                      || (isMembroDa(igrejaId)
+                          && request.resource.data.diff(resource.data)
+                               .affectedKeys().hasOnly(['oram_count', 'oram_por'])
+                          && request.resource.data.oram_count
+                               == resource.data.get('oram_count', 0) + 1
+                          && !(request.auth.uid in resource.data.get('oram_por', []))
+                          && request.resource.data.oram_por
+                               == resource.data.get('oram_por', []).concat([request.auth.uid]));
+
+        // Recusar um pedido é marcá-lo, não apagá-lo (feito pelo servidor).
+        allow delete: if false;
+      }
+
+      // ── Transações ──────────────────────────────────────────────────
+      match /transacoes/{transacaoId} {
+        // Acesso financeiro por unidade: liderança ministerial OU tesoureiro.
+        // Editor e moderador não entram. O dono vê as próprias contribuições.
+        allow read: if canReadFinance(igrejaId)
+                    || (isSignedIn() && resource.data.usuario_id == request.auth.uid);
+
+        // O cliente jamais escreve status financeiro. Toda criação passa pela
+        // Cloud Function, que carrega a credencial da unidade correta.
+        allow create, update, delete: if false;
+      }
+
+      // ── Auditoria ───────────────────────────────────────────────────
+      match /auditoria/{registroId} {
+        allow read: if canReadAudit(igrejaId);
+        // Fecha D.2: nenhum cliente cria, altera ou apaga auditoria.
+        allow create, update, delete: if false;
+      }
+
+      // ── Configurações da unidade ────────────────────────────────────
+      match /configuracoes/{docId} {
+        allow read: if isSignedIn();
+        allow write: if false; // somente servidor
+      }
     }
 
-    // ── Transações / Contribuições ─────────────────────────────────────
-    // Escopo do usuário. A CONFIRMAÇÃO de pagamento é feita pelo servidor
-    // (Cloud Functions/webhook), nunca pelo cliente — por isso o cliente não
-    // pode definir/alterar o status para 'aprovado'.
-    match /transacoes/{txId} {
-      allow read: if isLider()
-                  || (isSignedIn() && resource.data.usuario_id == request.auth.uid);
-      allow create: if isSignedIn()
-                    && request.resource.data.usuario_id == request.auth.uid
-                    && request.resource.data.status == 'pendente';
-      allow update, delete: if false; // somente servidor
-    }
-
-    // ── Igreja (dados institucionais) ──────────────────────────────────
-    match /igreja/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isLider();
-    }
-
-    // ── Ministérios ────────────────────────────────────────────────────
-    match /ministerios/{ministerioId} {
-      allow read: if isAprovado();
-      allow write: if isLider();
-    }
-
-    // ── Notificações pessoais ──────────────────────────────────────────
-    match /notificacoes/{notifId} {
-      allow read, update: if isSignedIn()
-                    && resource.data.destinatario_id == request.auth.uid;
-      allow create: if isLider();
-      allow delete: if isSignedIn()
-                    && resource.data.destinatario_id == request.auth.uid;
-    }
-
-    // ── Auditoria (aprovação/recusa de cadastros, etc.) ────────────────
-    // Somente liderança grava e lê; imutável (sem update/delete pelo cliente).
-    match /auditoria/{logId} {
-      allow read: if isLider();
-      allow create: if isLider();
-      allow update, delete: if false;
-    }
-
-    // ── Devocionais ────────────────────────────────────────────────────
-    match /devocionais/{devId} {
-      allow read: if isAprovado();
-      allow write: if isLider();
-    }
-
-    // ── Interesse em ministério (membro demonstra interesse) ───────────
-    match /interesses_ministerio/{id} {
-      allow create: if isAprovado()
-                    && request.resource.data.usuario_id == request.auth.uid;
-      allow read: if isLider();
-      allow update, delete: if isLider();
-    }
-
-    // ── Configurações públicas do app (ex.: Escola de Louvor) ──────────
-    match /configuracoes/{docId} {
-      allow read: if isSignedIn();
-      allow write: if isLider();
-    }
+    // ═══════════════════════════════════════════════════════════════════
+    // CAMINHOS GLOBAIS ANTIGOS — NEGADOS
+    //
+    // O app não foi lançado; a migração é direta. Estes caminhos existiram
+    // na v1.3.0 e são explicitamente negados para que nenhum cliente
+    // desatualizado continue lendo ou gravando fora do escopo de igreja.
+    // Os DADOS não são apagados — apenas o acesso do cliente é fechado.
+    // ═══════════════════════════════════════════════════════════════════
+    match /avisos/{documento=**}                { allow read, write: if false; }
+    match /eventos/{documento=**}               { allow read, write: if false; }
+    match /campanhas/{documento=**}             { allow read, write: if false; }
+    match /ministerios/{documento=**}           { allow read, write: if false; }
+    match /devocionais/{documento=**}           { allow read, write: if false; }
+    match /pedidos_oracao/{documento=**}        { allow read, write: if false; }
+    match /transacoes/{documento=**}            { allow read, write: if false; }
+    match /auditoria/{documento=**}             { allow read, write: if false; }
+    match /notificacoes/{documento=**}          { allow read, write: if false; }
+    match /tokens_dispositivo/{documento=**}    { allow read, write: if false; }
+    match /interesses_ministerio/{documento=**} { allow read, write: if false; }
+    match /igreja/{documento=**}                { allow read, write: if false; }
+    match /configuracoes/{documento=**}         { allow read, write: if false; }
   }
 }

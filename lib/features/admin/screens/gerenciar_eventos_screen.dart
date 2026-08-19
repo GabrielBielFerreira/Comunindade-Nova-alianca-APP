@@ -50,8 +50,9 @@ class GerenciarEventosScreen extends ConsumerWidget {
 
     String mensagem;
     try {
-      await ref.read(eventosRepositoryProvider).excluir(e.id);
-      mensagem = 'Evento excluído.';
+      // Cancela em vez de apagar: o histórico da programação é preservado.
+      await ref.read(eventosRepositoryProvider).definirCancelado(e.id, true);
+      mensagem = 'Evento cancelado.';
     } on FirebaseException catch (err) {
       mensagem = err.code == 'permission-denied'
           ? 'Sem permissão para esta ação. Confirme seu perfil de liderança.'

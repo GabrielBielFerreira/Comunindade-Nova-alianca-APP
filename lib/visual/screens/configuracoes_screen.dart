@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
@@ -6,22 +7,25 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/constants/igreja_info.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../core/services/app_info.dart';
 import '../../core/services/notification_preferences.dart';
 import '../visual_router.dart';
+import 'select_church_screen.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// Tela de Configurações (membro e liderança — idêntica para ambos).
 ///
 /// Tela interna (push), sem bottom navigation. Toggles são dados simulados.
-class ConfiguracoesScreen extends StatefulWidget {
+class ConfiguracoesScreen extends ConsumerStatefulWidget {
   const ConfiguracoesScreen({super.key});
 
   @override
-  State<ConfiguracoesScreen> createState() => _ConfiguracoesScreenState();
+  ConsumerState<ConfiguracoesScreen> createState() => _ConfiguracoesScreenState();
 }
 
-class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
+class _ConfiguracoesScreenState extends ConsumerState<ConfiguracoesScreen> {
   static const _designWidth = 394.0;
   static const _background = Color(0xFFFAFAFA);
   static const _primary = Color(0xFF7A0022);
@@ -30,7 +34,6 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   static const _line = Color(0xFFE5E7EB);
   static const _danger = Color(0xFFDC2626);
 
-  String _churchLabel = 'Nova Aliança Olinda';
 
   bool _liveNotifications = true;
   bool _eventNotifications = true;
@@ -67,27 +70,56 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
   }
 
   Future<void> _openChurchSelection() async {
-    final result = await Navigator.pushNamed(
+    // A tela de seleção grava o IgrejaId em igrejaVisualizadaProvider; aqui
+    // só confirmamos para a pessoa o que passou a ser exibido.
+    final result = await Navigator.push<String>(
       context,
-      VisualRoutes.visualizarOutraIgreja,
+      MaterialPageRoute(
+        builder: (_) =>
+            const SelectChurchScreen(modo: ModoSelecaoIgreja.troca),
+      ),
     );
 
     if (result is String && mounted) {
-      setState(() => _churchLabel = result);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Visualizando .'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     }
+  }
+
+  /// Volta a visualizar a própria igreja.
+  Future<void> _voltarParaMinhaIgreja() async {
+    await ref.read(igrejaVisualizadaProvider.notifier).limpar();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Voltando para a sua igreja.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
   }
 
   void _onLinkTap(String label) {
     switch (label) {
       case 'Compartilhar este aplicativo':
         Share.share(
-          'Conheça o app da ${IgrejaInfo.nome}. Baixe e participe: '
-          '${IgrejaInfo.instagramUrl}',
+          // Convite para a UNIDADE em foco, com o Instagram dela quando houver.
+          [
+            'Conheça o app da ${ref.read(nomeIgrejaEmFocoProvider)}.',
+            ?ref.read(igrejaAtualDadosProvider).valueOrNull?.instagram,
+          ].join(' '),
         );
       case 'Sobre o desenvolvedor':
         _showInfoDialog(
           'Sobre',
-          'App ${IgrejaInfo.nome} (${IgrejaInfo.sigla}).\n\n'
+          'App ${RedeNovaAlianca.nome} (${RedeNovaAlianca.sigla}).\n\n'
               '${_appVersao.isEmpty ? 'Versão do aplicativo' : 'Versão $_appVersao'}.\n\n'
               'Desenvolvido para uso da comunidade.',
         );
@@ -98,15 +130,15 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
               'organização da comunidade, e não são compartilhados com '
               'terceiros para fins comerciais. Para detalhes ou solicitações '
               'sobre seus dados, fale com a liderança pelo e-mail '
-              '${IgrejaInfo.pixChave}.',
+              '${RedeNovaAlianca.suporteEmail}.',
         );
       case 'Termos de serviço':
         _showInfoDialog(
           'Termos de serviço',
           'Ao usar este aplicativo, você concorda em utilizá-lo para os fins '
               'da comunidade, respeitando os demais membros. O conteúdo é de '
-              'uso interno da ${IgrejaInfo.nome}. Dúvidas: '
-              '${IgrejaInfo.pixChave}.',
+              'uso interno da ${RedeNovaAlianca.nome}. Dúvidas: '
+              '${RedeNovaAlianca.suporteEmail}.',
         );
     }
   }
@@ -135,7 +167,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
         content: Text(
           'A exclusão da conta é feita pela liderança, mediante solicitação, '
           'para preservar os registros da comunidade. Deseja enviar um pedido '
-          'de exclusão por e-mail para ${IgrejaInfo.pixChave}?',
+          'de exclusão por e-mail para ${RedeNovaAlianca.suporteEmail}?',
         ),
         actions: [
           TextButton(
@@ -152,7 +184,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
 
     if (confirmar != true) return;
     final uri = Uri.parse(
-      'mailto:${IgrejaInfo.pixChave}'
+      'mailto:${RedeNovaAlianca.suporteEmail}'
       '?subject=${Uri.encodeComponent('Pedido de exclusão de conta')}'
       '&body=${Uri.encodeComponent('Olá, gostaria de solicitar a exclusão da minha conta no app.')}',
     );
@@ -176,7 +208,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;
@@ -201,7 +233,7 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                           // MULTI_IGREJA ligada — desligada por padrão.
                           if (AppConfig.multiIgrejaHabilitada) ...[
                             _SectionLabel(
-                              'Visualizar outra igreja',
+                              'Igreja em foco',
                               scale: scale,
                             ),
                             SizedBox(height: 12 * scale),
@@ -210,9 +242,22 @@ class _ConfiguracoesScreenState extends State<ConfiguracoesScreen> {
                               children: [
                                 _ChangeChurchRow(
                                   scale: scale,
-                                  label: _churchLabel,
+                                  // Nome REAL da unidade em foco. Enquanto
+                                  // carrega, não inventa nome nenhum.
+                                  label: ref
+                                          .watch(igrejaAtualDadosProvider)
+                                          .valueOrNull
+                                          ?.nome ??
+                                      'Carregando...',
                                   onTap: _openChurchSelection,
                                 ),
+                                // Só aparece quando ha de fato o que desfazer.
+                                if (ref.watch(visualizandoOutraIgrejaProvider))
+                                  _LinkRow(
+                                    scale: scale,
+                                    label: 'Voltar para minha igreja',
+                                    onTap: _voltarParaMinhaIgreja,
+                                  ),
                               ],
                             ),
                             SizedBox(height: 28 * scale),

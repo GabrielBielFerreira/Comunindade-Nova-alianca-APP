@@ -16,6 +16,7 @@ import '../widgets/programacao_bottom_navigation.dart';
 import '../widgets/programacao_card.dart';
 import '../widgets/visitor_bottom_navigation.dart';
 import 'programacao_detalhes_screen.dart';
+import '../escala_tela.dart';
 
 String _categoriaEvento(TipoEvento t) => switch (t) {
       TipoEvento.culto => 'Culto',
@@ -228,7 +229,7 @@ class _ProgramacaoScreenState extends ConsumerState<ProgramacaoScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final scale = (constraints.maxWidth / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

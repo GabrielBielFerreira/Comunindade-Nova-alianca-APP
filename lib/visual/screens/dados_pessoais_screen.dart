@@ -7,10 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/perfil/providers/perfil_providers.dart';
 import '../profile_photo_notifier.dart';
 import '../widgets/internal_header.dart';
+import '../escala_tela.dart';
 
 /// Tela "Dados pessoais" — versão digital da ficha cadastral.
 ///
@@ -322,7 +324,7 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
 
@@ -432,9 +434,10 @@ class _DadosPessoaisScreenState extends ConsumerState<DadosPessoaisScreen> {
         // ================= Bloco 2: Vida eclesiástica =================
         _SectionTitle('Vida eclesiástica', scale: scale),
         SizedBox(height: 16 * scale),
+        // Igreja do VINCULO da pessoa, nao um nome fixo.
         _LinkedChurchField(
           scale: scale,
-          church: 'Nova Aliança Olinda',
+          church: ref.watch(nomeIgrejaEmFocoProvider),
         ),
         SizedBox(height: 18 * scale),
         _DropdownField(
@@ -1080,7 +1083,7 @@ class _SaveBar extends StatelessWidget {
     final scale =
         (MediaQuery.sizeOf(context).width /
                 _DadosPessoaisScreenState._designWidth)
-            .clamp(0.86, 1.0)
+            .clamp(escalaMinima, 1.0)
             .toDouble();
 
     return Container(

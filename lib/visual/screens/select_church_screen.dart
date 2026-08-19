@@ -2,28 +2,69 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../features/igrejas/data/igreja_opcao.dart';
+import '../../features/igrejas/providers/escolha_igreja_provider.dart';
+import '../../features/igrejas/providers/igreja_providers.dart';
 import '../mock_data.dart';
 import '../visual_router.dart';
 import '../widgets/auth_widgets.dart';
+import '../escala_tela.dart';
 
-class SelectChurchScreen extends StatefulWidget {
-  const SelectChurchScreen({super.key});
+/// Escolha da unidade no onboarding.
+///
+/// A lista vem de `igrejasAtivasProvider` (Firestore), não de constante: novas
+/// unidades cadastradas pelo superadministrador aparecem aqui sem publicar
+/// versão nova do aplicativo. Só unidades ATIVAS entram.
+///
+/// A mesma tela serve a quatro contextos — ver [ModoSelecaoIgreja].
+
+/// Contexto em que a seleção de igreja foi aberta.
+///
+/// O que muda entre os modos é O QUE SE FAZ com a escolha e PARA ONDE se vai
+/// depois. A lista e o visual são idênticos.
+enum ModoSelecaoIgreja {
+  /// Primeira abertura do aplicativo, sem sessão.
+  ///
+  /// Define a unidade pública em foco (o visitante passa a ver o conteúdo
+  /// dela) e também a pré-seleção do cadastro. Segue para "Bem-vindo"
+  /// SUBSTITUINDO a rota, para não empilhar a seleção atrás do Welcome.
+  onboarding,
+
+  /// Aberta a partir do formulário de cadastro.
+  ///
+  /// Só define a igreja do cadastro e VOLTA para o formulário, preservando o
+  /// que a pessoa já digitou. Mandar para o Welcome aqui perderia o
+  /// preenchimento.
+  cadastro,
+
+  /// Troca de unidade dentro do aplicativo, com sessão ativa.
+  ///
+  /// Define apenas a unidade visualizada. Não altera `igreja_principal_id`,
+  /// vínculo, perfil ou funções.
+  troca,
+}
+
+class SelectChurchScreen extends ConsumerStatefulWidget {
+  const SelectChurchScreen({super.key, this.modo = ModoSelecaoIgreja.onboarding});
+
+  final ModoSelecaoIgreja modo;
 
   static const _referenceWidth = 390.0;
 
   static double _scaleFor(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final effectiveWidth = math.min(width, _referenceWidth);
-    return (effectiveWidth / _referenceWidth).clamp(0.86, 1.0).toDouble();
+    return (effectiveWidth / _referenceWidth).clamp(escalaMinima, 1.0).toDouble();
   }
 
   @override
-  State<SelectChurchScreen> createState() => _SelectChurchScreenState();
+  ConsumerState<SelectChurchScreen> createState() => _SelectChurchScreenState();
 }
 
-class _SelectChurchScreenState extends State<SelectChurchScreen> {
+class _SelectChurchScreenState extends ConsumerState<SelectChurchScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
 
@@ -33,24 +74,18 @@ class _SelectChurchScreenState extends State<SelectChurchScreen> {
     super.dispose();
   }
 
-  List<ChurchOptionData> get _filteredChurches {
+  List<IgrejaOpcao> _filtrar(List<IgrejaOpcao> todas) {
     final query = _normalize(_query);
-    if (query.isEmpty) {
-      return SelectChurchMockData.churches;
-    }
-
-    return SelectChurchMockData.churches
-        .where((church) {
-          final haystack = _normalize('${church.name} ${church.address}');
-          return haystack.contains(query);
-        })
+    if (query.isEmpty) return todas;
+    return todas
+        .where((church) => _normalize(church.buscavel).contains(query))
         .toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
     final scale = SelectChurchScreen._scaleFor(context);
-    final churches = _filteredChurches;
+    final igrejasAsync = ref.watch(igrejasAtivasProvider);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -93,15 +128,63 @@ class _SelectChurchScreenState extends State<SelectChurchScreen> {
                             SizedBox(height: 16 * scale),
                             _LocationButton(scale: scale),
                             SizedBox(height: 24 * scale),
-                            for (final church in churches) ...[
-                              _ChurchCard(
-                                church: church,
-                                scale: scale,
-                                onTap: () =>
-                                    _showChurchDetails(context, church),
+                            igrejasAsync.when(
+                              loading: () => Padding(
+                                padding: EdgeInsets.symmetric(vertical: 32 * scale),
+                                child: const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
                               ),
-                              SizedBox(height: 16 * scale),
-                            ],
+                              error: (erro, _) => _MensagemLista(
+                                scale: scale,
+                                titulo: 'Não foi possível carregar as igrejas',
+                                detalhe:
+                                    'Verifique sua conexão e tente novamente.',
+                                onTentarNovamente: () =>
+                                    ref.invalidate(igrejasAtivasProvider),
+                              ),
+                              data: (igrejas) {
+                                final opcoes = igrejas
+                                    .map(IgrejaOpcao.de)
+                                    .toList(growable: false);
+                                final filtradas = _filtrar(opcoes);
+
+                                if (opcoes.isEmpty) {
+                                  return _MensagemLista(
+                                    scale: scale,
+                                    titulo: 'Nenhuma igreja disponível',
+                                    detalhe:
+                                        'Ainda não há unidades ativas para '
+                                        'cadastro. Procure a liderança da sua '
+                                        'igreja.',
+                                  );
+                                }
+
+                                if (filtradas.isEmpty) {
+                                  return _MensagemLista(
+                                    scale: scale,
+                                    titulo: 'Nenhuma igreja encontrada',
+                                    detalhe:
+                                        'Nenhuma unidade corresponde a '
+                                        '"${_query.trim()}".',
+                                  );
+                                }
+
+                                return Column(
+                                  children: [
+                                    for (final church in filtradas) ...[
+                                      _ChurchCard(
+                                        church: church,
+                                        scale: scale,
+                                        onTap: () =>
+                                            _showChurchDetails(context, church),
+                                      ),
+                                      SizedBox(height: 16 * scale),
+                                    ],
+                                  ],
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -116,7 +199,54 @@ class _SelectChurchScreenState extends State<SelectChurchScreen> {
     );
   }
 
-  void _showChurchDetails(BuildContext context, ChurchOptionData church) {
+  /// Aplica a escolha conforme o modo.
+  ///
+  /// Em todos os casos o que é gravado é o [IgrejaId]; o nome nunca vira
+  /// chave de escopo.
+  Future<void> _confirmar(IgrejaOpcao church) async {
+    switch (widget.modo) {
+      case ModoSelecaoIgreja.onboarding:
+        // A unidade pública passa a ser o contexto do visitante...
+        await ref.read(igrejaVisualizadaProvider.notifier).definir(church.id);
+        // ...e já fica pré-selecionada se a pessoa decidir se cadastrar.
+        await ref
+            .read(igrejaEscolhidaCadastroProvider.notifier)
+            .definir(church.id);
+
+        if (!mounted) return;
+        // Fecha o bottom sheet.
+        Navigator.of(context).pop();
+        if (!mounted) return;
+        // `pushReplacement` para a seleção não ficar empilhada atrás do
+        // Welcome — voltar dali levaria a uma tela já resolvida.
+        Navigator.of(context)
+            .pushReplacementNamed(VisualRoutes.welcomeAccess);
+
+      case ModoSelecaoIgreja.cadastro:
+        // Só a escolha do cadastro. NÃO mexe na unidade visualizada: o
+        // formulário está no meio do preenchimento e trocar o escopo agora
+        // recarregaria a tela por baixo.
+        await ref
+            .read(igrejaEscolhidaCadastroProvider.notifier)
+            .definir(church.id);
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // fecha o sheet
+        if (!mounted) return;
+        // Volta ao MESMO CadastroScreen, preservando o que já foi digitado.
+        Navigator.of(context).pop(church.id);
+
+      case ModoSelecaoIgreja.troca:
+        await ref.read(igrejaVisualizadaProvider.notifier).definir(church.id);
+
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        if (!mounted) return;
+        Navigator.of(context).pop(church.nome);
+    }
+  }
+
+  void _showChurchDetails(BuildContext context, IgrejaOpcao church) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -125,10 +255,7 @@ class _SelectChurchScreenState extends State<SelectChurchScreen> {
       useSafeArea: false,
       builder: (_) => _ChurchDetailsSheet(
         church: church,
-        onConfirm: () {
-          Navigator.of(context).pop();
-          Navigator.of(context).pushNamed(VisualRoutes.welcomeAccess);
-        },
+        onConfirm: () => _confirmar(church),
       ),
     );
   }
@@ -297,7 +424,7 @@ class _ChurchCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final double scale;
   final VoidCallback onTap;
 
@@ -324,7 +451,7 @@ class _ChurchCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      church.name,
+                      church.nome,
                       style: GoogleFonts.montserrat(
                         fontSize: 20 * scale,
                         fontWeight: FontWeight.w600,
@@ -334,7 +461,7 @@ class _ChurchCard extends StatelessWidget {
                     ),
                     SizedBox(height: 4 * scale),
                     Text(
-                      church.address,
+                      church.endereco,
                       style: GoogleFonts.inter(
                         fontSize: 14 * scale,
                         fontWeight: FontWeight.w400,
@@ -362,7 +489,7 @@ class _ChurchCard extends StatelessWidget {
 class _ChurchDetailsSheet extends StatelessWidget {
   const _ChurchDetailsSheet({required this.church, required this.onConfirm});
 
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final VoidCallback onConfirm;
 
   @override
@@ -476,7 +603,7 @@ class _SheetHeader extends StatelessWidget {
 class _ChurchInfoRow extends StatelessWidget {
   const _ChurchInfoRow({required this.church, required this.scale});
 
-  final ChurchOptionData church;
+  final IgrejaOpcao church;
   final double scale;
 
   @override
@@ -505,7 +632,7 @@ class _ChurchInfoRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                church.name,
+                church.nome,
                 style: GoogleFonts.montserrat(
                   fontSize: 20 * scale,
                   fontWeight: FontWeight.w600,
@@ -515,7 +642,7 @@ class _ChurchInfoRow extends StatelessWidget {
               ),
               SizedBox(height: 8 * scale),
               Text(
-                church.address,
+                church.endereco,
                 style: GoogleFonts.inter(
                   fontSize: 16 * scale,
                   fontWeight: FontWeight.w400,
@@ -638,6 +765,65 @@ class _SheetOutlineButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Estado honesto da lista: carregando falhou, vazio ou busca sem resultado.
+///
+/// Nunca substitui a lista por uma unidade fictícia para "não ficar vazio".
+class _MensagemLista extends StatelessWidget {
+  const _MensagemLista({
+    required this.scale,
+    required this.titulo,
+    required this.detalhe,
+    this.onTentarNovamente,
+  });
+
+  final double scale;
+  final String titulo;
+  final String detalhe;
+  final VoidCallback? onTentarNovamente;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 32 * scale),
+      child: Column(
+        children: [
+          Icon(
+            Icons.church_outlined,
+            size: 40 * scale,
+            color: AuthColors.primary.withValues(alpha: 0.5),
+          ),
+          SizedBox(height: 12 * scale),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 16 * scale,
+              fontWeight: FontWeight.w600,
+              color: AuthColors.title,
+            ),
+          ),
+          SizedBox(height: 6 * scale),
+          Text(
+            detalhe,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13 * scale,
+              color: AuthColors.muted,
+            ),
+          ),
+          if (onTentarNovamente != null) ...[
+            SizedBox(height: 16 * scale),
+            TextButton(
+              onPressed: onTentarNovamente,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ],
       ),
     );
   }

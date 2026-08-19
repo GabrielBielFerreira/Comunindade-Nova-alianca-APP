@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'navigation_service.dart';
@@ -36,33 +37,27 @@ class FcmService {
     }
   }
 
+  /// Tokens ficam em `usuarios/{uid}/tokens_dispositivo/{token}`.
+  ///
+  /// O próprio token vira o id do documento: isso torna a gravação idempotente
+  /// (sem consulta prévia) e a regra trivial — só o dono escreve na própria
+  /// subcoleção. Antes era uma coleção global consultada por `perfil_id`.
   static Future<void> _salvarToken(String token) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final db = FirebaseFirestore.instance;
-    final query = await db
+    await FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(uid)
         .collection('tokens_dispositivo')
-        .where('perfil_id', isEqualTo: uid)
-        .where('token', isEqualTo: token)
-        .limit(1)
-        .get();
-
-    if (query.docs.isEmpty) {
-      await db.collection('tokens_dispositivo').add({
-        'perfil_id': uid,
-        'token': token,
-        'plataforma': 'android',
-        'criado_em': Timestamp.now(),
-        'ultimo_uso': Timestamp.now(),
-        'ativo': true,
-      });
-    } else {
-      await query.docs.first.reference.update({
-        'ultimo_uso': Timestamp.now(),
-        'ativo': true,
-      });
-    }
+        .doc(token)
+        .set({
+      'token': token,
+      'plataforma': defaultTargetPlatform.name,
+      'criado_em': Timestamp.now(),
+      'ultimo_uso': Timestamp.now(),
+      'ativo': true,
+    }, SetOptions(merge: true));
   }
 
   static void _onMensagemForeground(RemoteMessage mensagem) {
@@ -94,16 +89,11 @@ class FcmService {
     final token = await _messaging.getToken();
     if (token == null) return;
 
-    final db = FirebaseFirestore.instance;
-    final query = await db
+    await FirebaseFirestore.instance
+        .collection('usuarios')
+        .doc(uid)
         .collection('tokens_dispositivo')
-        .where('perfil_id', isEqualTo: uid)
-        .where('token', isEqualTo: token)
-        .limit(1)
-        .get();
-
-    for (final doc in query.docs) {
-      await doc.reference.update({'ativo': false});
-    }
+        .doc(token)
+        .set({'ativo': false}, SetOptions(merge: true));
   }
 }

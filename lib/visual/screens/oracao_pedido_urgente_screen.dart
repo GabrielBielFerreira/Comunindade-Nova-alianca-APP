@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/leader_bottom_navigation.dart';
 import '../widgets/oracao_bottom_navigation.dart';
+import '../escala_tela.dart';
 
 class OracaoPedidoUrgenteScreen extends StatefulWidget {
   const OracaoPedidoUrgenteScreen({super.key, required this.isLeader});
@@ -77,7 +78,7 @@ class _OracaoPedidoUrgenteScreenState extends State<OracaoPedidoUrgenteScreen> {
           child: Builder(
             builder: (context) {
               final scale = (MediaQuery.sizeOf(context).width / _designWidth)
-                  .clamp(0.86, 1.0)
+                  .clamp(escalaMinima, 1.0)
                   .toDouble();
               final topPadding = MediaQuery.paddingOf(context).top;
               final bottomPadding = MediaQuery.paddingOf(context).bottom;

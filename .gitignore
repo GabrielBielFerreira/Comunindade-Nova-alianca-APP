@@ -70,5 +70,38 @@ android/key.properties
 functions/node_modules/
 functions/.env
 functions/.env.*
+functions/lib/
 seed/node_modules/
 **/serviceAccountKey.json
+
+# Testes de Rules (Node) + artefatos do Emulator Suite
+test_rules/node_modules/
+scripts/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+database-debug.log
+pubsub-debug.log
+firebase-export-*/
+.firebase/
+
+# Pacotes Dart locais
+packages/*/.dart_tool/
+packages/*/.packages
+packages/*/pubspec.lock
+packages/*/build/
+
+# Painel web
+admin_web/.dart_tool/
+admin_web/build/
+admin_web/pubspec.lock
+
+# Seed do emulador
+seed_emulador/node_modules/
+
+# Kotlin build (gerado pelo Gradle)
+android/.kotlin/
+
+# Artefatos de build (binarios nao entram no Git)
+dist/*
+!dist/LEIA-ME.md
