@@ -107,7 +107,12 @@ class ConfiguracaoFirebase {
   );
 
   static bool get producaoConfigurada =>
-      _apiKey.isNotEmpty && _appId.isNotEmpty && _projectId.isNotEmpty;
+      _apiKey.isNotEmpty &&
+      _appId.isNotEmpty &&
+      _senderId.isNotEmpty &&
+      _projectId.isNotEmpty &&
+      _authDomain.isNotEmpty &&
+      _storageBucket.isNotEmpty;
 
   static FirebaseOptions get opcoesProducao {
     if (!producaoConfigurada) {
@@ -136,12 +141,8 @@ class ConfiguracaoFirebase {
       appId: _appId,
       messagingSenderId: _senderId,
       projectId: _projectId,
-      authDomain: _authDomain.isEmpty
-          ? '$_projectId.firebaseapp.com'
-          : _authDomain,
-      storageBucket: _storageBucket.isEmpty
-          ? '$_projectId.appspot.com'
-          : _storageBucket,
+      authDomain: _authDomain,
+      storageBucket: _storageBucket,
     );
   }
 

@@ -168,7 +168,7 @@ cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && 
 Build de produção — substitua pelos valores do app Web do passo 1:
 
 ```bash
-cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP/admin_web" && flutter build web --release --dart-define=APP_ENV=production --dart-define=FB_API_KEY=SEU_API_KEY --dart-define=FB_APP_ID=SEU_APP_ID --dart-define=FB_SENDER_ID=SEU_SENDER_ID --dart-define=FB_PROJECT_ID=nova-alianca-app
+cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP/admin_web" && flutter build web --release --dart-define=APP_ENV=production --dart-define=FB_API_KEY=SEU_API_KEY --dart-define=FB_APP_ID=SEU_APP_ID --dart-define=FB_SENDER_ID=SEU_SENDER_ID --dart-define=FB_PROJECT_ID=nova-alianca-app --dart-define=FB_AUTH_DOMAIN=nova-alianca-app.firebaseapp.com --dart-define=FB_STORAGE_BUCKET=SEU_STORAGE_BUCKET
 ```
 
 ```bash
@@ -185,6 +185,16 @@ cd "C:/Users/Jean/Downloads/CNA APP atualizado/Comunindade-Nova-alianca-APP" && 
 ```
 
 O resultado precisa ser `0`.
+
+O build também precisa conter, com resposta pública sem login, as páginas:
+
+- `/privacidade`;
+- `/excluir-conta`;
+- `/termos`.
+
+Os textos versionados descrevem tecnicamente o comportamento atual, mas a
+aprovação jurídica e a definição dos prazos de retenção continuam sendo uma
+pendência de publicação nas lojas.
 
 ---
 

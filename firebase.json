@@ -26,6 +26,18 @@
       ],
       "rewrites": [
         {
+          "source": "/privacidade",
+          "destination": "/privacidade.html"
+        },
+        {
+          "source": "/excluir-conta",
+          "destination": "/excluir-conta.html"
+        },
+        {
+          "source": "/termos",
+          "destination": "/termos.html"
+        },
+        {
           "source": "**",
           "destination": "/index.html"
         }

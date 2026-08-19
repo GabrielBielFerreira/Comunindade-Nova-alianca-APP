@@ -19,7 +19,8 @@
  *   node scripts/verificar_producao.js --app --artefato <caminho>
  *
  * Variáveis aceitas para o painel (mesmas do --dart-define):
- *   FB_API_KEY, FB_APP_ID, FB_SENDER_ID, FB_PROJECT_ID
+ *   FB_API_KEY, FB_APP_ID, FB_SENDER_ID, FB_PROJECT_ID,
+ *   FB_AUTH_DOMAIN, FB_STORAGE_BUCKET
  */
 
 'use strict';
@@ -154,8 +155,8 @@ function verificarApp() {
   const keyProps = lerArquivo('android/key.properties');
   if (keyProps === null) {
     avisos.push(
-      'android/key.properties nao existe: o Gradle cairia na chave de DEBUG.\n' +
-        '    Gere a keystore e o key.properties antes de distribuir o APK.\n' +
+      'android/key.properties nao existe: o Gradle bloqueia tarefas de release.\n' +
+        '    Gere a keystore e o key.properties antes de distribuir APK/AAB.\n' +
         '    (Nao bloqueia builds de teste, mas bloqueia --exigir-assinatura.)'
     );
   } else {
@@ -166,7 +167,14 @@ function verificarApp() {
 // ── Painel web ──────────────────────────────────────────────────────────
 
 function verificarPainel() {
-  const exigidas = ['FB_API_KEY', 'FB_APP_ID', 'FB_PROJECT_ID'];
+  const exigidas = [
+    'FB_API_KEY',
+    'FB_APP_ID',
+    'FB_SENDER_ID',
+    'FB_PROJECT_ID',
+    'FB_AUTH_DOMAIN',
+    'FB_STORAGE_BUCKET',
+  ];
 
   const ausentes = exigidas.filter(
     (nome) => !process.env[nome] || process.env[nome].trim() === ''
