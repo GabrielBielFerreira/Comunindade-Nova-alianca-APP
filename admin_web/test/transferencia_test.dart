@@ -46,19 +46,19 @@ final _unidades = <IgrejaModel>[
 ];
 
 AcessoIgreja _acesso() => AcessoIgreja(
-      igrejaId: _olinda,
-      nome: 'Nova Aliança Olinda',
-      ativa: true,
-      perfil: PerfilComunitario.pastor,
-      status: 'aprovado',
-      funcoesAdmin: const {},
-      acessarPainel: true,
-      lerFinancas: true,
-      gerenciarConteudo: true,
-      moderarOracao: true,
-      aprovarMembro: true,
-      gerenciarLideranca: true,
-    );
+  igrejaId: _olinda,
+  nome: 'Nova Aliança Olinda',
+  ativa: true,
+  perfil: PerfilComunitario.pastor,
+  status: 'aprovado',
+  funcoesAdmin: const {},
+  acessarPainel: true,
+  lerFinancas: true,
+  gerenciarConteudo: true,
+  moderarOracao: true,
+  aprovarMembro: true,
+  gerenciarLideranca: true,
+);
 
 MembroPainel _membro({
   String uid = 'uid-ana',
@@ -162,8 +162,9 @@ void main() {
       expect(find.text('Transferir para outra igreja'), findsOneWidget);
     });
 
-    testWidgets('o diálogo avisa que cargos não são transportados',
-        (tester) async {
+    testWidgets('o diálogo avisa que cargos não são transportados', (
+      tester,
+    ) async {
       await _montar(
         tester,
         _tela(isSuperAdmin: true, repositorio: _RepositorioEspiao()),
@@ -172,8 +173,10 @@ void main() {
       await tester.tap(find.text('Transferir para outra igreja'));
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Igreja atual: Nova Aliança Olinda'),
-          findsOneWidget);
+      expect(
+        find.textContaining('Unidade de origem: Nova Aliança Olinda'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining('Cargos e permissões NÃO são transportados'),
         findsOneWidget,
@@ -196,16 +199,18 @@ void main() {
       expect(find.text('Nova Aliança Olinda'), findsNothing);
     });
 
-    testWidgets('confirmar fica bloqueado sem destino, motivo e aceite',
-        (tester) async {
+    testWidgets('confirmar fica bloqueado sem destino, motivo e aceite', (
+      tester,
+    ) async {
       final repo = _RepositorioEspiao();
       await _montar(tester, _tela(isSuperAdmin: true, repositorio: repo));
 
       await tester.tap(find.text('Transferir para outra igreja'));
       await tester.pumpAndSettle();
 
-      FilledButton confirmar() =>
-          tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Transferir'));
+      FilledButton confirmar() => tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Transferir'),
+      );
 
       expect(confirmar().onPressed, isNull, reason: 'nada preenchido');
 
@@ -216,7 +221,9 @@ void main() {
       expect(confirmar().onPressed, isNull, reason: 'ainda sem motivo');
 
       await tester.enterText(
-          find.byType(TextField), 'Mudanca de cidade da familia');
+        find.byType(TextField),
+        'Mudanca de cidade da familia',
+      );
       await tester.pumpAndSettle();
       expect(confirmar().onPressed, isNull, reason: 'ainda sem confirmação');
 
@@ -227,8 +234,9 @@ void main() {
       expect(repo.chamadas, 0, reason: 'nada foi enviado antes de confirmar');
     });
 
-    testWidgets('envia uid, origem, destino e motivo ao servidor',
-        (tester) async {
+    testWidgets('envia uid, origem, destino e motivo ao servidor', (
+      tester,
+    ) async {
       final repo = _RepositorioEspiao();
       await _montar(tester, _tela(isSuperAdmin: true, repositorio: repo));
 
@@ -310,8 +318,11 @@ void main() {
   });
 
   group('Responsividade da transferencia', () {
-    paraCadaTamanho('a tela de lideranca com a acao nao estoura',
-        (tester, tamanho, escala) async {
+    paraCadaTamanho('a tela de lideranca com a acao nao estoura', (
+      tester,
+      tamanho,
+      escala,
+    ) async {
       await esperarSemOverflow(
         tester,
         _tela(isSuperAdmin: true, repositorio: _RepositorioEspiao()),
@@ -322,8 +333,11 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    paraCadaTamanho('o dialogo de transferencia nao estoura',
-        (tester, tamanho, escala) async {
+    paraCadaTamanho('o dialogo de transferencia nao estoura', (
+      tester,
+      tamanho,
+      escala,
+    ) async {
       await esperarSemOverflow(
         tester,
         _tela(isSuperAdmin: true, repositorio: _RepositorioEspiao()),
@@ -340,7 +354,7 @@ void main() {
       await tester.tap(botao);
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('Igreja atual'), findsOneWidget);
+      expect(find.textContaining('Unidade de origem'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

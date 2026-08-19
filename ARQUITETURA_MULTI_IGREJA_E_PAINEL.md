@@ -209,6 +209,12 @@ Regras:
 - Exclusiva do `super_admin`. Pastor da unidade NÃO transfere.
 - Move a igreja principal: inativa o vínculo de origem e aprova o de destino
   na MESMA transação, junto com `usuarios/{uid}.igreja_principal_id`.
+- A origem informada precisa ser a igreja principal ATUAL da pessoa. Um vínculo
+  SECUNDÁRIO — alguém aprovado numa segunda unidade sem que ela seja a sua
+  igreja — não serve de origem e não move ninguém (`failed-precondition`).
+- Destino INATIVO é permitido de propósito: uma unidade em implantação nasce
+  inativa e precisa receber a primeira liderança antes de abrir. A auditoria
+  registra `destino_ativa`.
 - Não transporta perfil ministerial nem função administrativa: quem chega ao
   destino sem vínculo prévio entra como `membro`, sem função e sem ministério.
 - Um vínculo JÁ APROVADO no destino conserva o perfil que era dele naquela
